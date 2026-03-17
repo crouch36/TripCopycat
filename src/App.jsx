@@ -270,7 +270,7 @@ const MOCK_EMAILS = [
 function buildPlainText(trip) {
   if (!trip) return "";
   const L = [];
-  L.push(`TRIPBLUEPRINTS — ${trip.title.toUpperCase()}`);
+  L.push(`TRIPCOPYCAT — ${trip.title.toUpperCase()}`);
   L.push(`${trip.destination}  ·  ${trip.duration}  ·  ${trip.date}`);
   L.push(`Travelers: ${trip.travelers}`);
   if (trip.days?.length) {
@@ -526,7 +526,7 @@ function EmailImportModal({ onClose }) {
                   <div style={{ fontSize:"14px", fontWeight:700, color:C.slate, marginBottom:"5px" }}>{opt.title}</div>
                   <div style={{ fontSize:"11px", color:C.slateLight, marginBottom:"14px", lineHeight:1.6 }}>{opt.desc}</div>
                   {opt.input && <input placeholder="your@gmail.com" style={{ width:"100%", padding:"8px 11px", borderRadius:"7px", border:`1px solid ${C.tide}`, background:C.white, color:C.slate, fontSize:"12px", outline:"none", boxSizing:"border-box", marginBottom:"9px" }} />}
-                  {opt.addr && <div style={{ background:C.white, border:`1px solid ${C.tide}`, borderRadius:"7px", padding:"9px 11px", fontSize:"11px", color:C.azureDeep, fontFamily:"monospace", marginBottom:"9px", userSelect:"all" }}>import@parse.tripblueprints.com</div>}
+                  {opt.addr && <div style={{ background:C.white, border:`1px solid ${C.tide}`, borderRadius:"7px", padding:"9px 11px", fontSize:"11px", color:C.azureDeep, fontFamily:"monospace", marginBottom:"9px", userSelect:"all" }}>import@parse.tripcopycat.com</div>}
                   <button onClick={startScan} style={{ width:"100%", padding:"9px", borderRadius:"8px", border:`1px solid ${C.azure}`, background:i===0?C.azure:C.white, color:i===0?C.white:C.azure, fontWeight:700, cursor:"pointer", fontSize:"12px" }}>{opt.btnLabel}</button>
                 </div>
               ))}
@@ -952,7 +952,7 @@ function AddTripModal({ onClose, onAdd }) {
 
 
 // ── AI Prompt Generator ───────────────────────────────────────────────────────
-const AI_SUBMISSION_PROMPT = `You are helping me document a trip I took so I can share it on TripBlueprints.
+const AI_SUBMISSION_PROMPT = `You are helping me document a trip I took so I can share it on TripCopycat.
 
 Please ask me questions about my trip and help me fill in the following details. Ask conversationally, one section at a time. When done, output a clean structured summary under these exact headings:
 
@@ -1080,7 +1080,7 @@ function SubmitTripModal({ onClose, currentUser, displayName }) {
         <div style={{ padding:"20px 28px", borderBottom:`1px solid ${C.tide}`, background:C.seafoam, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div>
             <div style={{ fontSize:"17px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif" }}>Submit a Blueprint</div>
-            <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"2px" }}>Share your trip with the TripBlueprints community</div>
+            <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"2px" }}>Share your trip with the TripCopycat community</div>
           </div>
           <button onClick={onClose} style={{ background:C.seafoamDeep, border:"none", color:C.slateLight, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>x</button>
         </div>
@@ -1182,7 +1182,7 @@ function SubmitTripModal({ onClose, currentUser, displayName }) {
           <div style={{ padding:"60px 28px", textAlign:"center" }}>
             <div style={{ fontSize:"48px", marginBottom:"14px" }}>🎉</div>
             <div style={{ fontSize:"20px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"8px" }}>Blueprint Published!</div>
-            <div style={{ fontSize:"13px", color:C.slateLight, maxWidth:"380px", margin:"0 auto 24px", lineHeight:1.6 }}>Your trip passed all checks and is now live on TripBlueprints.</div>
+            <div style={{ fontSize:"13px", color:C.slateLight, maxWidth:"380px", margin:"0 auto 24px", lineHeight:1.6 }}>Your trip passed all checks and is now live on TripCopycat.</div>
             <button onClick={onClose} style={{ padding:"11px 28px", borderRadius:"10px", border:"none", background:C.cta, color:C.white, fontWeight:700, fontSize:"13px", cursor:"pointer" }}>View the site</button>
           </div>
         )}
@@ -1503,7 +1503,7 @@ function AdminLoginModal({ onSuccess, onClose }) {
         <div style={{ textAlign:"center", marginBottom:"28px" }}>
           <div style={{ fontSize:"36px", marginBottom:"12px" }}>🔐</div>
           <div style={{ fontSize:"20px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif" }}>Admin Access</div>
-          <div style={{ fontSize:"12px", color:C.slateLight, marginTop:"4px" }}>TripBlueprints Admin Panel</div>
+          <div style={{ fontSize:"12px", color:C.slateLight, marginTop:"4px" }}>TripCopycat Admin Panel</div>
         </div>
         <input
           type="password"
@@ -1734,7 +1734,7 @@ export default function App() {
         <div style={{ maxWidth:"1100px", margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"space-between", height:"58px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
             <span style={{ fontSize:"19px" }}>🧭</span>
-            <span style={{ fontFamily:"'Playfair Display',Georgia,serif", fontWeight:700, fontSize:"22px", color:C.slate, letterSpacing:"0.01em" }}>TripBlueprints</span>
+            <span style={{ fontFamily:"'Playfair Display',Georgia,serif", fontWeight:700, fontSize:"22px", color:C.slate, letterSpacing:"0.01em" }}>TripCopycat</span>
             <span style={{ fontSize:"9px", background:C.seafoamDeep, color:C.azureDeep, fontWeight:700, padding:"2px 7px", borderRadius:"20px", border:`1px solid ${C.tide}` }}>beta</span>
           </div>
           <div style={{ display:"flex", gap:"7px" }}>
@@ -1762,9 +1762,9 @@ export default function App() {
         {/* subtle texture overlay */}
         <div style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(circle at 20% 50%, rgba(196,168,130,0.08) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(193,105,42,0.06) 0%, transparent 50%)", pointerEvents:"none" }} />
         <div style={{ position:"relative", maxWidth:"780px", margin:"0 auto" }}>
-          <div style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:C.sandDeep, borderRadius:"30px", padding:"5px 16px", marginBottom:"24px" }}>
-            <span style={{ fontSize:"12px" }}>🧭</span>
-            <span style={{ fontSize:"10px", fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", color:C.slateLight }}>The Traveler's Playbook</span>
+          <div style={{ display:"inline-flex", alignItems:"center", gap:"10px", background:C.sandDeep, borderRadius:"30px", padding:"6px 20px 6px 6px", marginBottom:"24px" }}>
+            <img src="/copycat.png" alt="TripCopycat" style={{ height:"32px", width:"32px", objectFit:"contain" }} />
+            <span style={{ fontSize:"10px", fontWeight:700, letterSpacing:"0.14em", textTransform:"uppercase", color:C.slateLight }}>Copy the Trip. Own the Experience.</span>
           </div>
           <h1 style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:"clamp(36px,6vw,62px)", fontWeight:700, color:C.slate, margin:"0 0 20px", lineHeight:1.1, letterSpacing:"-0.01em" }}>
             Planned by them.<br/>Perfected by you.
