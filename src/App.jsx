@@ -731,22 +731,22 @@ function TripModal({ trip, onClose }) {
         <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"880px", boxShadow:`0 32px 64px rgba(44,62,80,0.2)`, overflow:"hidden", border:`1px solid ${C.tide}` }}>
 
           {/* header — coastal gradient */}
-          <div style={{ background:`linear-gradient(135deg,${C.slate} 0%,${C.slateMid} 100%)`, padding:"26px 30px", color:C.white }}>
+          <div style={{ background:`linear-gradient(135deg,#2C1810 0%,#3D2B1F 100%)`, padding:"26px 30px", color:C.white }}>
             <div style={{ display:"flex", justifyContent:"space-between" }}>
               <div>
-                <div style={{ fontSize:"10px", fontWeight:700, letterSpacing:"0.1em", opacity:.65, textTransform:"uppercase", marginBottom:"7px" }}>{trip.region} · {trip.duration} · {trip.date}</div>
-                <h2 style={{ margin:0, fontSize:"27px", fontWeight:700, fontFamily:"'Playfair Display',Georgia,serif" }}>{trip.title}</h2>
-                <div style={{ marginTop:"4px", opacity:.8, fontSize:"14px" }}>{trip.destination}</div>
+                <div style={{ fontSize:"10px", fontWeight:700, letterSpacing:"0.1em", color:"rgba(196,168,130,0.9)", textTransform:"uppercase", marginBottom:"7px" }}>{trip.region} · {trip.duration} · {trip.date}</div>
+                <h2 style={{ margin:0, fontSize:"27px", fontWeight:700, fontFamily:"'Playfair Display',Georgia,serif", color:"#FAF7F2" }}>{trip.title}</h2>
+                <div style={{ marginTop:"4px", fontSize:"14px", color:"rgba(250,247,242,0.75)" }}>{trip.destination}</div>
               </div>
               <div style={{ display:"flex", gap:"7px", alignItems:"flex-start" }}>
-                <button onClick={() => setShowExport(true)} style={{ background:"rgba(255,255,255,.2)", border:"1px solid rgba(255,255,255,.35)", color:C.white, borderRadius:"8px", padding:"6px 13px", cursor:"pointer", fontSize:"12px", fontWeight:700 }}>📤 Export</button>
-                <button onClick={onClose} style={{ background:"rgba(255,255,255,.2)", border:"none", color:C.white, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>×</button>
+                <button onClick={() => setShowExport(true)} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"6px 13px", cursor:"pointer", fontSize:"12px", fontWeight:700 }}>📤 Export</button>
+                <button onClick={onClose} style={{ background:"rgba(196,168,130,0.2)", border:"none", color:"#FAF7F2", borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>×</button>
               </div>
             </div>
-            <div style={{ marginTop:"12px", display:"flex", gap:"14px", flexWrap:"wrap", alignItems:"center" }}>
-              <span style={{ fontSize:"12px", opacity:.85 }}>by <strong>{trip.author}</strong></span>
-              <span style={{ fontSize:"12px", opacity:.85 }}>{trip.travelers}</span>
-              {trip.tags.map(t => <span key={t} style={{ fontSize:"10px", fontWeight:600, padding:"2px 9px", borderRadius:"20px", background:"rgba(255,255,255,.22)", color:C.white }}>{t}</span>)}
+            <div style={{ marginTop:"12px", display:"flex", gap:"10px", flexWrap:"wrap", alignItems:"center" }}>
+              <span style={{ fontSize:"12px", color:"rgba(250,247,242,0.8)" }}>by <strong>{trip.author}</strong></span>
+              <span style={{ fontSize:"12px", color:"rgba(250,247,242,0.8)" }}>{trip.travelers}</span>
+              {trip.tags.map(t => <span key={t} style={{ fontSize:"10px", fontWeight:600, padding:"2px 9px", borderRadius:"20px", background:"rgba(196,168,130,0.25)", color:"#FAF7F2", border:"1px solid rgba(196,168,130,0.3)" }}>{t}</span>)}
             </div>
           </div>
 
@@ -1558,10 +1558,10 @@ export default function App() {
             The ultimate cheat code for your next vacation. We crowd-source highly detailed, recreatable trip blueprints so you don't have to reinvent the wheel. Steal the logistics, duplicate the route, or customize and make it your own — spend your time looking forward to the destination.
           </p>
           <div style={{ display:"flex", gap:"12px", justifyContent:"center", alignItems:"center", flexWrap:"wrap", marginBottom:"36px" }}>
-            <button style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"50px", padding:"14px 32px", fontSize:"14px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", letterSpacing:"0.02em", boxShadow:`0 4px 18px rgba(196,168,130,0.45)` }}>
+            <button onClick={() => { const el = document.getElementById("blueprint-grid"); if(el) el.scrollIntoView({ behavior:"smooth" }); }} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"50px", padding:"14px 32px", fontSize:"14px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", letterSpacing:"0.02em", boxShadow:`0 4px 18px rgba(196,168,130,0.45)` }}>
               Leverage a Blueprint
             </button>
-            <button onClick={() => {}} style={{ background:"transparent", color:C.slateLight, border:`1.5px solid ${C.tide}`, borderRadius:"50px", padding:"14px 28px", fontSize:"13px", fontWeight:600, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
+            <button onClick={() => setShowSubmit(true)} style={{ background:"transparent", color:C.slateLight, border:`1.5px solid ${C.tide}`, borderRadius:"50px", padding:"14px 28px", fontSize:"13px", fontWeight:600, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
               Submit a Trip →
             </button>
           </div>
@@ -1584,7 +1584,7 @@ export default function App() {
       </div>
 
       {/* Grid */}
-      <main style={{ maxWidth:"1100px", margin:"0 auto", padding:"28px 24px" }}>
+      <main id="blueprint-grid" style={{ maxWidth:"1100px", margin:"0 auto", padding:"28px 24px" }}>
         <div style={{ marginBottom:"16px", fontSize:"12px", color:C.muted }}>
           <strong style={{ color:C.slate }}>{filtered.length}</strong> blueprint{filtered.length!==1?"s":""}{search&&<> for "<strong style={{ color:C.slate }}>{search}</strong>"</>}
         </div>
