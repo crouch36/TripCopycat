@@ -444,7 +444,7 @@ function PhotoImportModal({ onClose }) {
             </div>
 
             <div style={{ padding:"14px 28px", borderTop:`1px solid ${C.tide}`, display:"flex", justifyContent:"space-between", alignItems:"center", background:C.seafoam }}>
-              <div style={{ fontSize:"12px", color:C.slateLight }}>{nAcc} items will be added to your blueprint</div>
+              <div style={{ fontSize:"12px", color:C.slateLight }}>{nAcc} items will be added to your trip</div>
               <div style={{ display:"flex", gap:"8px" }}>
                 <button onClick={onClose} style={{ padding:"9px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>Cancel</button>
                 <button onClick={onClose} style={{ padding:"9px 22px", borderRadius:"8px", border:"none", background:`linear-gradient(135deg,${C.azure},${C.azureDark})`, color:C.white, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>Build from {nAcc} photos →</button>
@@ -468,7 +468,7 @@ function PhotoImportModal({ onClose }) {
               <div style={{ flex:1 }}><ConfBar val={lightbox.confidence} /></div>
             </div>
             <div style={{ display:"flex", gap:"7px" }}>
-              <button onClick={() => { toggle(lightbox.id,true); setLightbox(null); }} style={{ flex:1, padding:"9px", borderRadius:"8px", border:"none", background:C.green, color:C.white, fontWeight:700, cursor:"pointer" }}>✓ Add to Blueprint</button>
+              <button onClick={() => { toggle(lightbox.id,true); setLightbox(null); }} style={{ flex:1, padding:"9px", borderRadius:"8px", border:"none", background:C.green, color:C.white, fontWeight:700, cursor:"pointer" }}>✓ Add to Trip</button>
               <button onClick={() => { toggle(lightbox.id,false); setLightbox(null); }} style={{ flex:1, padding:"9px", borderRadius:"8px", border:`1px solid ${C.red}`, background:C.white, color:C.red, fontWeight:700, cursor:"pointer" }}>✗ Skip</button>
               <button onClick={() => setLightbox(null)} style={{ padding:"9px 14px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, cursor:"pointer" }}>Close</button>
             </div>
@@ -583,7 +583,7 @@ function EmailImportModal({ onClose }) {
             </div>
             <div style={{ padding:"14px 28px", borderTop:`1px solid ${C.tide}`, display:"flex", justifyContent:"space-between", background:C.seafoam }}>
               <button onClick={onClose} style={{ padding:"9px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>Cancel</button>
-              <button onClick={onClose} style={{ padding:"9px 22px", borderRadius:"8px", border:"none", background:`linear-gradient(135deg,${C.azure},${C.azureDark})`, color:C.white, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>Add {nAcc} items to Blueprint →</button>
+              <button onClick={onClose} style={{ padding:"9px 22px", borderRadius:"8px", border:"none", background:`linear-gradient(135deg,${C.azure},${C.azureDark})`, color:C.white, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>Add {nAcc} items to Trip →</button>
             </div>
           </div>
         )}
@@ -605,7 +605,7 @@ function SmartImportHub({ onClose }) {
         <div style={{ padding:"26px 30px", borderBottom:`1px solid ${C.tide}`, display:"flex", justifyContent:"space-between", alignItems:"flex-start", background:C.seafoam }}>
           <div>
             <div style={{ fontSize:"17px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif" }}>Smart Import</div>
-            <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"3px" }}>Auto-build your blueprint from existing data</div>
+            <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"3px" }}>Auto-build your itinerary from existing data</div>
           </div>
           <button onClick={onClose} style={{ background:C.seafoamDeep, border:"none", color:C.slateLight, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>×</button>
         </div>
@@ -966,7 +966,7 @@ function AddTripModal({ onClose, onAdd }) {
         <div style={{ padding:"12px 30px 24px", display:"flex", justifyContent:"space-between", background:C.seafoam, borderTop:`1px solid ${C.tide}` }}>
           <button onClick={()=>step>1?setStep(s=>s-1):onClose()} style={{ padding:"8px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>{step>1?"← Back":"Cancel"}</button>
           <button onClick={()=>step<3?setStep(s=>s+1):(onAdd({...form,id:Date.now(),author:"You"}),onClose())} style={{ padding:"8px 18px", borderRadius:"8px", border:"none", background:C.cta, color:C.white, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>
-            {step<3?"Next →":"✓ Publish Blueprint"}
+            {step<3?"Next →":"✓ Publish Itinerary"}
           </button>
         </div>
       </div>
@@ -1103,7 +1103,7 @@ function SubmitTripModal({ onClose, currentUser, displayName }) {
       <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"720px", overflow:"hidden", boxShadow:`0 32px 64px rgba(44,62,80,0.22)`, border:`1px solid ${C.tide}` }}>
         <div style={{ padding:"20px 28px", borderBottom:`1px solid ${C.tide}`, background:C.seafoam, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div>
-            <div style={{ fontSize:"17px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif" }}>Submit a Blueprint</div>
+            <div style={{ fontSize:"17px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif" }}>Submit a Trip</div>
             <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"2px" }}>Share your trip with the TripCopycat community</div>
           </div>
           <button onClick={onClose} style={{ background:C.seafoamDeep, border:"none", color:C.slateLight, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>x</button>
@@ -1113,7 +1113,7 @@ function SubmitTripModal({ onClose, currentUser, displayName }) {
           <div style={{ padding:"28px" }}>
             <div style={{ textAlign:"center", marginBottom:"24px" }}>
               <div style={{ fontSize:"32px", marginBottom:"10px" }}>✈️</div>
-              <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>How would you like to build your blueprint?</div>
+              <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>How would you like to build your itinerary?</div>
               <div style={{ fontSize:"13px", color:C.slateLight, lineHeight:1.6 }}>Use our AI prompt for the fastest experience, or fill the form directly.</div>
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
@@ -1166,6 +1166,7 @@ function SubmitTripModal({ onClose, currentUser, displayName }) {
                   {TAGS.filter(t=>t!=="All").map(tag=><button key={tag} onClick={()=>toggleTag(tag)} style={{ padding:"3px 10px", borderRadius:"20px", fontSize:"11px", fontWeight:600, cursor:"pointer", border:`1px solid ${form.tags.includes(tag)?C.azure:C.tide}`, background:form.tags.includes(tag)?C.azure:C.white, color:form.tags.includes(tag)?C.white:C.slateLight }}>{tag}</button>)}
                 </div>
               </div>
+
               <div style={{ gridColumn:"1/-1" }}><label style={{...lbl,color:C.green}}>What did you love?</label><textarea style={{...inp,height:"80px",resize:"vertical"}} value={form.loves} onChange={e=>setForm(p=>({...p,loves:e.target.value}))} /></div>
               <div style={{ gridColumn:"1/-1" }}><label style={{...lbl,color:C.amber}}>What would you do differently?</label><textarea style={{...inp,height:"80px",resize:"vertical"}} value={form.doNext} onChange={e=>setForm(p=>({...p,doNext:e.target.value}))} /></div>
             </div>
@@ -1205,7 +1206,7 @@ function SubmitTripModal({ onClose, currentUser, displayName }) {
         {step === "done" && (
           <div style={{ padding:"60px 28px", textAlign:"center" }}>
             <div style={{ fontSize:"48px", marginBottom:"14px" }}>🎉</div>
-            <div style={{ fontSize:"20px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"8px" }}>Blueprint Published!</div>
+            <div style={{ fontSize:"20px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"8px" }}>Itinerary Published!</div>
             <div style={{ fontSize:"13px", color:C.slateLight, maxWidth:"380px", margin:"0 auto 24px", lineHeight:1.6 }}>Your trip passed all checks and is now live on TripCopycat.</div>
             <button onClick={onClose} style={{ padding:"11px 28px", borderRadius:"10px", border:"none", background:C.cta, color:C.white, fontWeight:700, fontSize:"13px", cursor:"pointer" }}>View the site</button>
           </div>
@@ -1229,7 +1230,7 @@ function SubmitTripModal({ onClose, currentUser, displayName }) {
         {step === "form" && (
           <div style={{ padding:"14px 28px", borderTop:`1px solid ${C.tide}`, background:C.seafoam, display:"flex", justifyContent:"space-between" }}>
             <button onClick={() => setStep("prompt")} style={{ padding:"9px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>Back</button>
-            <button onClick={handleSubmit} style={{ padding:"9px 24px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>Submit Blueprint</button>
+            <button onClick={handleSubmit} style={{ padding:"9px 24px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>Submit Trip</button>
           </div>
         )}
       </div>
@@ -1462,7 +1463,7 @@ function ProfilePage({ authorName, allTrips, onClose, onTripClick }) {
               <div>
                 <div style={{ fontSize:"24px", fontWeight:700, color:"#FAF7F2", fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"4px" }}>{authorName}</div>
                 <div style={{ display:"flex", gap:"16px", flexWrap:"wrap" }}>
-                  <span style={{ fontSize:"12px", color:"rgba(196,168,130,0.9)" }}>🗺️ {contributorTrips.length} blueprint{contributorTrips.length!==1?"s":""}</span>
+                  <span style={{ fontSize:"12px", color:"rgba(196,168,130,0.9)" }}>🗺️ {contributorTrips.length} itinerary{contributorTrips.length!==1?"s":""}</span>
                   {memberSince && <span style={{ fontSize:"12px", color:"rgba(196,168,130,0.9)" }}>📅 Member since {memberSince}</span>}
                 </div>
               </div>
@@ -1474,7 +1475,7 @@ function ProfilePage({ authorName, allTrips, onClose, onTripClick }) {
         {/* Trips grid */}
         <div style={{ padding:"24px 28px" }}>
           <div style={{ fontSize:"13px", fontWeight:700, color:C.slate, marginBottom:"16px", fontFamily:"'Playfair Display',serif" }}>
-            Blueprints by {authorName}
+            Itineraries by {authorName}
           </div>
           {contributorTrips.length === 0 ? (
             <div style={{ textAlign:"center", padding:"40px", color:C.muted }}>
@@ -1758,7 +1759,7 @@ export default function App() {
       <nav style={{ background:C.white, borderBottom:`1px solid ${C.tide}`, padding:"0", margin:"0", position:"sticky", top:0, zIndex:100, boxShadow:`0 1px 6px rgba(28,43,58,0.06)` }}>
         <div style={{ width:"100%", padding:"0 32px", boxSizing:"border-box", display:"flex", alignItems:"center", justifyContent:"space-between", height:"58px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-            <img src="/copycat.svg" alt="TripCopycat" style={{ height:"44px", width:"44px", objectFit:"contain", background:"transparent", display:"block" }} />
+            <img src="/copycat.png" alt="TripCopycat" style={{ height:"44px", width:"44px", objectFit:"contain", background:"transparent", display:"block", mixBlendMode:"multiply" }} />
             <span style={{ fontFamily:"'Playfair Display',Georgia,serif", fontWeight:700, fontSize:"22px", color:C.slate, letterSpacing:"-0.01em" }}>TripCopycat</span>
             <span style={{ fontSize:"9px", background:C.seafoamDeep, color:C.azureDeep, fontWeight:700, padding:"2px 7px", borderRadius:"20px", border:`1px solid ${C.tide}` }}>beta</span>
           </div>
@@ -1766,7 +1767,7 @@ export default function App() {
             {!isAdmin && <button onClick={() => setShowSubmit(true)} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"8px", padding:"7px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer", boxShadow:`0 3px 12px rgba(196,168,130,0.4)` }}>+ Submit a Trip</button>}
             {isAdmin && <button onClick={() => setShowQueue(true)} style={{ background:C.amberBg, color:C.amber, border:`1px solid ${C.amber}44`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>📋 Queue</button>}
             {isAdmin && <button onClick={() => setShowImport(true)} style={{ background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>🤖 Smart Import</button>}
-            {isAdmin && <button onClick={() => setShowAdd(true)} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"8px", padding:"7px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer", boxShadow:`0 3px 12px rgba(196,168,130,0.4)` }}>+ Add Blueprint</button>}
+            {isAdmin && <button onClick={() => setShowAdd(true)} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"8px", padding:"7px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer", boxShadow:`0 3px 12px rgba(196,168,130,0.4)` }}>+ Add Trip</button>}
             {!isAdmin && !currentUser && <button onClick={() => setShowAuth(true)} style={{ background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>Sign In</button>}
             {!isAdmin && currentUser && (
               <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
@@ -1792,11 +1793,11 @@ export default function App() {
             Planned by them.<br/>Perfected by you.
           </h1>
           <p style={{ fontSize:"clamp(14px,2vw,17px)", color:C.slateLight, margin:"0 0 32px", maxWidth:"580px", marginLeft:"auto", marginRight:"auto", fontWeight:400, lineHeight:1.75 }}>
-            The ultimate cheat code for your next vacation. We crowd-source highly detailed, recreatable trip blueprints so you don't have to reinvent the wheel. Steal the logistics, duplicate the route, or customize and make it your own — spend your time looking forward to the destination.
+            The ultimate cheat code for your next vacation. We crowd-source highly detailed, recreatable trip itineraries so you don't have to reinvent the wheel. Steal the logistics, duplicate the route, or customize and make it your own — spend your time looking forward to the destination.
           </p>
           <div style={{ display:"flex", gap:"12px", justifyContent:"center", alignItems:"center", flexWrap:"wrap", marginBottom:"36px" }}>
-            <button onClick={() => { const el = document.getElementById("blueprint-grid"); if(el) el.scrollIntoView({ behavior:"smooth" }); }} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"50px", padding:"14px 32px", fontSize:"14px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", letterSpacing:"0.02em", boxShadow:`0 4px 18px rgba(196,168,130,0.45)` }}>
-              Leverage a Blueprint
+            <button onClick={() => { const el = document.getElementById("trip-grid"); if(el) el.scrollIntoView({ behavior:"smooth" }); }} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"50px", padding:"14px 32px", fontSize:"14px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", letterSpacing:"0.02em", boxShadow:`0 4px 18px rgba(196,168,130,0.45)` }}>
+              Leverage a Copycat
             </button>
             <button onClick={() => setShowSubmit(true)} style={{ background:"transparent", color:C.slateLight, border:`1.5px solid ${C.tide}`, borderRadius:"50px", padding:"14px 28px", fontSize:"13px", fontWeight:600, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
               Submit a Trip →
@@ -1824,7 +1825,7 @@ export default function App() {
             <div style={{ background:C.white, borderRadius:"12px", border:`1px solid ${C.tide}`, padding:"14px 16px", marginBottom:"14px", boxShadow:`0 1px 4px rgba(44,62,80,0.05)` }}>
               <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:"10px" }}>Platform</div>
               <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"6px" }}>
-                <span style={{ fontSize:"12px", color:C.slateLight }}>Blueprints</span>
+                <span style={{ fontSize:"12px", color:C.slateLight }}>Itineraries</span>
                 <strong style={{ fontSize:"12px", color:C.slate }}>{allTrips.length}</strong>
               </div>
               <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"14px" }}>
@@ -1854,6 +1855,7 @@ export default function App() {
               </div>
             </div>
 
+
             {/* Top contributors */}
             <div style={{ background:C.white, borderRadius:"12px", border:`1px solid ${C.tide}`, padding:"14px 16px", boxShadow:`0 1px 4px rgba(44,62,80,0.05)` }}>
               <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:"10px" }}>Top Contributors</div>
@@ -1880,9 +1882,9 @@ export default function App() {
         )}
 
         {/* Main content */}
-        <main id="blueprint-grid" style={{ flex:1, minWidth:0 }}>
+        <main id="trip-grid" style={{ flex:1, minWidth:0 }}>
           <div style={{ marginBottom:"14px", fontSize:"12px", color:C.muted, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-            <span><strong style={{ color:C.slate }}>{filtered.length}</strong> blueprint{filtered.length!==1?"s":""}{search&&<> for "<strong style={{ color:C.slate }}>{search}</strong>"</>}</span>
+            <span><strong style={{ color:C.slate }}>{filtered.length}</strong> itinerary{filtered.length!==1?"ies":"y"}{search&&<> for "<strong style={{ color:C.slate }}>{search}</strong>"</>}</span>
             {(region !== "All Regions" || tag !== "All") && (
               <button onClick={() => { setRegion("All Regions"); setTag("All"); }} style={{ fontSize:"11px", color:C.amber, background:"none", border:"none", cursor:"pointer", fontWeight:600 }}>Clear filters ×</button>
             )}
@@ -1902,7 +1904,7 @@ export default function App() {
             {filtered.length===0 && (
               <div style={{ gridColumn:"1/-1", textAlign:"center", padding:"56px 20px", color:C.muted }}>
                 <div style={{ fontSize:"38px", marginBottom:"12px" }}>✈️</div>
-                <div style={{ fontSize:"15px", fontWeight:600, color:C.slateLight }}>No blueprints match your search</div>
+                <div style={{ fontSize:"15px", fontWeight:600, color:C.slateLight }}>No itineraries match your search</div>
               </div>
             )}
           </div>
@@ -1914,7 +1916,7 @@ export default function App() {
         <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:4000, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(8px)" }}>
           <div style={{ background:C.white, borderRadius:"16px", padding:"32px", maxWidth:"400px", width:"90%", textAlign:"center", boxShadow:`0 32px 64px rgba(44,62,80,0.25)` }}>
             <div style={{ fontSize:"32px", marginBottom:"12px" }}>🗑️</div>
-            <div style={{ fontSize:"17px", fontWeight:800, color:C.slate, marginBottom:"8px" }}>Delete this blueprint?</div>
+            <div style={{ fontSize:"17px", fontWeight:800, color:C.slate, marginBottom:"8px" }}>Delete this itinerary?</div>
             <div style={{ fontSize:"13px", color:C.slateLight, marginBottom:"24px" }}>"{confirmDelete.title}" will be permanently removed.</div>
             <div style={{ display:"flex", gap:"10px" }}>
               <button onClick={() => setConfirmDelete(null)} style={{ flex:1, padding:"10px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontWeight:600, cursor:"pointer" }}>Cancel</button>
