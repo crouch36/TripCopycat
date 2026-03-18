@@ -834,30 +834,54 @@ function TripModal({ trip, onClose }) {
   );
 }
 
+
+// ── Region gradient map for card image placeholders ──────────────────────────
+const REGION_GRADIENTS = {
+  "Asia":           "linear-gradient(135deg, #C84B31 0%, #ECAB51 100%)",
+  "Europe":         "linear-gradient(135deg, #2C3E7A 0%, #5B7FBF 100%)",
+  "North America":  "linear-gradient(135deg, #1A6B3C 0%, #4CAF7D 100%)",
+  "Central America":"linear-gradient(135deg, #7B3FA0 0%, #C47DD4 100%)",
+  "South America":  "linear-gradient(135deg, #B5451B 0%, #E8903A 100%)",
+  "Africa":         "linear-gradient(135deg, #8B6914 0%, #D4A843 100%)",
+  "Oceania":        "linear-gradient(135deg, #0E6B8C 0%, #2EBFDB 100%)",
+};
+const REGION_EMOJI = {
+  "Asia":"🏯", "Europe":"🏰", "North America":"🗽",
+  "Central America":"🌴", "South America":"🌿",
+  "Africa":"🦁", "Oceania":"🐚",
+};
+
 // ── Trip Card ─────────────────────────────────────────────────────────────────
 
 function TripCard({ trip, onClick }) {
+  const grad = REGION_GRADIENTS[trip.region] || "linear-gradient(135deg,#8B7355,#C4A882)";
+  const emoji = REGION_EMOJI[trip.region] || "🌍";
   return (
-    <div onClick={() => onClick(trip)} style={{ background:C.white, border:`1px solid ${C.tide}`, borderRadius:"16px", padding:"22px", cursor:"pointer", transition:"all .2s", boxShadow:`0 2px 8px rgba(44,62,80,0.06)` }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow=`0 8px 28px rgba(28,43,58,0.12)`; e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.borderColor=C.azure; }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow=`0 2px 8px rgba(44,62,80,0.06)`; e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.borderColor=C.tide; }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"11px" }}>
-        <div>
-          <div style={{ fontSize:"10px", fontWeight:700, letterSpacing:"0.08em", color:C.amber, textTransform:"uppercase", marginBottom:"3px" }}>{trip.region}</div>
-          <h3 style={{ fontSize:"17px", fontWeight:700, color:C.slate, margin:0, fontFamily:"'Playfair Display',Georgia,serif" }}>{trip.title}</h3>
-          <div style={{ fontSize:"12px", color:C.slateLight, marginTop:"3px" }}>{trip.destination} · {trip.duration}</div>
+    <div onClick={() => onClick(trip)} style={{ background:C.white, border:`1px solid ${C.tide}`, borderRadius:"16px", overflow:"hidden", cursor:"pointer", transition:"all .2s", boxShadow:`0 2px 12px rgba(44,62,80,0.07)` }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow=`0 10px 32px rgba(28,43,58,0.15)`; e.currentTarget.style.transform="translateY(-3px)"; e.currentTarget.style.borderColor=C.amber; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow=`0 2px 12px rgba(44,62,80,0.07)`; e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.borderColor=C.tide; }}>
+      {/* Image placeholder */}
+      <div style={{ height:"148px", background:grad, position:"relative", display:"flex", alignItems:"flex-end", padding:"14px" }}>
+        <span style={{ fontSize:"42px", position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-60%)", opacity:0.35 }}>{emoji}</span>
+        <div style={{ position:"relative", zIndex:1 }}>
+          <div style={{ fontSize:"9px", fontWeight:700, letterSpacing:"0.1em", color:"rgba(255,255,255,0.8)", textTransform:"uppercase", marginBottom:"3px" }}>{trip.region}</div>
+          <div style={{ fontSize:"16px", fontWeight:700, color:"#FFFFFF", fontFamily:"'Playfair Display',Georgia,serif", lineHeight:1.2, textShadow:"0 1px 4px rgba(0,0,0,0.3)" }}>{trip.title}</div>
         </div>
-        <span style={{ fontSize:"24px" }}>🌍</span>
+        <div style={{ position:"absolute", top:"12px", right:"12px", background:"rgba(0,0,0,0.25)", borderRadius:"20px", padding:"3px 10px", fontSize:"10px", color:"rgba(255,255,255,0.9)", fontWeight:600 }}>{trip.duration}</div>
       </div>
-      <div style={{ display:"flex", flexWrap:"wrap", gap:"5px", marginBottom:"12px" }}>
-        {trip.tags.map(t => <span key={t} style={{ fontSize:"10px", fontWeight:600, padding:"2px 9px", borderRadius:"20px", background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}` }}>{t}</span>)}
-      </div>
-      <div style={{ fontSize:"12px", color:C.slateMid, lineHeight:1.65, marginBottom:"12px" }}>
-        <span style={{ fontWeight:700, color:C.green }}>❤️ </span>{trip.loves.substring(0,92)}…
-      </div>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:`1px solid ${C.seafoamDeep}`, paddingTop:"11px" }}>
-        <div style={{ fontSize:"11px", color:C.muted }}>by <strong onClick={e => { e.stopPropagation(); window.__setViewingProfile && window.__setViewingProfile(trip.author); }} style={{ color:C.amber, cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted" }}>{trip.author}</strong> · {trip.date}</div>
-        <div style={{ fontSize:"11px", color:C.slateMid, fontWeight:600 }}>{trip.travelers}</div>
+      {/* Card body */}
+      <div style={{ padding:"16px 18px" }}>
+        <div style={{ fontSize:"12px", color:C.slateLight, marginBottom:"9px" }}>{trip.destination}</div>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:"4px", marginBottom:"10px" }}>
+          {trip.tags.map(t => <span key={t} style={{ fontSize:"10px", fontWeight:600, padding:"2px 8px", borderRadius:"20px", background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}` }}>{t}</span>)}
+        </div>
+        <div style={{ fontSize:"12px", color:C.slateMid, lineHeight:1.65, marginBottom:"12px" }}>
+          <span style={{ fontWeight:700, color:C.green }}>❤️ </span>{trip.loves.substring(0,100)}…
+        </div>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:`1px solid ${C.seafoamDeep}`, paddingTop:"10px" }}>
+          <div style={{ fontSize:"11px", color:C.muted }}>by <strong onClick={e => { e.stopPropagation(); window.__setViewingProfile && window.__setViewingProfile(trip.author); }} style={{ color:C.amber, cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted" }}>{trip.author}</strong> · {trip.date}</div>
+          <div style={{ fontSize:"11px", color:C.slateMid, fontWeight:600 }}>{trip.travelers}</div>
+        </div>
       </div>
     </div>
   );
@@ -1645,6 +1669,7 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [region, setRegion] = useState("All Regions");
   const [tag, setTag] = useState("All");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Load from Supabase on mount
   // Expose profile setter for card author clicks
@@ -1757,7 +1782,7 @@ export default function App() {
       </nav>
 
       {/* Hero — Warm Nomad */}
-      <div style={{ background:C.seafoam, padding:"72px 24px 64px", textAlign:"center", position:"relative", overflow:"hidden", borderBottom:`1px solid ${C.tide}` }}>
+      <div style={{ background:C.seafoam, padding:"40px 24px 36px", textAlign:"center", position:"relative", overflow:"hidden", borderBottom:`1px solid ${C.tide}` }}>
         {/* subtle texture overlay */}
         <div style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(circle at 20% 50%, rgba(196,168,130,0.08) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(193,105,42,0.06) 0%, transparent 50%)", pointerEvents:"none" }} />
         <div style={{ position:"relative", maxWidth:"780px", margin:"0 auto" }}>
@@ -1779,49 +1804,111 @@ export default function App() {
             </button>
           </div>
           <div style={{ maxWidth:"520px", margin:"0 auto", position:"relative" }}>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search destinations, trips, activities…" style={{ width:"100%", padding:"14px 20px 14px 48px", borderRadius:"50px", border:`1.5px solid ${C.tide}`, fontSize:"13px", outline:"none", boxSizing:"border-box", background:C.white, color:C.slate, boxShadow:`0 4px 20px rgba(28,43,58,0.08)`, fontFamily:"'Nunito',sans-serif" }} />
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search destinations, trips, activities…" style={{ width:"100%", padding:"16px 22px 16px 52px", borderRadius:"50px", border:`2px solid ${C.tide}`, fontSize:"15px", outline:"none", boxSizing:"border-box", background:C.white, color:C.slate, boxShadow:`0 4px 20px rgba(28,43,58,0.08)`, fontFamily:"'Nunito',sans-serif" }} />
             <span style={{ position:"absolute", left:"18px", top:"50%", transform:"translateY(-50%)", fontSize:"16px" }}>🔍</span>
           </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div style={{ background:C.white, borderBottom:`1px solid ${C.tide}`, padding:"10px 24px" }}>
-        <div style={{ maxWidth:"1100px", margin:"0 auto", display:"flex", gap:"5px", flexWrap:"wrap", alignItems:"center" }}>
-          <span style={{ fontSize:"9px", fontWeight:700, color:C.muted, marginRight:"3px", textTransform:"uppercase", letterSpacing:"0.08em" }}>Region</span>
-          {REGIONS.map(r=><button key={r} onClick={()=>setRegion(r)} style={{ padding:"3px 10px", borderRadius:"20px", border:`1px solid ${region===r?C.slate:C.tide}`, background:region===r?C.slate:C.white, color:region===r?C.white:C.slateLight, fontSize:"11px", fontWeight:600, cursor:"pointer", transition:"all .12s" }}>{r}</button>)}
-          <div style={{ width:"1px", height:"16px", background:C.tide, margin:"0 4px" }} />
-          <span style={{ fontSize:"9px", fontWeight:700, color:C.muted, marginRight:"3px", textTransform:"uppercase", letterSpacing:"0.08em" }}>Type</span>
-          {TAGS.map(t=><button key={t} onClick={()=>setTag(t)} style={{ padding:"3px 10px", borderRadius:"20px", border:`1px solid ${tag===t?C.slate:C.tide}`, background:tag===t?C.slate:C.white, color:tag===t?C.white:C.slateLight, fontSize:"11px", fontWeight:600, cursor:"pointer", transition:"all .12s" }}>{t}</button>)}
-        </div>
-      </div>
+      {/* Main layout — sidebar + grid */}
+      <div style={{ maxWidth:"1200px", margin:"0 auto", padding:"24px 20px", display:"flex", gap:"24px", alignItems:"flex-start" }}>
 
-      {/* Grid */}
-      <main id="blueprint-grid" style={{ maxWidth:"1100px", margin:"0 auto", padding:"28px 24px" }}>
-        <div style={{ marginBottom:"16px", fontSize:"12px", color:C.muted }}>
-          <strong style={{ color:C.slate }}>{filtered.length}</strong> blueprint{filtered.length!==1?"s":""}{search&&<> for "<strong style={{ color:C.slate }}>{search}</strong>"</>}
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(310px,1fr))", gap:"18px" }}>
-          {filtered.map(trip => (
-            <div key={trip.id} style={{ position:"relative" }}>
-              <TripCard trip={trip} onClick={setSelected} />
-              {/* Admin controls overlay */}
-              {isAdmin && (
-                <div style={{ position:"absolute", top:"12px", right:"12px", display:"flex", gap:"6px", zIndex:10 }}>
-                  <button onClick={e => { e.stopPropagation(); setEditingTrip(trip); }} style={{ padding:"5px 12px", borderRadius:"7px", border:"none", background:C.azure, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer", boxShadow:"0 2px 8px rgba(44,62,80,0.2)" }}>✏️ Edit</button>
-                  <button onClick={e => { e.stopPropagation(); setConfirmDelete(trip); }} style={{ padding:"5px 12px", borderRadius:"7px", border:"none", background:C.red, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer", boxShadow:"0 2px 8px rgba(44,62,80,0.2)" }}>🗑️ Delete</button>
+        {/* Left Sidebar */}
+        {sidebarOpen && (
+          <aside style={{ width:"220px", flexShrink:0, position:"sticky", top:"78px" }}>
+            {/* Collapse button */}
+            <button onClick={() => setSidebarOpen(false)} style={{ width:"100%", padding:"7px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.muted, fontSize:"11px", fontWeight:600, cursor:"pointer", marginBottom:"14px", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span>Hide sidebar</span><span>←</span>
+            </button>
+
+            {/* Stats */}
+            <div style={{ background:C.white, borderRadius:"12px", border:`1px solid ${C.tide}`, padding:"14px 16px", marginBottom:"14px", boxShadow:`0 1px 4px rgba(44,62,80,0.05)` }}>
+              <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:"10px" }}>Platform</div>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"6px" }}>
+                <span style={{ fontSize:"12px", color:C.slateLight }}>Blueprints</span>
+                <strong style={{ fontSize:"12px", color:C.slate }}>{allTrips.length}</strong>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"14px" }}>
+                <span style={{ fontSize:"12px", color:C.slateLight }}>Contributors</span>
+                <strong style={{ fontSize:"12px", color:C.slate }}>{[...new Set(allTrips.map(t=>t.author))].length}</strong>
+              </div>
+              <button onClick={() => setShowSubmit(true)} style={{ width:"100%", padding:"9px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>+ Submit a Trip</button>
+            </div>
+
+            {/* Region filter */}
+            <div style={{ background:C.white, borderRadius:"12px", border:`1px solid ${C.tide}`, padding:"14px 16px", marginBottom:"14px", boxShadow:`0 1px 4px rgba(44,62,80,0.05)` }}>
+              <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:"10px" }}>Region</div>
+              {REGIONS.map(r => (
+                <button key={r} onClick={() => setRegion(r)} style={{ display:"block", width:"100%", textAlign:"left", padding:"6px 10px", borderRadius:"7px", border:"none", cursor:"pointer", fontSize:"12px", fontWeight:region===r?700:400, background:region===r?C.sandDeep:"transparent", color:region===r?C.slate:C.slateLight, marginBottom:"2px", transition:"all .12s" }}>
+                  {region===r && <span style={{ color:C.amber, marginRight:"5px" }}>▸</span>}{r}
+                </button>
+              ))}
+            </div>
+
+            {/* Trip type filter */}
+            <div style={{ background:C.white, borderRadius:"12px", border:`1px solid ${C.tide}`, padding:"14px 16px", marginBottom:"14px", boxShadow:`0 1px 4px rgba(44,62,80,0.05)` }}>
+              <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:"10px" }}>Trip Type</div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:"5px" }}>
+                {TAGS.map(t => (
+                  <button key={t} onClick={() => setTag(t)} style={{ padding:"3px 9px", borderRadius:"20px", border:`1px solid ${tag===t?C.slate:C.tide}`, background:tag===t?C.slate:C.white, color:tag===t?C.white:C.slateLight, fontSize:"10px", fontWeight:600, cursor:"pointer", transition:"all .12s" }}>{t}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Top contributors */}
+            <div style={{ background:C.white, borderRadius:"12px", border:`1px solid ${C.tide}`, padding:"14px 16px", boxShadow:`0 1px 4px rgba(44,62,80,0.05)` }}>
+              <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:"10px" }}>Top Contributors</div>
+              {[...allTrips.reduce((acc, t) => { acc.set(t.author, (acc.get(t.author)||0)+1); return acc; }, new Map())].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([author, count]) => (
+                <div key={author} onClick={() => setViewingProfile(author)} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"5px 0", cursor:"pointer", borderBottom:`1px solid ${C.seafoamDeep}` }}
+                  onMouseEnter={e=>e.currentTarget.style.opacity="0.7"}
+                  onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                  <div style={{ display:"flex", alignItems:"center", gap:"7px" }}>
+                    <div style={{ width:"22px", height:"22px", borderRadius:"50%", background:C.cta, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"10px", fontWeight:800, color:C.ctaText, flexShrink:0 }}>{author.charAt(0).toUpperCase()}</div>
+                    <span style={{ fontSize:"12px", color:C.amber, fontWeight:600 }}>{author}</span>
+                  </div>
+                  <span style={{ fontSize:"10px", color:C.muted }}>{count} trip{count!==1?"s":""}</span>
                 </div>
-              )}
+              ))}
             </div>
-          ))}
-          {filtered.length===0 && (
-            <div style={{ gridColumn:"1/-1", textAlign:"center", padding:"56px 20px", color:C.muted }}>
-              <div style={{ fontSize:"38px", marginBottom:"12px" }}>✈️</div>
-              <div style={{ fontSize:"15px", fontWeight:600, color:C.slateLight }}>No blueprints match your search</div>
-            </div>
-          )}
-        </div>
-      </main>
+          </aside>
+        )}
+
+        {/* Expand sidebar button when collapsed */}
+        {!sidebarOpen && (
+          <button onClick={() => setSidebarOpen(true)} style={{ position:"fixed", left:"16px", top:"50%", transform:"translateY(-50%)", zIndex:50, background:C.white, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"8px 6px", cursor:"pointer", fontSize:"11px", color:C.muted, boxShadow:`0 2px 8px rgba(44,62,80,0.1)`, writingMode:"vertical-rl" }}>
+            Filters →
+          </button>
+        )}
+
+        {/* Main content */}
+        <main id="blueprint-grid" style={{ flex:1, minWidth:0 }}>
+          <div style={{ marginBottom:"14px", fontSize:"12px", color:C.muted, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <span><strong style={{ color:C.slate }}>{filtered.length}</strong> blueprint{filtered.length!==1?"s":""}{search&&<> for "<strong style={{ color:C.slate }}>{search}</strong>"</>}</span>
+            {(region !== "All Regions" || tag !== "All") && (
+              <button onClick={() => { setRegion("All Regions"); setTag("All"); }} style={{ fontSize:"11px", color:C.amber, background:"none", border:"none", cursor:"pointer", fontWeight:600 }}>Clear filters ×</button>
+            )}
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:"18px" }}>
+            {filtered.map(trip => (
+              <div key={trip.id} style={{ position:"relative" }}>
+                <TripCard trip={trip} onClick={setSelected} />
+                {isAdmin && (
+                  <div style={{ position:"absolute", top:"12px", right:"12px", display:"flex", gap:"6px", zIndex:10 }}>
+                    <button onClick={e => { e.stopPropagation(); setEditingTrip(trip); }} style={{ padding:"5px 10px", borderRadius:"7px", border:"none", background:C.azure, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>✏️</button>
+                    <button onClick={e => { e.stopPropagation(); setConfirmDelete(trip); }} style={{ padding:"5px 10px", borderRadius:"7px", border:"none", background:C.red, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>🗑️</button>
+                  </div>
+                )}
+              </div>
+            ))}
+            {filtered.length===0 && (
+              <div style={{ gridColumn:"1/-1", textAlign:"center", padding:"56px 20px", color:C.muted }}>
+                <div style={{ fontSize:"38px", marginBottom:"12px" }}>✈️</div>
+                <div style={{ fontSize:"15px", fontWeight:600, color:C.slateLight }}>No blueprints match your search</div>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
 
       {/* Delete confirmation */}
       {confirmDelete && (
