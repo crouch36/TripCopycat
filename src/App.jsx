@@ -241,6 +241,60 @@ const REGION_EMOJI = {
   "Central America":"🌴", "South America":"🌿",
   "Africa":"🦁", "Oceania":"🐚",
 };
+const ADMIN_PASSWORDS = ["Guinness"];
+// ── AI Prompt Generator ───────────────────────────────────────────────────────
+const AI_SUBMISSION_PROMPT = `You are helping me document a trip I took so I can share it on TripCopycat.
+
+Please ask me questions about my trip and help me fill in the following details. Ask conversationally, one section at a time. When done, output a clean structured summary under these exact headings:
+
+TRIP OVERVIEW
+- Title:
+- Destination:
+- Region: (Asia / Europe / North America / Central America / South America / Africa / Oceania)
+- Date: (Month Year)
+- Duration:
+- Who traveled:
+- Tags: (choose from: family-friendly, romantic, adventure, food & wine, culture, beach, wildlife, scenic drives)
+
+WHAT I LOVED:
+(3-5 sentences about highlights)
+
+WHAT I WOULD DO DIFFERENTLY:
+(2-3 sentences of honest advice)
+
+FLIGHTS:
+- Airline and route:
+- Approximate cost per person:
+- Tip:
+
+HOTELS:
+For each place:
+- Name:
+- Nights and cost:
+- Tip:
+
+RESTAURANTS:
+For each notable meal:
+- Name and location:
+- Cost:
+- Tip:
+
+BARS:
+- Name:
+- Cost:
+- Tip:
+
+ACTIVITIES:
+- Name:
+- Cost:
+- Tip:
+
+DAILY ITINERARY:
+Day N - Title - Date
+  Time - type - what you did - note
+
+Start by asking: Where did you go and when?`;
+
 
 const catConfig = {
   airfare:     { label: "✈️ Airfare",      color: C.azureDeep  },
@@ -1064,59 +1118,6 @@ function AddTripModal({ onClose, onAdd }) {
 }
 
 
-// ── AI Prompt Generator ───────────────────────────────────────────────────────
-const AI_SUBMISSION_PROMPT = `You are helping me document a trip I took so I can share it on TripCopycat.
-
-Please ask me questions about my trip and help me fill in the following details. Ask conversationally, one section at a time. When done, output a clean structured summary under these exact headings:
-
-TRIP OVERVIEW
-- Title:
-- Destination:
-- Region: (Asia / Europe / North America / Central America / South America / Africa / Oceania)
-- Date: (Month Year)
-- Duration:
-- Who traveled:
-- Tags: (choose from: family-friendly, romantic, adventure, food & wine, culture, beach, wildlife, scenic drives)
-
-WHAT I LOVED:
-(3-5 sentences about highlights)
-
-WHAT I WOULD DO DIFFERENTLY:
-(2-3 sentences of honest advice)
-
-FLIGHTS:
-- Airline and route:
-- Approximate cost per person:
-- Tip:
-
-HOTELS:
-For each place:
-- Name:
-- Nights and cost:
-- Tip:
-
-RESTAURANTS:
-For each notable meal:
-- Name and location:
-- Cost:
-- Tip:
-
-BARS:
-- Name:
-- Cost:
-- Tip:
-
-ACTIVITIES:
-- Name:
-- Cost:
-- Tip:
-
-DAILY ITINERARY:
-Day N - Title - Date
-  Time - type - what you did - note
-
-Start by asking: Where did you go and when?`;
-
 // ── Submit Trip Modal ─────────────────────────────────────────────────────────
 function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess }) {
   const [step, setStep] = useState("prompt");
@@ -1752,7 +1753,6 @@ function ProfilePage({ authorName, allTrips, onClose, onTripClick }) {
 
 // ── Admin Config ──────────────────────────────────────────────────────────────
 // To add more admins, add their password to this array
-const ADMIN_PASSWORDS = ["Guinness"];
 
 // ── Admin Login Modal ─────────────────────────────────────────────────────────
 function AdminLoginModal({ onSuccess, onClose }) {
