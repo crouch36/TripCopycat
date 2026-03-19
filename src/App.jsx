@@ -1964,8 +1964,9 @@ function LegalModal({ onClose }) {
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [trips, setTrips] = useState(SAMPLE_TRIPS);
+  const [trips, setTrips] = useState([]);
   const [dbTrips, setDbTrips] = useState([]);
+  const [tripsLoading, setTripsLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -1989,9 +1990,10 @@ export default function App() {
 
 
   const fetchTrips = () => {
+    setTripsLoading(true);
     supabase.from("trips").select("*").eq("status","published").order("created_at", { ascending: false })
       .then(({ data, error }) => {
-        if (error) { console.error("Supabase fetch error:", error); return; }
+        if (error) { console.error("Supabase fetch error:", error); }
         if (data?.length > 0) {
           const mapped = data.map(t => ({
             id:t.id, title:t.title, destination:t.destination, region:t.region,
@@ -2003,6 +2005,7 @@ export default function App() {
           }));
           setDbTrips(mapped);
         }
+        setTripsLoading(false);
       });
   };
 
@@ -2272,7 +2275,13 @@ export default function App() {
                 )}
               </div>
             ))}
-            {filtered.length===0 && (
+            {tripsLoading && (
+              <div style={{ gridColumn:"1/-1", textAlign:"center", padding:"56px 20px", color:C.muted }}>
+                <div style={{ fontSize:"32px", marginBottom:"12px" }}>🐾</div>
+                <div style={{ fontSize:"14px", fontWeight:600, color:C.slateLight }}>Loading itineraries…</div>
+              </div>
+            )}
+            {!tripsLoading && filtered.length===0 && (
               <div style={{ gridColumn:"1/-1", textAlign:"center", padding:"56px 20px", color:C.muted }}>
                 <div style={{ fontSize:"38px", marginBottom:"12px" }}>✈️</div>
                 <div style={{ fontSize:"15px", fontWeight:600, color:C.slateLight }}>No itineraries match your search</div>
