@@ -1086,19 +1086,112 @@ function SubmitTripModal({ onClose, currentUser, displayName }) {
   };
 
   const parseAIOutput = () => {
-    const text = pastedText;
-    const get = (label) => { const re = new RegExp(label + "[:\s]+([^\n]+)", "i"); const m = text.match(re); return m ? m[1].trim() : ""; };
-    const getBlock = (label, next) => { const re = new RegExp(label + "[:\s\n]+([\s\S]*?)(?=" + next + "|$)", "i"); const m = text.match(re); return m ? m[1].trim() : ""; };
+    const raw = pastedText;
+    const text = raw.replace(/\*\*/g, "").replace(/\r\n/g, "\n");
+
+    const get = (label) => {
+      const re = new RegExp("[-*]?\\s*" + label + "[:\\s]+([^\\n]+)", "i");
+      const m = text.match(re);
+      return m ? m[1].replace(/^[-*\s]+/, "").trim() : "";
+    };
+
+    const getBlock = (label, ...nextLabels) => {
+      const escaped = nextLabels.map(l => l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+      const re = new RegExp(label + "[:\\s*]+([\\s\\S]*?)(?=" + escaped + "|$)", "i");
+      const m = text.match(re);
+      if (!m) return "";
+      return m[1].replace(/^[\s\n]+/, "").replace(/[\s\n]+$/, "").replace(/^[-*]\s*/gm, "").trim();
+    };
+
+    const parseCategory = (label, nextLabel) => {
+      const block = getBlock(label, nextLabel || "~~~END~~~");
+      if (!block) return [];
+      const rows = [];
+      const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
+      let current = null;
+      lines.forEach(line => {
+        const isCostLine = /cost[:\s]|~\$|\$\d|budget|splurge|moderate|free|low cost|\d+ night/i.test(line) && !/tip[:\s]/i.test(line);
+        const isTipLine  = /^tip[:\s]/i.test(line);
+        const isHeader   = !isCostLine && !isTipLine && /^[A-Z]/.test(line) && !line.startsWith("-");
+        if (isHeader && line.length > 2) {
+          if (current) rows.push(current);
+          current = { item: line.replace(/^[-*]\s*/, ""), detail: "", tip: "" };
+        } else if (current && isCostLine) {
+          current.detail = line.replace(/.*?:\s*/, "").trim();
+        } else if (current && isTipLine) {
+          current.tip = line.replace(/^tip[:\s]*/i, "").trim();
+        } else if (current && !current.tip) {
+          current.tip = line.replace(/^[-*]\s*/, "").trim();
+        }
+      });
+      if (current) rows.push(current);
+      return rows.filter(r => r.item.length > 1);
+    };
+
+    const parseDays = () => {
+      const block = getBlock("DAILY ITINERARY", "~~~END~~~");
+      if (!block) return [];
+      const days = [];
+      const dayBlocks = block.split(/\n(?=Day \d+)/i);
+      dayBlocks.forEach(db => {
+        const lines = db.split("\n").map(l => l.replace(/\*\*/g,"").trim()).filter(Boolean);
+        if (!lines.length) return;
+        const hm = lines[0].match(/Day\s*(\d+)\s*[\u2013\-\u2014]\s*(.+?)\s*[\u2013\-\u2014]\s*(.+)/i) ||
+                   lines[0].match(/Day\s*(\d+)\s*[\u2013\-\u2014]\s*(.+)/i);
+        if (!hm) return;
+        const dayNum = parseInt(hm[1]);
+        const title  = (hm[2] || "").trim();
+        const dateStr = (hm[3] || "").trim();
+        const items = [];
+        lines.slice(1).forEach(line => {
+          const m = line.match(/^(.+?)\s*[\u2013\-\u2014]\s*(activity|dining|bar|hotel|transport|travel)\s*[\u2013\-\u2014]\s*(.+)/i);
+          if (m) {
+            const type = m[2].toLowerCase().replace("dining","restaurant").replace("travel","transport");
+            items.push({ time: m[1].trim(), type, label: m[3].trim(), note: "" });
+          }
+        });
+        days.push({ day: dayNum, date: dateStr, title, items });
+      });
+      return days;
+    };
+
+    const parseTags = () => {
+      const tagLine = get("Tags");
+      if (!tagLine) return [];
+      return tagLine.split(/[,;]/).map(t => t.trim().toLowerCase()).filter(t => TAGS.includes(t));
+    };
+
+    const parseRegion = () => {
+      const r = get("Region");
+      return REGIONS.find(reg => reg !== "All Regions" && r.toLowerCase().includes(reg.toLowerCase())) || "";
+    };
+
+    const airfare     = parseCategory("FLIGHTS",      "HOTELS");
+    const hotels      = parseCategory("HOTELS",       "RESTAURANTS");
+    const restaurants = parseCategory("RESTAURANTS",  "BARS");
+    const bars        = parseCategory("BARS",          "ACTIVITIES");
+    const activities  = parseCategory("ACTIVITIES",   "DAILY ITINERARY");
+    const days        = parseDays();
+    const tags        = parseTags();
+    const region      = parseRegion();
+
     setForm(p => ({
       ...p,
-      title: get("Title") || p.title,
-      destination: get("Destination") || p.destination,
-      region: get("Region") || p.region,
-      date: get("Date") || p.date,
-      duration: get("Duration") || p.duration,
-      travelers: get("Who traveled") || p.travelers,
-      loves: getBlock("WHAT I LOVED", "WHAT I WOULD") || p.loves,
-      doNext: getBlock("WHAT I WOULD DO DIFFERENTLY", "FLIGHTS") || p.doNext,
+      title:        get("Title")        || p.title,
+      destination:  get("Destination")  || p.destination,
+      region:       region              || p.region,
+      date:         get("Date")         || p.date,
+      duration:     get("Duration")     || p.duration,
+      travelers:    get("Who traveled") || p.travelers,
+      loves:        getBlock("WHAT I LOVED", "WHAT I WOULD DO DIFFERENTLY", "FLIGHTS") || p.loves,
+      doNext:       getBlock("WHAT I WOULD DO DIFFERENTLY", "FLIGHTS", "HOTELS")       || p.doNext,
+      tags:         tags.length        ? tags        : p.tags,
+      airfare:      airfare.length     ? airfare     : p.airfare,
+      hotels:       hotels.length      ? hotels      : p.hotels,
+      restaurants:  restaurants.length ? restaurants : p.restaurants,
+      bars:         bars.length        ? bars        : p.bars,
+      activities:   activities.length  ? activities  : p.activities,
+      days:         days.length        ? days        : p.days,
     }));
     setStep("form");
   };
