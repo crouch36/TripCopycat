@@ -227,6 +227,21 @@ const PRIMARY_TAGS  = ["All","family-friendly","romantic","adventure","food & wi
 const EXTENDED_TAGS = ["solo","girls trip","guys trip","road trip","city break","ski & snow","national parks","budget","luxury","off the beaten path","hiking & trekking","nightlife","history & heritage","wellness & spa","bachelor/bachelorette","group travel","long weekend","kid-free"];
 const TAGS = [...PRIMARY_TAGS, ...EXTENDED_TAGS];
 
+const REGION_GRADIENTS = {
+  "Asia":           "linear-gradient(135deg, #C84B31 0%, #ECAB51 100%)",
+  "Europe":         "linear-gradient(135deg, #2C3E7A 0%, #5B7FBF 100%)",
+  "North America":  "linear-gradient(135deg, #1A6B3C 0%, #4CAF7D 100%)",
+  "Central America":"linear-gradient(135deg, #7B3FA0 0%, #C47DD4 100%)",
+  "South America":  "linear-gradient(135deg, #B5451B 0%, #E8903A 100%)",
+  "Africa":         "linear-gradient(135deg, #8B6914 0%, #D4A843 100%)",
+  "Oceania":        "linear-gradient(135deg, #0E6B8C 0%, #2EBFDB 100%)",
+};
+const REGION_EMOJI = {
+  "Asia":"🏯", "Europe":"🏰", "North America":"🗽",
+  "Central America":"🌴", "South America":"🌿",
+  "Africa":"🦁", "Oceania":"🐚",
+};
+
 const catConfig = {
   airfare:     { label: "✈️ Airfare",      color: C.azureDeep  },
   hotels:      { label: "🏨 Hotels",       color: C.cerulean   },
@@ -915,20 +930,6 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark }) {
 
 
 // ── Region gradient map for card image placeholders ──────────────────────────
-const REGION_GRADIENTS = {
-  "Asia":           "linear-gradient(135deg, #C84B31 0%, #ECAB51 100%)",
-  "Europe":         "linear-gradient(135deg, #2C3E7A 0%, #5B7FBF 100%)",
-  "North America":  "linear-gradient(135deg, #1A6B3C 0%, #4CAF7D 100%)",
-  "Central America":"linear-gradient(135deg, #7B3FA0 0%, #C47DD4 100%)",
-  "South America":  "linear-gradient(135deg, #B5451B 0%, #E8903A 100%)",
-  "Africa":         "linear-gradient(135deg, #8B6914 0%, #D4A843 100%)",
-  "Oceania":        "linear-gradient(135deg, #0E6B8C 0%, #2EBFDB 100%)",
-};
-const REGION_EMOJI = {
-  "Asia":"🏯", "Europe":"🏰", "North America":"🗽",
-  "Central America":"🌴", "South America":"🌿",
-  "Africa":"🦁", "Oceania":"🐚",
-};
 
 // ── Trip Card ─────────────────────────────────────────────────────────────────
 
