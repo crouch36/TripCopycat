@@ -640,6 +640,38 @@ function SmartImportHub({ onClose }) {
   );
 }
 
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+const DURATION_FILTERS = ["Any Length", "Weekend (1-3 days)", "1 Week (4-7 days)", "2 Weeks (8-14 days)", "2+ Weeks (15+ days)"];
+
+function matchesDuration(trip, filter) {
+  if (filter === "Any Length") return true;
+  const n = parseInt(trip.duration) || 0;
+  if (filter === "Weekend (1-3 days)") return n >= 1 && n <= 3;
+  if (filter === "1 Week (4-7 days)") return n >= 4 && n <= 7;
+  if (filter === "2 Weeks (8-14 days)") return n >= 8 && n <= 14;
+  if (filter === "2+ Weeks (15+ days)") return n >= 15;
+  return true;
+}
+
+function slugify(title) {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function useBookmarks() {
+  const [bookmarks, setBookmarks] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("tc_bookmarks") || "[]"); } catch { return []; }
+  });
+  const toggle = (id) => {
+    setBookmarks(prev => {
+      const next = prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id];
+      localStorage.setItem("tc_bookmarks", JSON.stringify(next));
+      return next;
+    });
+  };
+  return { bookmarks, toggle };
+}
+
 // ── Export Modal ──────────────────────────────────────────────────────────────
 
 function ExportModal({ trip, onClose }) {
@@ -897,38 +929,6 @@ const REGION_EMOJI = {
   "Central America":"🌴", "South America":"🌿",
   "Africa":"🦁", "Oceania":"🐚",
 };
-
-// ── Utilities ─────────────────────────────────────────────────────────────────
-
-const DURATION_FILTERS = ["Any Length", "Weekend (1-3 days)", "1 Week (4-7 days)", "2 Weeks (8-14 days)", "2+ Weeks (15+ days)"];
-
-function matchesDuration(trip, filter) {
-  if (filter === "Any Length") return true;
-  const n = parseInt(trip.duration) || 0;
-  if (filter === "Weekend (1-3 days)") return n >= 1 && n <= 3;
-  if (filter === "1 Week (4-7 days)") return n >= 4 && n <= 7;
-  if (filter === "2 Weeks (8-14 days)") return n >= 8 && n <= 14;
-  if (filter === "2+ Weeks (15+ days)") return n >= 15;
-  return true;
-}
-
-function slugify(title) {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
-
-function useBookmarks() {
-  const [bookmarks, setBookmarks] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("tc_bookmarks") || "[]"); } catch { return []; }
-  });
-  const toggle = (id) => {
-    setBookmarks(prev => {
-      const next = prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id];
-      localStorage.setItem("tc_bookmarks", JSON.stringify(next));
-      return next;
-    });
-  };
-  return { bookmarks, toggle };
-}
 
 // ── Trip Card ─────────────────────────────────────────────────────────────────
 
