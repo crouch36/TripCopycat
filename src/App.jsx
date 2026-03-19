@@ -1993,6 +1993,7 @@ export default function App() {
     setTripsLoading(true);
     supabase.from("trips").select("*").eq("status","published").order("created_at", { ascending: false })
       .then(({ data, error }) => {
+        console.log("fetchTrips result:", { data, error, count: data?.length });
         if (error) { console.error("Supabase fetch error:", error); }
         if (data?.length > 0) {
           const mapped = data.map(t => ({
@@ -2003,6 +2004,7 @@ export default function App() {
             bars:t.bars||[], activities:t.activities||[], days:t.days||[],
             image:t.image||""
           }));
+          console.log("mapped trips:", mapped.length);
           setDbTrips(mapped);
         }
         setTripsLoading(false);
