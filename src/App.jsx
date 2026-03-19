@@ -1037,7 +1037,7 @@ Day N - Title - Date
 Start by asking: Where did you go and when?`;
 
 // ── Submit Trip Modal ─────────────────────────────────────────────────────────
-function SubmitTripModal({ onClose, currentUser, displayName }) {
+function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess }) {
   const [step, setStep] = useState("prompt");
   const [pastedText, setPastedText] = useState("");
   const [filterResult, setFilterResult] = useState(null);
@@ -1219,6 +1219,7 @@ function SubmitTripModal({ onClose, currentUser, displayName }) {
         image: photoUrl || "", status: "published"
       }]);
       setStep("done");
+      if (onSubmitSuccess) onSubmitSuccess();
     } else {
       await supabase.from("submissions").insert([{
         trip_data: tripWithPhoto, submitter_name: submitterName, submitter_email: submitterEmail,
@@ -1986,10 +1987,12 @@ export default function App() {
   // Expose profile setter for card author clicks
   useEffect(() => { window.__setViewingProfile = setViewingProfile; }, []);
 
-  useEffect(() => {
+
+  const fetchTrips = () => {
     supabase.from("trips").select("*").eq("status","published").order("created_at", { ascending: false })
       .then(({ data, error }) => {
-        if (!error && data?.length > 0) {
+        if (error) { console.error("Supabase fetch error:", error); return; }
+        if (data?.length > 0) {
           const mapped = data.map(t => ({
             id:t.id, title:t.title, destination:t.destination, region:t.region,
             author:t.author_name, date:t.date, duration:t.duration, travelers:t.travelers,
@@ -2001,7 +2004,9 @@ export default function App() {
           setDbTrips(mapped);
         }
       });
-  }, []);
+  };
+
+  useEffect(() => { fetchTrips(); }, []);
 
   const allTrips = [...dbTrips, ...trips];
 
@@ -2278,7 +2283,7 @@ export default function App() {
       {selected      && <TripModal trip={selected} onClose={() => setSelected(null)} />}
       {showAdd       && <AddTripModal onClose={() => setShowAdd(false)} onAdd={t => setTrips(p=>[t,...p])} />}
       {showImport    && <SmartImportHub onClose={() => setShowImport(false)} />}
-      {showSubmit    && <SubmitTripModal onClose={() => setShowSubmit(false)} currentUser={currentUser} displayName={currentDisplayName} />}
+      {showSubmit    && <SubmitTripModal onClose={() => setShowSubmit(false)} currentUser={currentUser} displayName={currentDisplayName} onSubmitSuccess={fetchTrips} />}
       {showAuth      && <AuthModal onClose={() => setShowAuth(false)} onSuccess={handleAuthSuccess} />}
       {viewingProfile && <ProfilePage authorName={viewingProfile} allTrips={allTrips} onClose={() => setViewingProfile(null)} onTripClick={setSelected} />}
       {showQueue     && <AdminQueueModal onClose={() => setShowQueue(false)} />}
