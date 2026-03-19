@@ -1677,6 +1677,81 @@ function AdminEditModal({ trip, onSave, onClose }) {
   );
 }
 
+// ── Feedback Modal ────────────────────────────────────────────────────────────
+
+function FeedbackModal({ onClose }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const inp = { width:"100%", padding:"9px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"13px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate };
+
+  const handleSend = async () => {
+    if (!message.trim()) return;
+    setSending(true);
+    try {
+      await fetch("https://formsubmit.co/ajax/andrew@tripcopycat.com", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ name: name || "Anonymous", email: email || "No email provided", message, _subject: "TripCopycat Beta Feedback" })
+      });
+    } catch(e) {}
+    setSending(false);
+    setSent(true);
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:6000, display:"flex", alignItems:"center", justifyContent:"center", padding:"24px 16px", backdropFilter:"blur(8px)" }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"480px", boxShadow:`0 32px 64px rgba(44,62,80,0.25)`, overflow:"hidden", border:`1px solid ${C.tide}` }}>
+
+        {/* Header */}
+        <div style={{ background:`linear-gradient(135deg, #1C2B3A 0%, #C1692A 100%)`, padding:"22px 28px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div>
+            <div style={{ fontSize:"11px", fontWeight:700, color:"rgba(255,255,255,0.7)", textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:"3px" }}>Beta Feedback</div>
+            <div style={{ fontSize:"19px", fontWeight:700, color:C.white, fontFamily:"'Playfair Display',Georgia,serif" }}>Share Your Thoughts</div>
+          </div>
+          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:C.white, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"18px" }}>×</button>
+        </div>
+
+        {sent ? (
+          <div style={{ padding:"48px 28px", textAlign:"center" }}>
+            <div style={{ fontSize:"44px", marginBottom:"14px" }}>🙏</div>
+            <div style={{ fontSize:"18px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"8px" }}>Thank you!</div>
+            <div style={{ fontSize:"13px", color:C.slateLight, lineHeight:1.6, marginBottom:"24px" }}>Your feedback helps us build a better TripCopycat. We read every message.</div>
+            <button onClick={onClose} style={{ padding:"10px 28px", borderRadius:"10px", border:"none", background:C.cta, color:C.ctaText, fontWeight:700, fontSize:"13px", cursor:"pointer" }}>Close</button>
+          </div>
+        ) : (
+          <div style={{ padding:"24px 28px" }}>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"12px" }}>
+              <div>
+                <label style={{ fontSize:"11px", fontWeight:600, color:C.slateMid, display:"block", marginBottom:"4px" }}>Name <span style={{ color:C.muted, fontWeight:400 }}>(optional)</span></label>
+                <input style={inp} value={name} onChange={e=>setName(e.target.value)} placeholder="Your name" />
+              </div>
+              <div>
+                <label style={{ fontSize:"11px", fontWeight:600, color:C.slateMid, display:"block", marginBottom:"4px" }}>Email <span style={{ color:C.muted, fontWeight:400 }}>(optional)</span></label>
+                <input style={inp} type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" />
+              </div>
+            </div>
+            <div style={{ marginBottom:"20px" }}>
+              <label style={{ fontSize:"11px", fontWeight:600, color:C.slateMid, display:"block", marginBottom:"4px" }}>Feedback <span style={{ color:C.red }}>*</span></label>
+              <textarea style={{...inp, height:"110px", resize:"vertical"}} value={message} onChange={e=>setMessage(e.target.value)} placeholder="Tell us about a bug, a suggestion, or anything on your mind…" />
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <button onClick={onClose} style={{ padding:"9px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>Cancel</button>
+              <button onClick={handleSend} disabled={!message.trim() || sending} style={{ padding:"9px 24px", borderRadius:"8px", border:"none", background:message.trim()?C.cta:C.tide, color:message.trim()?C.ctaText:C.muted, fontSize:"12px", fontWeight:700, cursor:message.trim()?"pointer":"not-allowed", transition:"all .15s" }}>
+                {sending ? "Sending…" : "Send Feedback →"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Legal Modal ───────────────────────────────────────────────────────────────
 
 function LegalModal({ onClose }) {
@@ -1818,6 +1893,7 @@ export default function App() {
   const [showAdminLogin, setShowAdminLogin] = useState(isAdminUrl);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLegal, setShowLegal] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   useEffect(() => { window.__setShowLegal = setShowLegal; }, []);
   const [editingTrip, setEditingTrip] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -1845,6 +1921,21 @@ export default function App() {
           <button onClick={() => setIsAdmin(false)} style={{ fontSize:"11px", fontWeight:700, color:C.white, background:"rgba(255,255,255,0.2)", border:"none", borderRadius:"6px", padding:"4px 12px", cursor:"pointer" }}>Exit Admin</button>
         </div>
       )}
+
+      {/* Beta banner */}
+      <div style={{ background:`linear-gradient(135deg, #1C2B3A 0%, #2E4A3E 60%, #C1692A 100%)`, padding:"10px 20px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:"12px", flexWrap:"wrap" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"10px", flex:1, minWidth:0 }}>
+          <span style={{ fontSize:"16px", flexShrink:0 }}>🐾</span>
+          <p style={{ margin:0, fontSize:"12px", color:"rgba(255,255,255,0.92)", lineHeight:1.5 }}>
+            <strong style={{ color:C.cta }}>Welcome to the TripCopycat Beta!</strong> We're currently building the world's first travel blueprint library. If you find a bug or have a suggestion, we'd love your feedback as we grow.
+          </p>
+        </div>
+        <button onClick={() => setShowFeedback(true)} style={{ flexShrink:0, padding:"7px 16px", borderRadius:"20px", border:"1px solid rgba(196,168,130,0.6)", background:"rgba(196,168,130,0.15)", color:C.cta, fontSize:"12px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap", transition:"all .15s" }}
+          onMouseEnter={e=>{e.currentTarget.style.background="rgba(196,168,130,0.3)"}}
+          onMouseLeave={e=>{e.currentTarget.style.background="rgba(196,168,130,0.15)"}}>
+          Provide Feedback →
+        </button>
+      </div>
 
       {/* Nav */}
       <nav style={{ background:C.white, borderBottom:`1px solid ${C.tide}`, padding:"0", margin:"0", position:"sticky", top:0, zIndex:100, boxShadow:`0 1px 6px rgba(28,43,58,0.06)` }}>
@@ -2026,6 +2117,14 @@ export default function App() {
       {showAdminLogin && <AdminLoginModal onSuccess={handleAdminLogin} onClose={() => setShowAdminLogin(false)} />}
       {editingTrip   && <AdminEditModal trip={editingTrip} onSave={handleSaveTrip} onClose={() => setEditingTrip(null)} />}
       {showLegal     && <LegalModal onClose={() => setShowLegal(false)} />}
+      {showFeedback  && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+
+      {/* Floating feedback button */}
+      <button onClick={() => setShowFeedback(true)} style={{ position:"fixed", bottom:"24px", right:"24px", zIndex:500, background:`linear-gradient(135deg, #1C2B3A, #C1692A)`, color:C.white, border:"none", borderRadius:"50px", padding:"11px 20px", fontSize:"12px", fontWeight:700, cursor:"pointer", boxShadow:`0 4px 18px rgba(28,43,58,0.35)`, display:"flex", alignItems:"center", gap:"7px", transition:"transform .15s" }}
+        onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"}
+        onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}>
+        💬 Feedback
+      </button>
 
       {/* Site footer */}
       <footer style={{ borderTop:`1px solid ${C.tide}`, background:C.white, padding:"16px 32px", display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:"40px" }}>
