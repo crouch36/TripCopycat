@@ -1146,7 +1146,7 @@ function SubmitTripModal({ onClose, currentUser, displayName }) {
         </div>
 
         {step === "prompt" && (
-          <div style={{ padding:"28px" }}>
+          <div style={{ padding:"28px", maxHeight:"70vh", overflowY:"auto" }}>
             <div style={{ textAlign:"center", marginBottom:"24px" }}>
               <div style={{ fontSize:"32px", marginBottom:"10px" }}>✈️</div>
               <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>How would you like to build your itinerary?</div>
@@ -1168,7 +1168,7 @@ function SubmitTripModal({ onClose, currentUser, displayName }) {
         )}
 
         {step === "ai-prompt" && (
-          <div style={{ padding:"24px 28px" }}>
+          <div style={{ padding:"24px 28px", maxHeight:"70vh", overflowY:"auto" }}>
             <div style={{ fontSize:"13px", color:C.slateLight, marginBottom:"14px", lineHeight:1.6 }}>Copy this prompt and paste it into Claude, ChatGPT, or any AI. Answer its questions about your trip. When done, copy the full output and paste it below.</div>
             <pre style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"10px", padding:"14px", fontSize:"10.5px", lineHeight:1.7, color:C.slateMid, whiteSpace:"pre-wrap", wordBreak:"break-word", maxHeight:"200px", overflowY:"auto", fontFamily:"monospace", marginBottom:"14px" }}>
               {AI_SUBMISSION_PROMPT}
