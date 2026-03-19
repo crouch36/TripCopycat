@@ -2052,8 +2052,25 @@ export default function App() {
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   const handleAdminLogin = () => { setIsAdmin(true); setShowAdminLogin(false); };
-  const handleSaveTrip = (updated) => { setTrips(p => p.map(t => t.id === updated.id ? updated : t)); setEditingTrip(null); };
-  const handleDeleteTrip = (id) => { setTrips(p => p.filter(t => t.id !== id)); setConfirmDelete(null); };
+  const handleSaveTrip = async (updated) => {
+    await supabase.from("trips").update({
+      title: updated.title, destination: updated.destination, region: updated.region,
+      date: updated.date, duration: updated.duration, travelers: updated.travelers,
+      tags: updated.tags, loves: updated.loves, do_next: updated.doNext,
+      airfare: updated.airfare, hotels: updated.hotels, restaurants: updated.restaurants,
+      bars: updated.bars, activities: updated.activities, days: updated.days,
+      image: updated.image || ""
+    }).eq("id", updated.id);
+    setTrips(p => p.map(t => t.id === updated.id ? updated : t));
+    setDbTrips(p => p.map(t => t.id === updated.id ? updated : t));
+    setEditingTrip(null);
+  };
+  const handleDeleteTrip = async (id) => {
+    await supabase.from("trips").delete().eq("id", id);
+    setTrips(p => p.filter(t => t.id !== id));
+    setDbTrips(p => p.filter(t => t.id !== id));
+    setConfirmDelete(null);
+  };
 
   const filtered = useMemo(() => {
     const f = allTrips.filter(t =>
