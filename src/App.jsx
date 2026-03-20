@@ -1594,18 +1594,22 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                 </div>
               </div>
 
-              <div style={{ gridColumn:"1/-1" }}><label style={{...lbl,color:C.green}}>What did you love?</label><textarea style={{...inp,height:"80px",resize:"vertical"}} value={form.loves} onChange={e=>setForm(p=>({...p,loves:e.target.value}))} /></div>
-              <div style={{ gridColumn:"1/-1" }}><label style={{...lbl,color:C.amber}}>What would you do differently?</label><textarea style={{...inp,height:"80px",resize:"vertical"}} value={form.doNext} onChange={e=>setForm(p=>({...p,doNext:e.target.value}))} /></div>
+              <div style={{ gridColumn:"1/-1" }}><label style={{...lbl,color:C.green}}>What did you love?</label><textarea style={{...inp,height:"100px",resize:"vertical"}} value={form.loves} onChange={e=>setForm(p=>({...p,loves:e.target.value}))} /></div>
+              <div style={{ gridColumn:"1/-1" }}><label style={{...lbl,color:C.amber}}>What would you do differently?</label><textarea style={{...inp,height:"100px",resize:"vertical"}} value={form.doNext} onChange={e=>setForm(p=>({...p,doNext:e.target.value}))} /></div>
             </div>
             {Object.entries(catConfig).map(([key,cfg]) => (
               <div key={key} style={{ marginBottom:"14px" }}>
                 <div style={{ fontSize:"12px", fontWeight:700, color:cfg.color, marginBottom:"6px" }}>{cfg.label}</div>
                 {form[key].map((row,i) => (
-                  <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr auto", gap:"5px", marginBottom:"5px" }}>
-                    <input style={inp} placeholder="Name" value={row.item} onChange={e=>updRow(key,i,"item",e.target.value)} />
-                    <input style={inp} placeholder="Details" value={row.detail} onChange={e=>updRow(key,i,"detail",e.target.value)} />
-                    <input style={inp} placeholder="Tip" value={row.tip} onChange={e=>updRow(key,i,"tip",e.target.value)} />
-                    <button onClick={()=>delRow(key,i)} style={{ padding:"5px 8px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer" }}>x</button>
+                  <div key={i} style={{ background:C.seafoam, borderRadius:"8px", padding:"10px", marginBottom:"8px", border:`1px solid ${C.tide}` }}>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:"6px", marginBottom:"5px" }}>
+                      <input style={inp} placeholder="Name" value={row.item} onChange={e=>updRow(key,i,"item",e.target.value)} />
+                      <button onClick={()=>delRow(key,i)} style={{ padding:"5px 10px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"12px" }}>✕</button>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px" }}>
+                      <textarea style={{...inp, height:"52px", resize:"vertical", fontSize:"11px"}} placeholder="Details / Cost" value={row.detail} onChange={e=>updRow(key,i,"detail",e.target.value)} />
+                      <textarea style={{...inp, height:"52px", resize:"vertical", fontSize:"11px"}} placeholder="Insider tip" value={row.tip} onChange={e=>updRow(key,i,"tip",e.target.value)} />
+                    </div>
                   </div>
                 ))}
                 <button onClick={()=>addRow(key)} style={{ fontSize:"11px", color:cfg.color, background:"none", border:`1px dashed ${cfg.color}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600 }}>+ Add</button>
