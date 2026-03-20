@@ -1494,9 +1494,9 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
             <div style={{ textAlign:"center", marginBottom:"24px" }}>
               <div style={{ fontSize:"32px", marginBottom:"10px" }}>✈️</div>
               <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>How would you like to build your itinerary?</div>
-              <div style={{ fontSize:"13px", color:C.slateLight, lineHeight:1.6 }}>Use our AI prompt for the fastest experience, or fill the form directly.</div>
+              <div style={{ fontSize:"13px", color:C.slateLight, lineHeight:1.6 }}>Choose the fastest path for you.</div>
             </div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"12px" }}>
               <button onClick={() => setStep("ai-prompt")} style={{ padding:"18px", borderRadius:"12px", border:`2px solid ${C.azure}`, background:C.seafoam, cursor:"pointer", textAlign:"left" }}>
                 <div style={{ fontSize:"22px", marginBottom:"8px" }}>🤖</div>
                 <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Use AI Prompt</div>
@@ -1508,7 +1508,42 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                 <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"3px", lineHeight:1.5 }}>Enter your trip details directly into the form fields.</div>
               </button>
             </div>
+            <button onClick={() => setStep("photo-import")} style={{ width:"100%", padding:"18px", borderRadius:"12px", border:`2px solid ${C.amber}`, background:C.amberBg, cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:"16px" }}>
+              <div style={{ fontSize:"28px", flexShrink:0 }}>📸</div>
+              <div>
+                <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"3px" }}>
+                  <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Smart Import From Photos</div>
+                  <span style={{ fontSize:"9px", fontWeight:700, background:C.amber, color:C.white, padding:"2px 7px", borderRadius:"20px" }}>NEW</span>
+                </div>
+                <div style={{ fontSize:"11px", color:C.slateLight, lineHeight:1.5 }}>Upload up to 30 trip photos. AI reads GPS, identifies venues from signage, and reconstructs your itinerary automatically.</div>
+              </div>
+            </button>
           </div>
+        )}
+
+        {step === "photo-import" && (
+          <PhotoImportModal
+            onClose={() => setStep("prompt")}
+            onComplete={(data) => {
+              setForm(p => ({
+                ...p,
+                title: data.destination ? `${data.destination} Trip` : p.title,
+                destination: data.destination || p.destination,
+                region: data.region || p.region,
+                duration: data.duration || p.duration,
+                travelers: data.travelers || p.travelers,
+                tags: data.tags?.length ? data.tags : p.tags,
+                loves: data.loves || p.loves,
+                doNext: data.doNext || p.doNext,
+                hotels: data.hotels?.length ? data.hotels : p.hotels,
+                restaurants: data.restaurants?.length ? data.restaurants : p.restaurants,
+                bars: data.bars?.length ? data.bars : p.bars,
+                activities: data.activities?.length ? data.activities : p.activities,
+                days: data.days?.length ? data.days : p.days,
+              }));
+              setStep("form");
+            }}
+          />
         )}
 
         {step === "ai-prompt" && (
