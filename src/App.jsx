@@ -543,30 +543,30 @@ function PhotoImportModal({ onClose, onComplete }) {
       return parts.join(" | ");
     }).join("\n");
 
-    const content = [
-      {
-        type: "text",
-        text: `You are analysing travel photos to reconstruct a trip itinerary. Here is the metadata extracted from each photo:\n\n${metaSummary}\n\nPlease analyse all photos and the metadata above to reconstruct the trip. Return ONLY a JSON object with this exact structure, no other text:\n{\n  "destination": "City, Country",\n  "region": "Europe|Asia|North America|Central America|South America|Africa|Oceania",\n  "duration": "N days",\n  "travelers": "description e.g. Couple, Family, Guys trip",\n  "tags": ["tag1", "tag2"],\n  "loves": "2-4 sentences about highlights visible in the photos",\n  "doNext": "1-2 sentences of honest advice based on what you can see",\n  "hotels": [{"item": "name", "detail": "location", "tip": ""}],\n  "restaurants": [{"item": "name or description", "detail": "type of food/cuisine", "tip": ""}],\n  "bars": [{"item": "name", "detail": "type", "tip": ""}],\n  "activities": [{"item": "name", "detail": "description", "tip": ""}],\n  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"time": "", "type": "activity|restaurant|bar|hotel|transport", "label": "what happened", "note": ""}]}]\n}\nFor restaurants/bars/activities, use any visible signage to name them. If GPS data shows a specific place, use it. Be specific where you can, descriptive where you cannot.`
-      },
-      ...compressed.map((p, i) => ({
-        type: "image",
-        source: { type: "base64", media_type: "image/jpeg", data: p.b64 }
-      }))
-    ];
-
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2000,
-          messages: [{ role: "user", content }]
-        })
-      });
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) throw new Error("No API key configured");
+
+      const parts = [
+        {
+          text: `You are analysing travel photos to reconstruct a trip itinerary. Here is the metadata extracted from each photo:\n\n${metaSummary}\n\nPlease analyse all photos and the metadata above to reconstruct the trip. Return ONLY a JSON object with this exact structure, no other text:\n{\n  "destination": "City, Country",\n  "region": "Europe|Asia|North America|Central America|South America|Africa|Oceania",\n  "duration": "N days",\n  "travelers": "description e.g. Couple, Family, Guys trip",\n  "tags": ["tag1", "tag2"],\n  "loves": "2-4 sentences about highlights visible in the photos",\n  "doNext": "1-2 sentences of honest advice based on what you can see",\n  "hotels": [{"item": "name", "detail": "location", "tip": ""}],\n  "restaurants": [{"item": "name or description", "detail": "type of food/cuisine", "tip": ""}],\n  "bars": [{"item": "name", "detail": "type", "tip": ""}],\n  "activities": [{"item": "name", "detail": "description", "tip": ""}],\n  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"time": "", "type": "activity|restaurant|bar|hotel|transport", "label": "what happened", "note": ""}]}]\n}\nFor restaurants/bars/activities, use any visible signage to name them. If GPS data shows a specific place, use it. Be specific where you can, descriptive where you cannot.`
+        },
+        ...compressed.map(p => ({
+          inline_data: { mime_type: "image/jpeg", data: p.b64 }
+        }))
+      ];
+
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts }] })
+        }
+      );
       const data = await res.json();
       setProgress(95);
-      const text = data.content?.find(b => b.type === "text")?.text || "";
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error("No JSON in response");
       const parsed = JSON.parse(jsonMatch[0]);
@@ -575,7 +575,7 @@ function PhotoImportModal({ onClose, onComplete }) {
       setProgress(100);
     } catch(e) {
       console.error("Claude API error:", e);
-      setError("Something went wrong analysing your photos. Please try again.");
+      setError(`Analysis failed: ${e.message}. Please try again.`);
       setPhase("error");
     }
   };
