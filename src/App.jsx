@@ -500,6 +500,7 @@ function PhotoImportModal({ onClose, onComplete }) {
   const [progressLabel, setProgressLabel] = useState("");
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [rawDebug, setRawDebug] = useState("");
   const fileRef = useRef();
 
   const processPhotos = async (files) => {
@@ -565,9 +566,13 @@ function PhotoImportModal({ onClose, onComplete }) {
         }
       );
       const data = await res.json();
+      const rawText = JSON.stringify(data).slice(0, 800);
+      setRawDebug(rawText);
+      console.log("Gemini response:", rawText);
       setProgress(95);
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      console.log("Gemini text:", text.slice(0, 300));
+      const jsonMatch = text.replace(/```json\n?|```\n?/g, "").match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error("No JSON in response");
       const parsed = JSON.parse(jsonMatch[0]);
       setResult(parsed);
@@ -691,10 +696,16 @@ function PhotoImportModal({ onClose, onComplete }) {
 
         {/* error */}
         {phase === "error" && (
-          <div style={{ padding:"48px 32px", textAlign:"center" }}>
+          <div style={{ padding:"32px 28px", textAlign:"center" }}>
             <div style={{ fontSize:"36px", marginBottom:"12px" }}>😕</div>
             <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"8px" }}>Something went wrong</div>
-            <div style={{ fontSize:"13px", color:C.slateLight, marginBottom:"24px" }}>{error}</div>
+            <div style={{ fontSize:"13px", color:C.slateLight, marginBottom:"16px" }}>{error}</div>
+            {rawDebug && (
+              <div style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"10px 12px", marginBottom:"16px", textAlign:"left", maxHeight:"120px", overflowY:"auto" }}>
+                <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, marginBottom:"4px" }}>DEBUG — API Response:</div>
+                <div style={{ fontSize:"10px", color:C.slateMid, wordBreak:"break-all", lineHeight:1.5 }}>{rawDebug}</div>
+              </div>
+            )}
             <button onClick={() => setPhase("drop")} style={{ padding:"10px 24px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontWeight:700, cursor:"pointer" }}>Try Again</button>
           </div>
         )}
