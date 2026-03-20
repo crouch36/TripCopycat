@@ -1468,25 +1468,13 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
     const tripWithPhoto = { ...form, image: photoUrl || "" };
     const result = runContentFilter(tripWithPhoto);
     setFilterResult(result);
-    if (result.passed) {
-      await supabase.from("trips").insert([{
-        title: form.title, destination: form.destination, region: form.region,
-        author_name: submitterName, author_email: submitterEmail,
-        date: form.date, duration: form.duration, travelers: form.travelers,
-        tags: form.tags, loves: form.loves, do_next: form.doNext,
-        airfare: form.airfare, hotels: form.hotels, restaurants: form.restaurants,
-        bars: form.bars, activities: form.activities, days: form.days,
-        image: photoUrl || "", status: "published"
-      }]);
-      setStep("done");
-      if (onSubmitSuccess) onSubmitSuccess();
-    } else {
-      await supabase.from("submissions").insert([{
-        trip_data: tripWithPhoto, submitter_name: submitterName, submitter_email: submitterEmail,
-        status: "flagged", ai_flagged: true, ai_flag_reason: result.flags.join("; ")
-      }]);
-      setStep("flagged");
-    }
+    await supabase.from("submissions").insert([{
+      trip_data: tripWithPhoto, submitter_name: submitterName, submitter_email: submitterEmail,
+      status: result.passed ? "pending" : "flagged",
+      ai_flagged: !result.passed,
+      ai_flag_reason: result.flags.join("; ")
+    }]);
+    setStep("flagged");
   };
 
   return (
@@ -1665,16 +1653,10 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
 
         {step === "flagged" && (
           <div style={{ padding:"50px 28px", textAlign:"center" }}>
-            <div style={{ fontSize:"40px", marginBottom:"14px" }}>📋</div>
-            <div style={{ fontSize:"18px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"8px" }}>Submission Received</div>
-            <div style={{ fontSize:"13px", color:C.slateLight, maxWidth:"380px", margin:"0 auto 16px", lineHeight:1.6 }}>Your trip is under review. We will be in touch at <strong>{submitterEmail}</strong>.</div>
-            {filterResult?.flags?.length > 0 && (
-              <div style={{ background:C.amberBg, border:`1px solid ${C.amber}`, borderRadius:"10px", padding:"12px 16px", maxWidth:"380px", margin:"0 auto 20px", textAlign:"left" }}>
-                <div style={{ fontSize:"11px", fontWeight:700, color:C.amber, marginBottom:"5px" }}>Items flagged for review:</div>
-                {filterResult.flags.map((f,i) => <div key={i} style={{ fontSize:"11px", color:C.slateMid }}>- {f}</div>)}
-              </div>
-            )}
-            <button onClick={onClose} style={{ padding:"11px 28px", borderRadius:"10px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontWeight:600, fontSize:"13px", cursor:"pointer" }}>Close</button>
+            <div style={{ fontSize:"40px", marginBottom:"14px" }}>🎉</div>
+            <div style={{ fontSize:"18px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"8px" }}>Trip Submitted!</div>
+            <div style={{ fontSize:"13px", color:C.slateLight, maxWidth:"380px", margin:"0 auto 16px", lineHeight:1.6 }}>Thanks for contributing to TripCopycat! Your trip is under review and will be published shortly. We'll be in touch at <strong>{submitterEmail}</strong>.</div>
+            <button onClick={onClose} style={{ padding:"11px 28px", borderRadius:"10px", border:"none", background:C.cta, color:C.ctaText, fontWeight:700, fontSize:"13px", cursor:"pointer" }}>Done</button>
           </div>
         )}
 
