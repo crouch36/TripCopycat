@@ -1472,7 +1472,8 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
       trip_data: tripWithPhoto, submitter_name: submitterName, submitter_email: submitterEmail,
       status: result.passed ? "pending" : "flagged",
       ai_flagged: !result.passed,
-      ai_flag_reason: result.flags.join("; ")
+      ai_flag_reason: result.flags.join("; "),
+      user_id: currentUser?.id || null
     }]);
     setStep("flagged");
   };
@@ -1699,7 +1700,7 @@ function AdminQueueModal({ onClose, onApprove }) {
       tags:t.tags||[], loves:t.loves, do_next:t.do_next||t.doNext||"",
       airfare:t.airfare||[], hotels:t.hotels||[], restaurants:t.restaurants||[],
       bars:t.bars||[], activities:t.activities||[], days:t.days||[],
-      image:t.image||"", status:"published"
+      image:t.image||"", status:"published", user_id:sub.user_id||null
     }]);
     await supabase.from("submissions").update({ status:"approved", reviewed_at:new Date().toISOString() }).eq("id",sub.id);
     setSubmissions(p => p.map(s => s.id===sub.id ? {...s,status:"approved"} : s));
@@ -1871,13 +1872,15 @@ function AuthModal({ onClose, onSuccess }) {
 }
 
 // ── Profile Page ──────────────────────────────────────────────────────────────
-function ProfilePage({ authorName, allTrips, onClose, onTripClick }) {
+function ProfilePage({ authorName, allTrips, onClose, onTripClick, currentUser, onEditTrip, onDeleteTrip }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const contributorTrips = allTrips.filter(t =>
     (t.author || "").toLowerCase() === authorName.toLowerCase()
   );
+
+  const isOwnProfile = currentUser && contributorTrips.some(t => t.userId === currentUser.id);
 
   useEffect(() => {
     supabase.from("profiles").select("*")
@@ -1928,19 +1931,27 @@ function ProfilePage({ authorName, allTrips, onClose, onTripClick }) {
           ) : (
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:"14px" }}>
               {contributorTrips.map(trip => (
-                <div key={trip.id} onClick={() => { onTripClick(trip); onClose(); }}
-                  style={{ background:C.white, border:`1px solid ${C.tide}`, borderRadius:"14px", padding:"18px", cursor:"pointer", transition:"all .2s", boxShadow:`0 1px 4px rgba(28,43,58,0.05)` }}
-                  onMouseEnter={e => { e.currentTarget.style.boxShadow=`0 6px 20px rgba(28,43,58,0.1)`; e.currentTarget.style.transform="translateY(-1px)"; e.currentTarget.style.borderColor=C.amber; }}
-                  onMouseLeave={e => { e.currentTarget.style.boxShadow=`0 1px 4px rgba(28,43,58,0.05)`; e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.borderColor=C.tide; }}>
-                  <div style={{ fontSize:"10px", fontWeight:700, color:C.amber, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:"4px" }}>{trip.region}</div>
-                  <div style={{ fontSize:"15px", fontWeight:700, color:C.slate, fontFamily:"'Playfair Display',serif", marginBottom:"4px", lineHeight:1.2 }}>{trip.title}</div>
-                  <div style={{ fontSize:"11px", color:C.slateLight, marginBottom:"8px" }}>{trip.destination} · {trip.duration}</div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:"4px", marginBottom:"8px" }}>
-                    {(trip.tags||[]).slice(0,3).map(t => <span key={t} style={{ fontSize:"10px", padding:"2px 8px", borderRadius:"20px", background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}` }}>{t}</span>)}
+                <div key={trip.id} style={{ position:"relative" }}>
+                  <div onClick={() => { onTripClick(trip); onClose(); }}
+                    style={{ background:C.white, border:`1px solid ${C.tide}`, borderRadius:"14px", padding:"18px", cursor:"pointer", transition:"all .2s", boxShadow:`0 1px 4px rgba(28,43,58,0.05)` }}
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow=`0 6px 20px rgba(28,43,58,0.1)`; e.currentTarget.style.transform="translateY(-1px)"; e.currentTarget.style.borderColor=C.amber; }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow=`0 1px 4px rgba(28,43,58,0.05)`; e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.borderColor=C.tide; }}>
+                    <div style={{ fontSize:"10px", fontWeight:700, color:C.amber, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:"4px" }}>{trip.region}</div>
+                    <div style={{ fontSize:"15px", fontWeight:700, color:C.slate, fontFamily:"'Playfair Display',serif", marginBottom:"4px", lineHeight:1.2 }}>{trip.title}</div>
+                    <div style={{ fontSize:"11px", color:C.slateLight, marginBottom:"8px" }}>{trip.destination} · {trip.duration}</div>
+                    <div style={{ display:"flex", flexWrap:"wrap", gap:"4px", marginBottom:"8px" }}>
+                      {(trip.tags||[]).slice(0,3).map(t => <span key={t} style={{ fontSize:"10px", padding:"2px 8px", borderRadius:"20px", background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}` }}>{t}</span>)}
+                    </div>
+                    <div style={{ fontSize:"11px", color:C.slateMid, lineHeight:1.5 }}>
+                      <span style={{ color:C.green, fontWeight:700 }}>❤️ </span>{(trip.loves||"").substring(0,80)}…
+                    </div>
                   </div>
-                  <div style={{ fontSize:"11px", color:C.slateMid, lineHeight:1.5 }}>
-                    <span style={{ color:C.green, fontWeight:700 }}>❤️ </span>{(trip.loves||"").substring(0,80)}…
-                  </div>
+                  {(isOwnProfile && trip.userId === currentUser?.id) && (
+                    <div style={{ position:"absolute", top:"10px", right:"10px", display:"flex", gap:"5px" }}>
+                      <button onClick={e => { e.stopPropagation(); onEditTrip && onEditTrip(trip); }} style={{ padding:"4px 10px", borderRadius:"6px", border:"none", background:C.azure, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>✏️ Edit</button>
+                      <button onClick={e => { e.stopPropagation(); onDeleteTrip && onDeleteTrip(trip); }} style={{ padding:"4px 10px", borderRadius:"6px", border:"none", background:C.red, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>🗑️</button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -2253,6 +2264,13 @@ export default function App() {
   const [showImport, setShowImport] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
   const [photoImportData, setPhotoImportData] = useState(null);
+  const [pendingSubmit, setPendingSubmit] = useState(false);
+
+  // Force login before submitting
+  const openSubmit = () => {
+    if (!currentUser) { setPendingSubmit(true); setShowAuth(true); }
+    else setShowSubmit(true);
+  };
   const [showQueue, setShowQueue] = useState(false);
   const [search, setSearch] = useState("");
   const [region, setRegion] = useState("All Regions");
@@ -2285,7 +2303,7 @@ export default function App() {
             tags:t.tags||[], loves:t.loves, doNext:t.do_next,
             airfare:t.airfare||[], hotels:t.hotels||[], restaurants:t.restaurants||[],
             bars:t.bars||[], activities:t.activities||[], days:t.days||[],
-            image:t.image||""
+            image:t.image||"", userId:t.user_id||null
           }));
           setDbTrips(mapped);
         }
@@ -2338,6 +2356,7 @@ export default function App() {
     setCurrentUser(user);
     setCurrentDisplayName(displayName);
     setShowAuth(false);
+    if (pendingSubmit) { setPendingSubmit(false); setShowSubmit(true); }
   };
 
   const handleSignOut = async () => {
@@ -2360,6 +2379,13 @@ export default function App() {
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   const handleSaveTrip = async (updated) => {
+    if (!isAdmin) {
+      const result = runContentFilter(updated);
+      if (!result.passed) {
+        alert("Your edit contains flagged content and could not be saved: " + result.flags.join(", "));
+        return;
+      }
+    }
     await supabase.from("trips").update({
       title: updated.title, destination: updated.destination, region: updated.region,
       date: updated.date, duration: updated.duration, travelers: updated.travelers,
@@ -2431,7 +2457,7 @@ export default function App() {
             <span style={{ fontSize:"9px", background:C.seafoamDeep, color:C.azureDeep, fontWeight:700, padding:"2px 7px", borderRadius:"20px", border:`1px solid ${C.tide}` }}>beta</span>
           </div>
           <div style={{ display:"flex", gap:"7px" }}>
-            {!isAdmin && <button onClick={() => setShowSubmit(true)} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"8px", padding:"7px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer", boxShadow:`0 3px 12px rgba(196,168,130,0.4)` }}>+ Submit a Trip</button>}
+            {!isAdmin && <button onClick={() => openSubmit()} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"8px", padding:"7px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer", boxShadow:`0 3px 12px rgba(196,168,130,0.4)` }}>+ Submit a Trip</button>}
             {isAdmin && <button onClick={() => setShowQueue(true)} style={{ background:C.amberBg, color:C.amber, border:`1px solid ${C.amber}44`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>📋 Queue</button>}
             {isAdmin && <button onClick={() => setShowImport(true)} style={{ background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>🤖 Smart Import</button>}
             {isAdmin && <button onClick={() => setShowAdd(true)} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"8px", padding:"7px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer", boxShadow:`0 3px 12px rgba(196,168,130,0.4)` }}>+ Add Trip</button>}
@@ -2466,7 +2492,7 @@ export default function App() {
             <button onClick={() => { const el = document.getElementById("trip-grid"); if(el) el.scrollIntoView({ behavior:"smooth" }); }} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"50px", padding:"14px 32px", fontSize:"14px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", letterSpacing:"0.02em", boxShadow:`0 4px 18px rgba(196,168,130,0.45)` }}>
               Leverage a Copycat
             </button>
-            <button onClick={() => setShowSubmit(true)} style={{ background:"transparent", color:C.slateLight, border:`1.5px solid ${C.tide}`, borderRadius:"50px", padding:"14px 28px", fontSize:"13px", fontWeight:600, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
+            <button onClick={() => openSubmit()} style={{ background:"transparent", color:C.slateLight, border:`1.5px solid ${C.tide}`, borderRadius:"50px", padding:"14px 28px", fontSize:"13px", fontWeight:600, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
               Submit a Trip →
             </button>
           </div>
@@ -2548,7 +2574,7 @@ export default function App() {
                 <span style={{ fontSize:"12px", color:C.slateLight }}>Contributors</span>
                 <strong style={{ fontSize:"12px", color:C.slate }}>{[...new Set(allTrips.map(t=>t.author))].length}</strong>
               </div>
-              <button onClick={() => setShowSubmit(true)} style={{ width:"100%", padding:"9px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>+ Submit a Trip</button>
+              <button onClick={() => openSubmit()} style={{ width:"100%", padding:"9px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>+ Submit a Trip</button>
             </div>
           </aside>
         )}
@@ -2633,10 +2659,10 @@ export default function App() {
 
       {selected      && <TripModal trip={selected} onClose={closeTrip} allTrips={allTrips} isBookmarked={bookmarks.includes(selected.id)} onBookmark={toggleBookmark} />}
       {showAdd       && <AddTripModal onClose={() => setShowAdd(false)} onAdd={t => setTrips(p=>[t,...p])} />}
-      {showImport    && <SmartImportHub onClose={() => setShowImport(false)} onPhotoComplete={(data) => { setPhotoImportData(data); setShowImport(false); setShowSubmit(true); }} />}
+      {showImport    && <SmartImportHub onClose={() => setShowImport(false)} onPhotoComplete={(data) => { setPhotoImportData(data); setShowImport(false); openSubmit(); }} />}
       {showSubmit    && <SubmitTripModal onClose={() => { setShowSubmit(false); setPhotoImportData(null); }} currentUser={currentUser} displayName={currentDisplayName} onSubmitSuccess={fetchTrips} prefillData={photoImportData} />}
       {showAuth      && <AuthModal onClose={() => setShowAuth(false)} onSuccess={handleAuthSuccess} />}
-      {viewingProfile && <ProfilePage authorName={viewingProfile} allTrips={allTrips} onClose={() => setViewingProfile(null)} onTripClick={openTrip} />}
+      {viewingProfile && <ProfilePage authorName={viewingProfile} allTrips={allTrips} onClose={() => setViewingProfile(null)} onTripClick={openTrip} currentUser={currentUser} onEditTrip={(trip) => setEditingTrip(trip)} onDeleteTrip={(trip) => setConfirmDelete(trip)} />}
       {showQueue     && <AdminQueueModal onClose={() => setShowQueue(false)} onApprove={fetchTrips} />}
       {showAdminLogin && <AdminLoginModal onSuccess={handleAdminLogin} onClose={() => setShowAdminLogin(false)} />}
       {editingTrip   && <AdminEditModal trip={editingTrip} onSave={handleSaveTrip} onClose={() => setEditingTrip(null)} />}
