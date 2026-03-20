@@ -388,32 +388,201 @@ function ConfBar({ val }) {
 
 // ── Photo Import ──────────────────────────────────────────────────────────────
 
-function PhotoImportModal({ onClose }) {
+// Extract EXIF GPS and timestamp from image file (client-side, no upload needed)
+async function extractExif(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const buf = e.target.result;
+      const view = new DataView(buf);
+      try {
+        if (view.getUint16(0) !== 0xFFD8) return resolve({});
+        let offset = 2;
+        while (offset < view.byteLength - 2) {
+          const marker = view.getUint16(offset);
+          if (marker === 0xFFE1) {
+            const len = view.getUint16(offset + 2);
+            const exifStr = String.fromCharCode(...new Uint8Array(buf, offset + 4, 6));
+            if (exifStr.startsWith("Exif")) {
+              const tiffOffset = offset + 10;
+              const little = view.getUint16(tiffOffset) === 0x4949;
+              const rd = (o, s) => s === 2 ? view.getUint16(tiffOffset + o, little) : view.getUint32(tiffOffset + o, little);
+              const ifdOffset = rd(4, 4);
+              const entries = rd(ifdOffset, 2);
+              let gpsOff = null, dateStr = null;
+              for (let i = 0; i < entries; i++) {
+                const eOff = tiffOffset + ifdOffset + 2 + i * 12;
+                const tag = view.getUint16(eOff, little);
+                if (tag === 0x8825) gpsOff = tiffOffset + view.getUint32(eOff + 8, little);
+                if (tag === 0x9003) {
+                  const cnt = view.getUint32(eOff + 4, little);
+                  const valOff = cnt <= 4 ? eOff + 8 : tiffOffset + view.getUint32(eOff + 8, little);
+                  dateStr = String.fromCharCode(...new Uint8Array(buf, valOff, cnt - 1));
+                }
+              }
+              let lat = null, lon = null;
+              if (gpsOff) {
+                try {
+                  const gpsEntries = rd(gpsOff - tiffOffset, 2);
+                  let latVal, lonVal, latRef, lonRef;
+                  for (let i = 0; i < gpsEntries; i++) {
+                    const ge = gpsOff + 2 + i * 12;
+                    const gtag = view.getUint16(ge, little);
+                    const gtype = view.getUint16(ge + 2, little);
+                    const gcnt = view.getUint32(ge + 4, little);
+                    const gvoff = tiffOffset + view.getUint32(ge + 8, little);
+                    const readRat = off => view.getUint32(off, little) / (view.getUint32(off + 4, little) || 1);
+                    if (gtag === 1) latRef = String.fromCharCode(view.getUint8(ge + 8));
+                    if (gtag === 2) latVal = readRat(gvoff) + readRat(gvoff+8)/60 + readRat(gvoff+16)/3600;
+                    if (gtag === 3) lonRef = String.fromCharCode(view.getUint8(ge + 8));
+                    if (gtag === 4) lonVal = readRat(gvoff) + readRat(gvoff+8)/60 + readRat(gvoff+16)/3600;
+                  }
+                  if (latVal != null && lonVal != null) {
+                    lat = latRef === "S" ? -latVal : latVal;
+                    lon = lonRef === "W" ? -lonVal : lonVal;
+                  }
+                } catch(e) {}
+              }
+              return resolve({ lat, lon, dateStr, filename: file.name });
+            }
+          }
+          if (marker === 0xFFDA) break;
+          offset += 2 + view.getUint16(offset + 2);
+        }
+      } catch(e) {}
+      resolve({ filename: file.name });
+    };
+    reader.readAsArrayBuffer(file.slice(0, 65536));
+  });
+}
+
+// Compress image via Canvas to ~200KB max
+async function compressImage(file, maxW = 1200, quality = 0.65) {
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxW / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result.split(",")[1]);
+        reader.readAsDataURL(blob);
+        URL.revokeObjectURL(url);
+      }, "image/jpeg", quality);
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+// Reverse geocode lat/lon to place name using OpenStreetMap (free, no key needed)
+async function reverseGeocode(lat, lon) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`, {
+      headers: { "Accept-Language": "en" }
+    });
+    const data = await res.json();
+    const a = data.address || {};
+    return [a.tourism || a.amenity || a.leisure || a.building, a.city || a.town || a.village, a.country]
+      .filter(Boolean).join(", ");
+  } catch { return null; }
+}
+
+function PhotoImportModal({ onClose, onComplete }) {
   const [phase, setPhase] = useState("drop");
-  const [progress, setProgress] = useState(0);
   const [photos, setPhotos] = useState([]);
-  const [filter, setFilter] = useState("all");
-  const [lightbox, setLightbox] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [progressLabel, setProgressLabel] = useState("");
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
   const fileRef = useRef();
 
-  const startScan = useCallback(() => {
-    setPhase("scanning"); setProgress(0);
-    const t = setInterval(() => setProgress(p => {
-      if (p >= 100) { clearInterval(t); setPhase("review"); setPhotos(MOCK_PHOTOS.map(x => ({ ...x, accepted:null }))); return 100; }
-      return p + 4;
-    }), 55);
-  }, []);
+  const processPhotos = async (files) => {
+    if (!files || files.length === 0) return;
+    const fileArr = Array.from(files).slice(0, 30);
+    setPhase("processing");
+    setProgress(0);
 
-  const toggle   = (id, v) => setPhotos(ps => ps.map(p => p.id === id ? { ...p, accepted:v } : p));
-  const acceptAll = () => setPhotos(ps => ps.map(p => ({ ...p, accepted:true })));
-  const show = filter === "all" ? photos : filter === "pending" ? photos.filter(p => p.accepted === null) : photos.filter(p => p.accepted === (filter === "accepted"));
-  const nAcc  = photos.filter(p => p.accepted === true).length;
-  const nPend = photos.filter(p => p.accepted === null).length;
-  const icons = { hotel:"🏨", restaurant:"🍽️", activity:"🎯", bar:"🍸", transport:"🚗" };
+    // Step 1: Extract EXIF from all photos
+    setProgressLabel("Reading GPS & timestamps…");
+    const metaArr = [];
+    for (let i = 0; i < fileArr.length; i++) {
+      const meta = await extractExif(fileArr[i]);
+      // Reverse geocode if GPS available
+      if (meta.lat && meta.lon) {
+        meta.placeName = await reverseGeocode(meta.lat, meta.lon);
+      }
+      metaArr.push(meta);
+      setProgress(Math.round((i + 1) / fileArr.length * 30));
+    }
+
+    // Step 2: Compress all photos
+    setProgressLabel("Compressing photos…");
+    const compressed = [];
+    for (let i = 0; i < fileArr.length; i++) {
+      const b64 = await compressImage(fileArr[i]);
+      if (b64) compressed.push({ b64, meta: metaArr[i], idx: i });
+      setProgress(30 + Math.round((i + 1) / fileArr.length * 40));
+    }
+
+    // Step 3: Send to Claude API
+    setProgressLabel("Analysing with AI…");
+    setProgress(70);
+
+    const metaSummary = compressed.map((p, i) => {
+      const m = p.meta;
+      const parts = [`Photo ${i + 1}: ${m.filename || "photo"}`];
+      if (m.placeName) parts.push(`GPS location: ${m.placeName}`);
+      else if (m.lat && m.lon) parts.push(`GPS: ${m.lat.toFixed(4)}, ${m.lon.toFixed(4)}`);
+      if (m.dateStr) parts.push(`Taken: ${m.dateStr}`);
+      return parts.join(" | ");
+    }).join("\n");
+
+    const content = [
+      {
+        type: "text",
+        text: `You are analysing travel photos to reconstruct a trip itinerary. Here is the metadata extracted from each photo:\n\n${metaSummary}\n\nPlease analyse all photos and the metadata above to reconstruct the trip. Return ONLY a JSON object with this exact structure, no other text:\n{\n  "destination": "City, Country",\n  "region": "Europe|Asia|North America|Central America|South America|Africa|Oceania",\n  "duration": "N days",\n  "travelers": "description e.g. Couple, Family, Guys trip",\n  "tags": ["tag1", "tag2"],\n  "loves": "2-4 sentences about highlights visible in the photos",\n  "doNext": "1-2 sentences of honest advice based on what you can see",\n  "hotels": [{"item": "name", "detail": "location", "tip": ""}],\n  "restaurants": [{"item": "name or description", "detail": "type of food/cuisine", "tip": ""}],\n  "bars": [{"item": "name", "detail": "type", "tip": ""}],\n  "activities": [{"item": "name", "detail": "description", "tip": ""}],\n  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"time": "", "type": "activity|restaurant|bar|hotel|transport", "label": "what happened", "note": ""}]}]\n}\nFor restaurants/bars/activities, use any visible signage to name them. If GPS data shows a specific place, use it. Be specific where you can, descriptive where you cannot.`
+      },
+      ...compressed.map((p, i) => ({
+        type: "image",
+        source: { type: "base64", media_type: "image/jpeg", data: p.b64 }
+      }))
+    ];
+
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 2000,
+          messages: [{ role: "user", content }]
+        })
+      });
+      const data = await res.json();
+      setProgress(95);
+      const text = data.content?.find(b => b.type === "text")?.text || "";
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("No JSON in response");
+      const parsed = JSON.parse(jsonMatch[0]);
+      setResult(parsed);
+      setPhase("review");
+      setProgress(100);
+    } catch(e) {
+      console.error("Claude API error:", e);
+      setError("Something went wrong analysing your photos. Please try again.");
+      setPhase("error");
+    }
+  };
 
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.7)", zIndex:3000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"28px 16px", overflowY:"auto", backdropFilter:"blur(8px)" }}>
-      <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"920px", overflow:"hidden", boxShadow:`0 32px 64px rgba(44,62,80,0.22)`, border:`1px solid ${C.tide}` }}>
+      <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"680px", overflow:"hidden", boxShadow:`0 32px 64px rgba(44,62,80,0.22)`, border:`1px solid ${C.tide}` }}>
 
         {/* header */}
         <div style={{ padding:"22px 30px", borderBottom:`1px solid ${C.tide}`, display:"flex", justifyContent:"space-between", alignItems:"center", background:C.seafoam }}>
@@ -421,132 +590,115 @@ function PhotoImportModal({ onClose }) {
             <span style={{ fontSize:"22px" }}>📸</span>
             <div>
               <div style={{ fontSize:"17px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif" }}>Photo Album Import</div>
-              <div style={{ fontSize:"11px", color:C.slateLight }}>AI reads GPS metadata + image content to reconstruct your itinerary</div>
+              <div style={{ fontSize:"11px", color:C.slateLight }}>Upload up to 30 photos · GPS + AI reconstructs your trip automatically</div>
             </div>
           </div>
           <button onClick={onClose} style={{ background:C.seafoamDeep, border:"none", color:C.slateLight, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>×</button>
         </div>
 
-        {/* drop */}
+        {/* drop zone */}
         {phase === "drop" && (
           <div style={{ padding:"44px 32px", textAlign:"center", background:C.white }}>
-            <input ref={fileRef} type="file" multiple accept="image/*" style={{ display:"none" }} onChange={startScan} />
-            <div onDrop={e => { e.preventDefault(); startScan(); }} onDragOver={e => e.preventDefault()} onClick={() => fileRef.current.click()}
-              style={{ border:`2px dashed ${C.tide}`, borderRadius:"16px", padding:"56px 40px", cursor:"pointer", transition:"border-color .2s", background:C.seafoam }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = C.azure}
+            <input ref={fileRef} type="file" multiple accept="image/*" style={{ display:"none" }} onChange={e => processPhotos(e.target.files)} />
+            <div onDrop={e => { e.preventDefault(); processPhotos(e.dataTransfer.files); }}
+              onDragOver={e => e.preventDefault()}
+              onClick={() => fileRef.current.click()}
+              style={{ border:`2px dashed ${C.tide}`, borderRadius:"16px", padding:"48px 32px", cursor:"pointer", background:C.seafoam, transition:"border-color .2s" }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = C.amber}
               onMouseLeave={e => e.currentTarget.style.borderColor = C.tide}>
               <div style={{ fontSize:"44px", marginBottom:"14px" }}>📁</div>
               <div style={{ fontSize:"17px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>Drop your trip photos here</div>
-              <div style={{ fontSize:"12px", color:C.slateLight, marginBottom:"20px" }}>Or click to browse · JPEG, HEIC, PNG supported</div>
-              <div style={{ display:"flex", justifyContent:"center", gap:"10px", flexWrap:"wrap" }}>
-                {["📍 GPS → place names","🕐 Timestamps → timeline","👁️ AI → venue detection"].map(t => (
-                  <span key={t} style={{ fontSize:"11px", background:C.white, color:C.slateMid, padding:"5px 13px", borderRadius:"20px", border:`1px solid ${C.tide}` }}>{t}</span>
+              <div style={{ fontSize:"12px", color:C.slateLight, marginBottom:"20px" }}>Or click to browse · Up to 30 photos · JPEG, PNG, HEIC</div>
+              <div style={{ display:"flex", justifyContent:"center", gap:"8px", flexWrap:"wrap" }}>
+                {["📍 GPS → place names", "🕐 Timestamps → timeline", "👁️ AI identifies venues", "🗜️ Auto-compressed"].map(t => (
+                  <span key={t} style={{ fontSize:"11px", background:C.white, color:C.slateMid, padding:"4px 12px", borderRadius:"20px", border:`1px solid ${C.tide}` }}>{t}</span>
                 ))}
               </div>
             </div>
-            <button onClick={startScan} style={{ marginTop:"20px", background:`linear-gradient(135deg,${C.azure},${C.azureDark})`, color:C.white, border:"none", borderRadius:"10px", padding:"11px 26px", fontSize:"13px", fontWeight:700, cursor:"pointer" }}>
-              Demo: Simulate scan of 12 photos →
-            </button>
           </div>
         )}
 
-        {/* scanning */}
-        {phase === "scanning" && (
-          <div style={{ padding:"72px 32px", textAlign:"center", background:C.white }}>
-            <div style={{ fontSize:"44px", marginBottom:"20px" }}>🔍</div>
-            <div style={{ fontSize:"17px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>Scanning 12 photos…</div>
-            <div style={{ fontSize:"12px", color:C.slateLight, marginBottom:"28px" }}>Reading GPS data, timestamps & image content</div>
+        {/* processing */}
+        {phase === "processing" && (
+          <div style={{ padding:"64px 32px", textAlign:"center", background:C.white }}>
+            <div style={{ fontSize:"44px", marginBottom:"20px" }}>
+              {progress < 30 ? "📍" : progress < 70 ? "🗜️" : "🤖"}
+            </div>
+            <div style={{ fontSize:"17px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>{progressLabel}</div>
+            <div style={{ fontSize:"12px", color:C.slateLight, marginBottom:"28px" }}>This takes about 15–20 seconds for 30 photos</div>
             <div style={{ maxWidth:"380px", margin:"0 auto" }}>
-              <div style={{ height:"6px", background:C.seafoamDeep, borderRadius:"3px", overflow:"hidden" }}>
-                <div style={{ height:"100%", background:`linear-gradient(90deg,${C.azure},${C.azureDark})`, borderRadius:"3px", transition:"width .12s", width:`${progress}%` }} />
+              <div style={{ height:"8px", background:C.seafoamDeep, borderRadius:"4px", overflow:"hidden" }}>
+                <div style={{ height:"100%", background:`linear-gradient(90deg,${C.azure},${C.amber})`, borderRadius:"4px", transition:"width .3s", width:`${progress}%` }} />
               </div>
-              <div style={{ marginTop:"10px", fontSize:"12px", color:C.muted }}>{progress}% complete</div>
+              <div style={{ marginTop:"10px", fontSize:"12px", color:C.muted }}>{progress}%</div>
             </div>
             <div style={{ marginTop:"24px", display:"flex", justifyContent:"center", gap:"7px", flexWrap:"wrap" }}>
-              {["📍 Extracting GPS","🕐 Parsing timestamps","🗺️ Matching venues","🏷️ Categorizing"].map((s,i) => (
-                <span key={s} style={{ fontSize:"11px", padding:"4px 11px", borderRadius:"20px", background:progress>i*25?C.seafoamDeep:C.sand, color:progress>i*25?C.azureDeep:C.muted, transition:"all .4s" }}>{s}</span>
+              {[["📍 GPS", 0], ["🗜️ Compress", 30], ["🤖 AI Analysis", 70], ["✓ Done", 95]].map(([label, threshold]) => (
+                <span key={label} style={{ fontSize:"11px", padding:"4px 11px", borderRadius:"20px", background:progress >= threshold ? C.seafoamDeep : C.sand, color:progress >= threshold ? C.azureDeep : C.muted, transition:"all .4s" }}>{label}</span>
               ))}
             </div>
           </div>
         )}
 
-        {/* review */}
-        {phase === "review" && (
-          <div>
-            <div style={{ padding:"14px 28px", background:C.seafoam, borderBottom:`1px solid ${C.tide}`, display:"flex", gap:"20px", alignItems:"center", flexWrap:"wrap" }}>
-              <div style={{ display:"flex", gap:"18px" }}>
-                {[{l:"Total",v:photos.length,col:C.slateLight},{l:"Accepted",v:nAcc,col:C.green},{l:"Pending",v:nPend,col:C.amber},{l:"Declined",v:photos.filter(p=>p.accepted===false).length,col:C.red}].map(s => (
-                  <div key={s.l} style={{ textAlign:"center" }}>
-                    <div style={{ fontSize:"20px", fontWeight:800, color:s.col }}>{s.v}</div>
-                    <div style={{ fontSize:"9px", color:C.muted, textTransform:"uppercase", letterSpacing:"0.05em" }}>{s.l}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ marginLeft:"auto", display:"flex", gap:"6px", flexWrap:"wrap" }}>
-                {[["all","All"],["pending","Pending"],["accepted","✓ Accepted"],["declined","✗ Declined"]].map(([f,l]) => (
-                  <button key={f} onClick={() => setFilter(f)} style={{ padding:"5px 12px", borderRadius:"8px", border:`1px solid ${filter===f?C.azure:C.tide}`, cursor:"pointer", fontSize:"11px", fontWeight:600, background:filter===f?C.azure:C.white, color:filter===f?C.white:C.slateLight }}>{l}</button>
-                ))}
-                <button onClick={acceptAll} style={{ padding:"5px 12px", borderRadius:"8px", border:"none", cursor:"pointer", fontSize:"11px", fontWeight:600, background:C.green, color:C.white }}>Accept All</button>
+        {/* review result */}
+        {phase === "review" && result && (
+          <div style={{ padding:"24px 28px", maxHeight:"60vh", overflowY:"auto" }}>
+            <div style={{ background:C.greenBg, border:`1px solid ${C.green}`, borderRadius:"12px", padding:"14px 18px", marginBottom:"20px", display:"flex", alignItems:"center", gap:"10px" }}>
+              <span style={{ fontSize:"20px" }}>✅</span>
+              <div>
+                <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Trip reconstructed from your photos</div>
+                <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"2px" }}>Review the details below, then import to your form</div>
               </div>
             </div>
 
-            <div style={{ padding:"18px 22px", maxHeight:"460px", overflowY:"auto", background:C.white }}>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(188px,1fr))", gap:"12px" }}>
-                {show.map(photo => (
-                  <div key={photo.id} style={{ background:C.white, borderRadius:"12px", overflow:"hidden", border:`2px solid ${photo.accepted===true?C.green:photo.accepted===false?C.red:C.tide}`, transition:"border-color .15s", boxShadow:`0 2px 8px rgba(44,62,80,0.07)` }}>
-                    <div onClick={() => setLightbox(photo)} style={{ height:"106px", background:`linear-gradient(135deg,${C.seafoamDeep},${C.sand})`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", position:"relative" }}>
-                      <span style={{ fontSize:"34px" }}>{icons[photo.category]||"📷"}</span>
-                      {photo.accepted === true  && <div style={{ position:"absolute", top:"7px", right:"7px", background:C.green, borderRadius:"50%", width:"19px", height:"19px", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"10px", color:C.white }}>✓</div>}
-                      {photo.accepted === false && <div style={{ position:"absolute", top:"7px", right:"7px", background:C.red, borderRadius:"50%", width:"19px", height:"19px", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"10px", color:C.white }}>✗</div>}
-                      <div style={{ position:"absolute", bottom:"5px", left:"7px", fontSize:"9px", color:C.white, background:"rgba(44,62,80,0.5)", padding:"2px 6px", borderRadius:"3px" }}>{photo.date}</div>
-                    </div>
-                    <div style={{ padding:"9px 11px" }}>
-                      <div style={{ fontSize:"12px", fontWeight:700, color:C.slate, marginBottom:"3px", lineHeight:1.3 }}>{photo.detectedPlace}</div>
-                      <div style={{ fontSize:"10px", color:C.slateLight, marginBottom:"5px" }}>📍 {photo.location}</div>
-                      <div style={{ marginBottom:"6px" }}><Pill category={photo.category} /></div>
-                      <ConfBar val={photo.confidence} />
-                      <div style={{ display:"flex", gap:"5px", marginTop:"7px" }}>
-                        <button onClick={() => toggle(photo.id, true)} style={{ flex:1, padding:"5px", borderRadius:"6px", border:"none", cursor:"pointer", background:photo.accepted===true?C.green:C.greenBg, color:photo.accepted===true?C.white:C.green, fontSize:"11px", fontWeight:700 }}>✓ Add</button>
-                        <button onClick={() => toggle(photo.id, false)} style={{ flex:1, padding:"5px", borderRadius:"6px", border:"none", cursor:"pointer", background:photo.accepted===false?C.red:C.redBg, color:photo.accepted===false?C.white:C.red, fontSize:"11px", fontWeight:700 }}>✗ Skip</button>
-                      </div>
-                    </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px", marginBottom:"14px" }}>
+              {[["📍 Destination", result.destination], ["🌍 Region", result.region], ["⏱️ Duration", result.duration], ["👥 Travelers", result.travelers]].map(([label, val]) => val && (
+                <div key={label} style={{ background:C.seafoam, borderRadius:"8px", padding:"10px 12px", border:`1px solid ${C.tide}` }}>
+                  <div style={{ fontSize:"10px", color:C.muted, marginBottom:"2px" }}>{label}</div>
+                  <div style={{ fontSize:"12px", fontWeight:600, color:C.slate }}>{val}</div>
+                </div>
+              ))}
+            </div>
+
+            {result.loves && (
+              <div style={{ marginBottom:"12px" }}>
+                <div style={{ fontSize:"11px", fontWeight:700, color:C.green, marginBottom:"4px" }}>❤️ WHAT THEY LOVED</div>
+                <div style={{ fontSize:"12px", color:C.slateMid, lineHeight:1.65 }}>{result.loves}</div>
+              </div>
+            )}
+
+            {["bars", "restaurants", "activities", "hotels"].map(cat => result[cat]?.length > 0 && (
+              <div key={cat} style={{ marginBottom:"12px" }}>
+                <div style={{ fontSize:"11px", fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:"6px" }}>
+                  {cat === "bars" ? "🍸 Bars" : cat === "restaurants" ? "🍽️ Restaurants" : cat === "activities" ? "🎯 Activities" : "🏨 Hotels"}
+                </div>
+                {result[cat].map((item, i) => (
+                  <div key={i} style={{ fontSize:"12px", color:C.slate, padding:"5px 0", borderBottom:`1px solid ${C.seafoamDeep}` }}>
+                    <strong>{item.item}</strong>{item.detail ? ` — ${item.detail}` : ""}
                   </div>
                 ))}
               </div>
-            </div>
+            ))}
 
-            <div style={{ padding:"14px 28px", borderTop:`1px solid ${C.tide}`, display:"flex", justifyContent:"space-between", alignItems:"center", background:C.seafoam }}>
-              <div style={{ fontSize:"12px", color:C.slateLight }}>{nAcc} items will be added to your trip</div>
-              <div style={{ display:"flex", gap:"8px" }}>
-                <button onClick={onClose} style={{ padding:"9px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>Cancel</button>
-                <button onClick={onClose} style={{ padding:"9px 22px", borderRadius:"8px", border:"none", background:`linear-gradient(135deg,${C.azure},${C.azureDark})`, color:C.white, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>Build from {nAcc} photos →</button>
-              </div>
+            <div style={{ display:"flex", gap:"10px", marginTop:"20px" }}>
+              <button onClick={onClose} style={{ flex:1, padding:"10px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>Cancel</button>
+              <button onClick={() => { onComplete && onComplete(result); onClose(); }} style={{ flex:2, padding:"10px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"13px", fontWeight:700, cursor:"pointer" }}>
+                Import to Trip Form →
+              </button>
             </div>
           </div>
         )}
-      </div>
 
-      {/* lightbox */}
-      {lightbox && (
-        <div style={{ position:"fixed", inset:0, zIndex:4000, background:"rgba(44,62,80,0.85)", display:"flex", alignItems:"center", justifyContent:"center" }} onClick={() => setLightbox(null)}>
-          <div style={{ background:C.white, borderRadius:"16px", padding:"22px", maxWidth:"480px", width:"92%", boxShadow:`0 32px 64px rgba(44,62,80,0.3)` }} onClick={e => e.stopPropagation()}>
-            <div style={{ height:"220px", background:`linear-gradient(135deg,${C.seafoamDeep},${C.sandDeep})`, borderRadius:"10px", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:"18px" }}>
-              <span style={{ fontSize:"68px" }}>{ {hotel:"🏨",restaurant:"🍽️",activity:"🎯",bar:"🍸",transport:"🚗"}[lightbox.category]||"📷" }</span>
-            </div>
-            <div style={{ fontSize:"16px", fontWeight:800, color:C.slate, marginBottom:"4px" }}>{lightbox.detectedPlace}</div>
-            <div style={{ fontSize:"11px", color:C.slateLight, marginBottom:"10px" }}>📍 {lightbox.location} · 🕐 {lightbox.date} · {lightbox.filename}</div>
-            <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"16px" }}>
-              <Pill category={lightbox.category} />
-              <div style={{ flex:1 }}><ConfBar val={lightbox.confidence} /></div>
-            </div>
-            <div style={{ display:"flex", gap:"7px" }}>
-              <button onClick={() => { toggle(lightbox.id,true); setLightbox(null); }} style={{ flex:1, padding:"9px", borderRadius:"8px", border:"none", background:C.green, color:C.white, fontWeight:700, cursor:"pointer" }}>✓ Add to Trip</button>
-              <button onClick={() => { toggle(lightbox.id,false); setLightbox(null); }} style={{ flex:1, padding:"9px", borderRadius:"8px", border:`1px solid ${C.red}`, background:C.white, color:C.red, fontWeight:700, cursor:"pointer" }}>✗ Skip</button>
-              <button onClick={() => setLightbox(null)} style={{ padding:"9px 14px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, cursor:"pointer" }}>Close</button>
-            </div>
+        {/* error */}
+        {phase === "error" && (
+          <div style={{ padding:"48px 32px", textAlign:"center" }}>
+            <div style={{ fontSize:"36px", marginBottom:"12px" }}>😕</div>
+            <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"8px" }}>Something went wrong</div>
+            <div style={{ fontSize:"13px", color:C.slateLight, marginBottom:"24px" }}>{error}</div>
+            <button onClick={() => setPhase("drop")} style={{ padding:"10px 24px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontWeight:700, cursor:"pointer" }}>Try Again</button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -666,9 +818,9 @@ function EmailImportModal({ onClose }) {
 
 // ── Smart Import Hub ──────────────────────────────────────────────────────────
 
-function SmartImportHub({ onClose }) {
+function SmartImportHub({ onClose, onPhotoComplete }) {
   const [active, setActive] = useState(null);
-  if (active === "photo") return <PhotoImportModal onClose={() => setActive(null)} />;
+  if (active === "photo") return <PhotoImportModal onClose={() => setActive(null)} onComplete={(data) => { onPhotoComplete && onPhotoComplete(data); onClose(); }} />;
   if (active === "email") return <EmailImportModal onClose={() => setActive(null)} />;
 
   return (
@@ -1033,7 +1185,23 @@ function TripCard({ trip, onClick, isBookmarked, onBookmark }) {
 
 function AddTripModal({ onClose, onAdd }) {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ title:"", destination:"", region:"Asia", duration:"", travelers:"", date:"", tags:[], loves:"", doNext:"", airfare:[{item:"",detail:"",tip:""}], hotels:[{item:"",detail:"",tip:""}], restaurants:[{item:"",detail:"",tip:""}], bars:[{item:"",detail:"",tip:""}], activities:[{item:"",detail:"",tip:""}] });
+  const [form, setForm] = useState({
+    title: prefillData?.destination ? `${prefillData.destination} Trip` : "",
+    destination: prefillData?.destination || "",
+    region: prefillData?.region || "Europe",
+    duration: prefillData?.duration || "",
+    travelers: prefillData?.travelers || "",
+    date: "",
+    tags: prefillData?.tags || [],
+    loves: prefillData?.loves || "",
+    doNext: prefillData?.doNext || "",
+    airfare: [{item:"",detail:"",tip:""}],
+    hotels: prefillData?.hotels?.length ? prefillData.hotels : [{item:"",detail:"",tip:""}],
+    restaurants: prefillData?.restaurants?.length ? prefillData.restaurants : [{item:"",detail:"",tip:""}],
+    bars: prefillData?.bars?.length ? prefillData.bars : [{item:"",detail:"",tip:""}],
+    activities: prefillData?.activities?.length ? prefillData.activities : [{item:"",detail:"",tip:""}],
+    days: prefillData?.days || []
+  });
 
   const updRow   = (cat,i,f,v) => setForm(p => { const u=[...p[cat]]; u[i]={...u[i],[f]:v}; return {...p,[cat]:u}; });
   const addRow   = cat => setForm(p => ({...p,[cat]:[...p[cat],{item:"",detail:"",tip:""}]}));
@@ -1118,8 +1286,8 @@ function AddTripModal({ onClose, onAdd }) {
 
 
 // ── Submit Trip Modal ─────────────────────────────────────────────────────────
-function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess }) {
-  const [step, setStep] = useState("prompt");
+function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, prefillData }) {
+  const [step, setStep] = useState(prefillData ? "form" : "prompt");
   const [pastedText, setPastedText] = useState("");
   const [filterResult, setFilterResult] = useState(null);
   const [submitterName, setSubmitterName] = useState(displayName || "");
@@ -1778,7 +1946,6 @@ function AdminLoginModal({ onSuccess, onClose }) {
           onKeyDown={e => e.key === "Enter" && attempt()}
           placeholder="Enter admin password"
           style={{ width:"100%", padding:"11px 14px", borderRadius:"10px", border:`2px solid ${error?C.red:C.tide}`, fontSize:"14px", outline:"none", boxSizing:"border-box", marginBottom:"12px", background:error?C.redBg:C.white, color:C.slate, transition:"all .2s" }}
-          autoFocus
         />
         {error && <div style={{ fontSize:"12px", color:C.red, textAlign:"center", marginBottom:"10px", fontWeight:600 }}>Incorrect password — try again</div>}
         <button onClick={attempt} style={{ width:"100%", padding:"11px", borderRadius:"10px", border:"none", background:C.cta, color:C.white, fontSize:"14px", fontWeight:700, cursor:"pointer", marginBottom:"10px" }}>
@@ -2052,6 +2219,7 @@ export default function App() {
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
+  const [photoImportData, setPhotoImportData] = useState(null);
   const [showQueue, setShowQueue] = useState(false);
   const [search, setSearch] = useState("");
   const [region, setRegion] = useState("All Regions");
@@ -2431,8 +2599,8 @@ export default function App() {
 
       {selected      && <TripModal trip={selected} onClose={closeTrip} allTrips={allTrips} isBookmarked={bookmarks.includes(selected.id)} onBookmark={toggleBookmark} />}
       {showAdd       && <AddTripModal onClose={() => setShowAdd(false)} onAdd={t => setTrips(p=>[t,...p])} />}
-      {showImport    && <SmartImportHub onClose={() => setShowImport(false)} />}
-      {showSubmit    && <SubmitTripModal onClose={() => setShowSubmit(false)} currentUser={currentUser} displayName={currentDisplayName} onSubmitSuccess={fetchTrips} />}
+      {showImport    && <SmartImportHub onClose={() => setShowImport(false)} onPhotoComplete={(data) => { setPhotoImportData(data); setShowImport(false); setShowSubmit(true); }} />}
+      {showSubmit    && <SubmitTripModal onClose={() => { setShowSubmit(false); setPhotoImportData(null); }} currentUser={currentUser} displayName={currentDisplayName} onSubmitSuccess={fetchTrips} prefillData={photoImportData} />}
       {showAuth      && <AuthModal onClose={() => setShowAuth(false)} onSuccess={handleAuthSuccess} />}
       {viewingProfile && <ProfilePage authorName={viewingProfile} allTrips={allTrips} onClose={() => setViewingProfile(null)} onTripClick={openTrip} />}
       {showQueue     && <AdminQueueModal onClose={() => setShowQueue(false)} onApprove={fetchTrips} />}
