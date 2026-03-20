@@ -2388,6 +2388,7 @@ export default function App() {
     }
     await supabase.from("trips").update({
       title: updated.title, destination: updated.destination, region: updated.region,
+      author_name: updated.author,
       date: updated.date, duration: updated.duration, travelers: updated.travelers,
       tags: updated.tags, loves: updated.loves, do_next: updated.doNext,
       airfare: updated.airfare, hotels: updated.hotels, restaurants: updated.restaurants,
