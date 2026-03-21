@@ -1018,7 +1018,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark }) {
 
           {/* header */}
           <div style={{ position:"relative", background:`linear-gradient(135deg,#2C1810 0%,#3D2B1F 100%)`, padding:"26px 30px", color:C.white, overflow:"hidden" }}>
-            {trip.image && <img src={trip.image} alt={trip.title} style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:"center", opacity:0.35 }} />}
+            {trip.image && <img src={trip.image} alt={trip.title} style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:`${trip.focalPoint?.x||50}% ${trip.focalPoint?.y||50}%`, opacity:0.35 }} />}
             <div style={{ position:"relative", zIndex:1, display:"flex", justifyContent:"space-between" }}>
               <div>
                 <div style={{ fontSize:"10px", fontWeight:800, letterSpacing:"0.1em", color:"rgba(255,255,255,0.95)", textTransform:"uppercase", marginBottom:"7px", textShadow:"0 1px 4px rgba(0,0,0,0.5)" }}>{trip.region} · {trip.duration} · {trip.date}</div>
@@ -1164,7 +1164,7 @@ function TripCard({ trip, onClick, isBookmarked, onBookmark }) {
       {/* Image / placeholder */}
       <div style={{ height:"148px", background:trip.image ? "transparent" : grad, position:"relative", display:"flex", alignItems:"flex-end", padding:"14px", overflow:"hidden" }}>
         {trip.image
-          ? <img src={trip.image} alt={trip.title} style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:"center" }} />
+          ? <img src={trip.image} alt={trip.title} style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:`${trip.focalPoint?.x||50}% ${trip.focalPoint?.y||50}%` }} />
           : <span style={{ fontSize:"42px", position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-60%)", opacity:0.35 }}>{emoji}</span>
         }
         {trip.image && <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.1) 60%)" }} />}
@@ -1298,7 +1298,7 @@ const EMPTY_FORM = {
   title:"", destination:"", region:"Europe", duration:"", travelers:"", date:"", tags:[], loves:"", doNext:"",
   airfare:[{item:"",detail:"",tip:""}], hotels:[{item:"",detail:"",tip:""}],
   restaurants:[{item:"",detail:"",tip:""}], bars:[{item:"",detail:"",tip:""}],
-  activities:[{item:"",detail:"",tip:""}], days:[]
+  activities:[{item:"",detail:"",tip:""}], days:[], focalPoint:{x:50,y:50}
 };
 
 function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, prefillData }) {
@@ -1312,6 +1312,8 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
   const [coverPhoto, setCoverPhoto] = useState(null);
   const [coverPhotoPreview, setCoverPhotoPreview] = useState(null);
   const [photoError, setPhotoError] = useState("");
+  const [focalPoint, setFocalPoint] = useState({ x: 50, y: 50 });
+  const focalDragging = useRef(false);
   const [draftExists, setDraftExists] = useState(false);
   const [draftSaving, setDraftSaving] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
@@ -1458,7 +1460,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
     if (!submitterName || !submitterEmail) { alert("Please add your name and email."); return; }
     setStep("submitting");
     const photoUrl = await uploadPhoto();
-    const tripWithPhoto = { ...form, image: photoUrl || "" };
+    const tripWithPhoto = { ...form, image: photoUrl || "", focalPoint };
     const result = runContentFilter(tripWithPhoto);
     setFilterResult(result);
     await supabase.from("submissions").insert([{
@@ -1626,9 +1628,50 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
               <div style={{ fontSize:"12px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>📸 Cover Photo <span style={{ fontWeight:400, color:C.muted }}>(optional)</span></div>
               <input ref={photoRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif,image/avif,image/tiff" style={{ display:"none" }} onChange={handlePhotoChange} />
               {coverPhotoPreview ? (
-                <div style={{ position:"relative", marginBottom:"8px" }}>
-                  <img src={coverPhotoPreview} alt="Cover preview" style={{ width:"100%", height:"140px", objectFit:"cover", borderRadius:"10px", border:`1px solid ${C.tide}` }} />
-                  <button onClick={() => { setCoverPhoto(null); setCoverPhotoPreview(null); photoRef.current.value=""; }} style={{ position:"absolute", top:"8px", right:"8px", background:"rgba(0,0,0,0.5)", border:"none", color:C.white, borderRadius:"50%", width:"26px", height:"26px", cursor:"pointer", fontSize:"14px", display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
+                <div style={{ marginBottom:"8px" }}>
+                  <div style={{ position:"relative", height:"160px", borderRadius:"10px", overflow:"hidden", border:`1px solid ${C.tide}`, cursor:"crosshair", userSelect:"none" }}
+                    onMouseDown={e => {
+                      focalDragging.current = true;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+                      const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+                      setFocalPoint({ x, y });
+                    }}
+                    onMouseMove={e => {
+                      if (!focalDragging.current) return;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = Math.max(0, Math.min(100, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
+                      const y = Math.max(0, Math.min(100, Math.round(((e.clientY - rect.top) / rect.height) * 100)));
+                      setFocalPoint({ x, y });
+                    }}
+                    onMouseUp={() => { focalDragging.current = false; }}
+                    onMouseLeave={() => { focalDragging.current = false; }}
+                    onTouchStart={e => {
+                      const touch = e.touches[0];
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = Math.round(((touch.clientX - rect.left) / rect.width) * 100);
+                      const y = Math.round(((touch.clientY - rect.top) / rect.height) * 100);
+                      setFocalPoint({ x, y });
+                    }}
+                    onTouchMove={e => {
+                      e.preventDefault();
+                      const touch = e.touches[0];
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = Math.max(0, Math.min(100, Math.round(((touch.clientX - rect.left) / rect.width) * 100)));
+                      const y = Math.max(0, Math.min(100, Math.round(((touch.clientY - rect.top) / rect.height) * 100)));
+                      setFocalPoint({ x, y });
+                    }}>
+                    <img src={coverPhotoPreview} alt="Cover preview" style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:`${focalPoint.x}% ${focalPoint.y}%`, display:"block", pointerEvents:"none" }} />
+                    {/* Focal point crosshair */}
+                    <div style={{ position:"absolute", left:`${focalPoint.x}%`, top:`${focalPoint.y}%`, transform:"translate(-50%,-50%)", pointerEvents:"none" }}>
+                      <div style={{ width:"28px", height:"28px", borderRadius:"50%", border:"2px solid white", boxShadow:"0 0 0 1px rgba(0,0,0,0.4)", background:"rgba(255,255,255,0.2)" }} />
+                      <div style={{ position:"absolute", top:"50%", left:"0", right:"0", height:"1px", background:"white", transform:"translateY(-50%)", boxShadow:"0 0 2px rgba(0,0,0,0.5)" }} />
+                      <div style={{ position:"absolute", left:"50%", top:"0", bottom:"0", width:"1px", background:"white", transform:"translateX(-50%)", boxShadow:"0 0 2px rgba(0,0,0,0.5)" }} />
+                    </div>
+                    {/* Remove button */}
+                    <button onClick={e => { e.stopPropagation(); setCoverPhoto(null); setCoverPhotoPreview(null); setFocalPoint({x:50,y:50}); photoRef.current.value=""; }} style={{ position:"absolute", top:"8px", right:"8px", background:"rgba(0,0,0,0.5)", border:"none", color:C.white, borderRadius:"50%", width:"26px", height:"26px", cursor:"pointer", fontSize:"14px", display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
+                  </div>
+                  <div style={{ fontSize:"10px", color:C.muted, marginTop:"4px", textAlign:"center" }}>Drag to reposition the focal point · Card will crop to this area</div>
                 </div>
               ) : (
                 <div onClick={() => photoRef.current.click()} style={{ border:`2px dashed ${C.tide}`, borderRadius:"10px", padding:"20px", textAlign:"center", cursor:"pointer", background:C.seafoam, marginBottom:"8px" }}
@@ -1718,7 +1761,7 @@ function AdminQueueModal({ onClose, onApprove }) {
       tags:t.tags||[], loves:t.loves, do_next:t.do_next||t.doNext||"",
       airfare:t.airfare||[], hotels:t.hotels||[], restaurants:t.restaurants||[],
       bars:t.bars||[], activities:t.activities||[], days:t.days||[],
-      image:t.image||"", status:"published", user_id:sub.user_id||null
+      image:t.image||"", status:"published", user_id:sub.user_id||null, focal_point:t.focalPoint||{x:50,y:50}
     }]);
     await supabase.from("submissions").update({ status:"approved", reviewed_at:new Date().toISOString() }).eq("id",sub.id);
     setSubmissions(p => p.map(s => s.id===sub.id ? {...s,status:"approved"} : s));
@@ -2434,7 +2477,7 @@ export default function App() {
             tags:t.tags||[], loves:t.loves, doNext:t.do_next,
             airfare:t.airfare||[], hotels:t.hotels||[], restaurants:t.restaurants||[],
             bars:t.bars||[], activities:t.activities||[], days:t.days||[],
-            image:t.image||"", userId:t.user_id||null, featured:t.featured||false
+            image:t.image||"", userId:t.user_id||null, featured:t.featured||false, focalPoint:t.focal_point||{x:50,y:50}
           }));
           setDbTrips(mapped);
         }
@@ -2547,7 +2590,7 @@ export default function App() {
       tags: updated.tags, loves: updated.loves, do_next: updated.doNext,
       airfare: updated.airfare, hotels: updated.hotels, restaurants: updated.restaurants,
       bars: updated.bars, activities: updated.activities, days: updated.days,
-      image: updated.image || "", featured: updated.featured || false
+      image: updated.image || "", featured: updated.featured || false, focal_point: updated.focalPoint || {x:50,y:50}
     }).eq("id", updated.id);
     setTrips(p => p.map(t => t.id === updated.id ? updated : t));
     setDbTrips(p => p.map(t => t.id === updated.id ? updated : t));
