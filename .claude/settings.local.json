@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls C:/Users/crouc/tripcopycat/.env*)",
+      "Bash(node -e \":*)",
+      "Bash(npm run:*)"
+    ]
+  }
+}
