@@ -2459,15 +2459,6 @@ export default function App() {
   const [showSubmit, setShowSubmit] = useState(false);
   const [photoImportData, setPhotoImportData] = useState(null);
   const [pendingSubmit, setPendingSubmit] = useState(false);
-  const [hasDraft, setHasDraft] = useState(false);
-
-  // Check for draft when user logs in
-  useEffect(() => {
-    if (!currentUser) { setHasDraft(false); return; }
-    supabase.from("drafts").select("id").eq("user_id", currentUser.id).single()
-      .then(({ data }) => setHasDraft(!!data));
-  }, [currentUser]);
-
   // Force login before submitting
   const openSubmit = () => {
     if (!currentUser) { setPendingSubmit(true); setShowAuth(true); }
@@ -2541,6 +2532,14 @@ export default function App() {
   const [currentDisplayName, setCurrentDisplayName] = useState("");
   const [showAuth, setShowAuth] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
+
+  // Check for draft when user logs in
+  useEffect(() => {
+    if (!currentUser) { setHasDraft(false); return; }
+    supabase.from("drafts").select("id").eq("user_id", currentUser.id).single()
+      .then(({ data }) => setHasDraft(!!data));
+  }, [currentUser]);
 
   // Detect Supabase password reset redirect
   useEffect(() => {
