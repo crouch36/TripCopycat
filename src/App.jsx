@@ -557,14 +557,19 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
         }))
       ];
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts }] })
+          body: JSON.stringify({ contents: [{ parts }] }),
+          signal: controller.signal
         }
       );
+      clearTimeout(timeoutId);
       const data = await res.json();
       const rawText = JSON.stringify(data).slice(0, 800);
       setRawDebug(rawText);
@@ -579,8 +584,11 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
       setPhase("review");
       setProgress(100);
     } catch(e) {
-      console.error("Claude API error:", e);
-      setError(`Analysis failed: ${e.message}. Please try again.`);
+      console.error("Gemini API error:", e);
+      const msg = e.name === "AbortError"
+        ? "Request timed out after 45 seconds. Try with fewer photos or on a stronger connection."
+        : `Analysis failed: ${e.message}. Please try again.`;
+      setError(msg);
       setPhase("error");
     }
   };
@@ -625,7 +633,7 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
 
         {/* processing */}
         {phase === "processing" && (
-          <div style={{ padding:"64px 32px", textAlign:"center", background:C.white }}>
+          <div style={{ padding:"48px 32px", textAlign:"center", background:C.white }}>
             <div style={{ fontSize:"44px", marginBottom:"20px" }}>
               {progress < 30 ? "📍" : progress < 70 ? "🗜️" : "🤖"}
             </div>
@@ -642,6 +650,9 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
                 <span key={label} style={{ fontSize:"11px", padding:"4px 11px", borderRadius:"20px", background:progress >= threshold ? C.seafoamDeep : C.sand, color:progress >= threshold ? C.azureDeep : C.muted, transition:"all .4s" }}>{label}</span>
               ))}
             </div>
+            <button onClick={() => setPhase("drop")} style={{ marginTop:"24px", padding:"8px 20px", borderRadius:"7px", border:`1px solid ${C.tide}`, background:C.white, color:C.muted, fontSize:"12px", cursor:"pointer" }}>
+              Cancel
+            </button>
           </div>
         )}
 
