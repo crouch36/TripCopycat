@@ -2454,8 +2454,13 @@ export default function App() {
   useEffect(() => {
     const hash = window.location.hash;
     if (hash.includes("type=recovery")) {
-      setShowResetPassword(true);
-      window.history.replaceState(null, "", window.location.pathname);
+      // Let Supabase process the hash tokens first, then show reset form
+      supabase.auth.onAuthStateChange((event, session) => {
+        if (event === "PASSWORD_RECOVERY") {
+          setShowResetPassword(true);
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+      });
     }
   }, []);
   const [viewingProfile, setViewingProfile] = useState(null);
