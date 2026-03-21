@@ -3,7 +3,9 @@
     "allow": [
       "Bash(ls C:/Users/crouc/tripcopycat/.env*)",
       "Bash(node -e \":*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "WebFetch(domain:tripcopycat.com)",
+      "Bash(npx vercel:*)"
     ]
   }
 }

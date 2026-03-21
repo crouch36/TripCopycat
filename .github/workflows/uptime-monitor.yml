@@ -1,0 +1,30 @@
+name: Uptime Monitor
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # Every 5 minutes
+  workflow_dispatch:        # Allow manual trigger from Actions tab
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check homepage
+        run: |
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" --max-time 15 https://tripcopycat.com)
+          echo "Homepage HTTP status: $STATUS"
+          if [ "$STATUS" -ne 200 ]; then
+            echo "❌ HOMEPAGE IS DOWN - HTTP $STATUS"
+            exit 1
+          fi
+          echo "✅ Homepage is up - HTTP $STATUS"
+
+      - name: Check trip page
+        run: |
+          STATUS=$(curl -o /dev/null -s -w "%{http_code}" --max-time 15 https://tripcopycat.com/trips/d329d3a2-16d2-49a6-8436-5ecb614c4d68)
+          echo "Trip page HTTP status: $STATUS"
+          if [ "$STATUS" -ne 200 ]; then
+            echo "❌ TRIP PAGE IS DOWN - HTTP $STATUS"
+            exit 1
+          fi
+          echo "✅ Trip page is up - HTTP $STATUS"
