@@ -2612,19 +2612,17 @@ export default function App() {
               {hasDraft && <span style={{ position:"absolute", top:"-4px", right:"-4px", width:"8px", height:"8px", borderRadius:"50%", background:C.amber, border:`1.5px solid ${C.white}` }} />}
             </button>}
             {isAdmin && <button onClick={() => setShowQueue(true)} style={{ background:C.amberBg, color:C.amber, border:`1px solid ${C.amber}44`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>📋 Queue</button>}
-            {isAdmin && <button onClick={() => setShowImport(true)} style={{ background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>🤖 Smart Import</button>}
-            {isAdmin && <button onClick={() => setShowAdd(true)} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"8px", padding:"7px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer", boxShadow:`0 3px 12px rgba(196,168,130,0.4)` }}>+ Add Trip</button>}
+            {isAdmin && <button onClick={() => setShowImport(true)} style={{ background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>🤖 Import</button>}
+            {isAdmin && <button onClick={() => setShowAdd(true)} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"8px", padding:"7px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>+ Add</button>}
             {!isAdmin && !currentUser && <button onClick={() => setShowAuth(true)} style={{ background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>Sign In</button>}
             {!isAdmin && currentUser && (
-              <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                <button onClick={() => setViewingProfile(currentDisplayName)} style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"6px 12px", fontSize:"12px", fontWeight:600, color:C.slate, cursor:"pointer", display:"flex", alignItems:"center", gap:"6px" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"6px" }}>
+                <button onClick={() => setViewingProfile(currentDisplayName)} style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"6px 10px", fontSize:"12px", fontWeight:600, color:C.slate, cursor:"pointer", display:"flex", alignItems:"center", gap:"6px" }}>
                   <span style={{ width:"22px", height:"22px", borderRadius:"50%", background:C.cta, display:"inline-flex", alignItems:"center", justifyContent:"center", fontSize:"11px", fontWeight:800, color:C.ctaText }}>{currentDisplayName.charAt(0).toUpperCase()}</span>
-                  {currentDisplayName}
                 </button>
                 <button onClick={handleSignOut} style={{ background:"none", border:"none", color:C.muted, fontSize:"11px", cursor:"pointer", padding:"4px" }}>Sign out</button>
               </div>
             )}
-            {!isAdmin && <button onClick={() => setShowAdminLogin(true)} style={{ background:C.seafoam, color:C.muted, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"7px 12px", fontSize:"11px", fontWeight:600, cursor:"pointer", opacity:0.3 }}>🔐</button>}
           </div>
         </div>
       </nav>
