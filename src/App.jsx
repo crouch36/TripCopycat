@@ -2603,28 +2603,23 @@ export default function App() {
       </nav>
 
       {/* Hero — Warm Nomad */}
-      <div style={{ background:C.seafoam, padding:"40px 0 36px", margin:"0", textAlign:"center", position:"relative", overflow:"hidden", borderBottom:`1px solid ${C.tide}` }}>
-        {/* subtle texture overlay */}
+      <div style={{ background:C.seafoam, padding:"24px 0 20px", margin:"0", textAlign:"center", position:"relative", overflow:"hidden", borderBottom:`1px solid ${C.tide}` }}>
         <div style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(circle at 20% 50%, rgba(196,168,130,0.08) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(193,105,42,0.06) 0%, transparent 50%)", pointerEvents:"none" }} />
-        <div style={{ position:"relative", maxWidth:"680px", margin:"0 auto" }}>
-
-          <h1 style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:"clamp(36px,6vw,62px)", fontWeight:700, color:C.slate, margin:"0 0 20px", lineHeight:1.1, letterSpacing:"-0.01em" }}>
-            Planned by others.<br/>Perfected by you.
+        <div style={{ position:"relative", maxWidth:"680px", margin:"0 auto", padding:"0 16px" }}>
+          <h1 style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:"clamp(28px,5vw,48px)", fontWeight:700, color:C.slate, margin:"0 0 12px", lineHeight:1.1, letterSpacing:"-0.01em" }}>
+            Planned by others. Perfected by you.
           </h1>
-          <p style={{ fontSize:"clamp(14px,2vw,17px)", color:C.slateLight, margin:"0 0 32px", maxWidth:"580px", marginLeft:"auto", marginRight:"auto", fontWeight:400, lineHeight:1.75 }}>
-            The ultimate cheat code for your next vacation. We crowd-source highly detailed, recreatable trip itineraries so you don't have to reinvent the wheel. Steal the logistics, duplicate the route, or customize and make it your own — spend your time looking forward to the destination.
-          </p>
-          <div style={{ display:"flex", gap:"12px", justifyContent:"center", alignItems:"center", flexWrap:"wrap", marginBottom:"36px" }}>
-            <button onClick={() => { const el = document.getElementById("trip-grid"); if(el) el.scrollIntoView({ behavior:"smooth" }); }} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"50px", padding:"14px 32px", fontSize:"14px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", letterSpacing:"0.02em", boxShadow:`0 4px 18px rgba(196,168,130,0.45)` }}>
+          <div style={{ display:"flex", gap:"10px", justifyContent:"center", alignItems:"center", flexWrap:"wrap", marginBottom:"16px" }}>
+            <button onClick={() => { const el = document.getElementById("trip-grid"); if(el) el.scrollIntoView({ behavior:"smooth" }); }} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"50px", padding:"11px 26px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", letterSpacing:"0.02em", boxShadow:`0 4px 18px rgba(196,168,130,0.45)` }}>
               Leverage a Copycat
             </button>
-            <button onClick={() => openSubmit()} style={{ background:"transparent", color:C.slateLight, border:`1.5px solid ${C.tide}`, borderRadius:"50px", padding:"14px 28px", fontSize:"13px", fontWeight:600, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
+            <button onClick={() => openSubmit()} style={{ background:"transparent", color:C.slateLight, border:`1.5px solid ${C.tide}`, borderRadius:"50px", padding:"11px 22px", fontSize:"12px", fontWeight:600, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
               Submit a Trip →
             </button>
           </div>
-          <div style={{ maxWidth:"520px", margin:"0 auto", position:"relative" }}>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search destinations, trips, activities…" style={{ width:"100%", padding:"16px 22px 16px 52px", borderRadius:"50px", border:`2px solid ${C.tide}`, fontSize:"15px", outline:"none", boxSizing:"border-box", background:C.white, color:C.slate, boxShadow:`0 4px 20px rgba(28,43,58,0.08)`, fontFamily:"'Nunito',sans-serif" }} />
-            <span style={{ position:"absolute", left:"18px", top:"50%", transform:"translateY(-50%)", fontSize:"16px" }}>🔍</span>
+          <div style={{ maxWidth:"500px", margin:"0 auto", position:"relative" }}>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search destinations, trips, activities…" style={{ width:"100%", padding:"13px 20px 13px 46px", borderRadius:"50px", border:`2px solid ${C.tide}`, fontSize:"14px", outline:"none", boxSizing:"border-box", background:C.white, color:C.slate, boxShadow:`0 4px 20px rgba(28,43,58,0.08)`, fontFamily:"'Nunito',sans-serif" }} />
+            <span style={{ position:"absolute", left:"16px", top:"50%", transform:"translateY(-50%)", fontSize:"15px" }}>🔍</span>
           </div>
         </div>
       </div>
