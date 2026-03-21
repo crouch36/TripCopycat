@@ -5,17 +5,15 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { writeFileSync, readFileSync } from "fs";
+import { writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
-// Read credentials from src/.env (two lines: URL then anon key)
+// Public anon credentials — safe to hardcode (already shipped in the client bundle)
+const SUPABASE_URL = "https://wnjxtjeospeblvqdqsdj.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_8usxe69F1Loh3l3-dYHp4g_dnXxwWY7";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const envPath = join(__dirname, "..", "src", ".env");
-const [SUPABASE_URL, SUPABASE_ANON_KEY] = readFileSync(envPath, "utf8")
-  .split("\n")
-  .map((l) => l.trim())
-  .filter(Boolean);
 
 const SITE_URL = "https://tripcopycat.com";
 
