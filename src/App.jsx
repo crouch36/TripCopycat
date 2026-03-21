@@ -2583,7 +2583,7 @@ export default function App() {
             <span style={{ fontSize:"9px", background:C.seafoamDeep, color:C.azureDeep, fontWeight:700, padding:"2px 7px", borderRadius:"20px", border:`1px solid ${C.tide}` }}>beta</span>
           </div>
           <div style={{ display:"flex", gap:"7px" }}>
-            {!isAdmin && <button onClick={() => openSubmit()} style={{ background:"transparent", color:C.slate, border:`1.5px solid ${C.slate}`, borderRadius:"6px", padding:"7px 16px", fontSize:"12px", fontWeight:500, cursor:"pointer" }}>+ Submit a Trip</button>}
+            {!isAdmin && <button onClick={() => openSubmit()} style={{ background:"transparent", color:C.slate, border:`1.5px solid ${C.slate}`, borderRadius:"6px", padding:"6px 14px", fontSize:"11px", fontWeight:500, cursor:"pointer", whiteSpace:"nowrap" }}>+ Submit a Trip</button>}
             {isAdmin && <button onClick={() => setShowQueue(true)} style={{ background:C.amberBg, color:C.amber, border:`1px solid ${C.amber}44`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>📋 Queue</button>}
             {isAdmin && <button onClick={() => setShowImport(true)} style={{ background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>🤖 Smart Import</button>}
             {isAdmin && <button onClick={() => setShowAdd(true)} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"8px", padding:"7px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer", boxShadow:`0 3px 12px rgba(196,168,130,0.4)` }}>+ Add Trip</button>}
@@ -2603,23 +2603,23 @@ export default function App() {
       </nav>
 
       {/* Hero — Warm Nomad */}
-      <div style={{ background:C.seafoam, padding:"24px 0 20px", margin:"0", textAlign:"center", position:"relative", overflow:"hidden", borderBottom:`1px solid ${C.tide}` }}>
+      <div style={{ background:C.seafoam, padding:"16px 0 14px", margin:"0", textAlign:"center", position:"relative", overflow:"hidden", borderBottom:`1px solid ${C.tide}` }}>
         <div style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(circle at 20% 50%, rgba(196,168,130,0.08) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(193,105,42,0.06) 0%, transparent 50%)", pointerEvents:"none" }} />
         <div style={{ position:"relative", maxWidth:"680px", margin:"0 auto", padding:"0 16px" }}>
-          <h1 style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:"clamp(28px,5vw,48px)", fontWeight:700, color:C.slate, margin:"0 0 12px", lineHeight:1.1, letterSpacing:"-0.01em" }}>
+          <h1 style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:"clamp(22px,4.5vw,46px)", fontWeight:700, color:C.slate, margin:"0 0 10px", lineHeight:1.15, letterSpacing:"-0.01em" }}>
             Planned by others. Perfected by you.
           </h1>
-          <div style={{ display:"flex", gap:"10px", justifyContent:"center", alignItems:"center", flexWrap:"wrap", marginBottom:"16px" }}>
-            <button onClick={() => { const el = document.getElementById("trip-grid"); if(el) el.scrollIntoView({ behavior:"smooth" }); }} style={{ background:C.amber, color:C.slate, border:`1.5px solid ${C.amber}`, borderRadius:"6px", padding:"11px 26px", fontSize:"13px", fontWeight:500, cursor:"pointer", fontFamily:"'Nunito',sans-serif", letterSpacing:"0.01em" }}>
+          <div style={{ display:"flex", gap:"8px", justifyContent:"center", alignItems:"center", flexWrap:"wrap", marginBottom:"12px" }}>
+            <button onClick={() => { const el = document.getElementById("trip-grid"); if(el) el.scrollIntoView({ behavior:"smooth" }); }} style={{ background:C.amber, color:C.slate, border:`1.5px solid ${C.amber}`, borderRadius:"6px", padding:"8px 20px", fontSize:"12px", fontWeight:500, cursor:"pointer", fontFamily:"'Nunito',sans-serif", letterSpacing:"0.01em" }}>
               Leverage a Copycat
             </button>
-            <button onClick={() => openSubmit()} style={{ background:"transparent", color:C.slate, border:`1.5px solid ${C.slate}`, borderRadius:"6px", padding:"11px 26px", fontSize:"13px", fontWeight:500, cursor:"pointer", fontFamily:"'Nunito',sans-serif", letterSpacing:"0.01em" }}>
+            <button onClick={() => openSubmit()} style={{ background:"transparent", color:C.slate, border:`1.5px solid ${C.slate}`, borderRadius:"6px", padding:"8px 20px", fontSize:"12px", fontWeight:500, cursor:"pointer", fontFamily:"'Nunito',sans-serif", letterSpacing:"0.01em" }}>
               Submit a Trip →
             </button>
           </div>
           <div style={{ maxWidth:"500px", margin:"0 auto", position:"relative" }}>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search destinations, trips, activities…" style={{ width:"100%", padding:"13px 20px 13px 46px", borderRadius:"50px", border:`2px solid ${C.tide}`, fontSize:"14px", outline:"none", boxSizing:"border-box", background:C.white, color:C.slate, boxShadow:`0 4px 20px rgba(28,43,58,0.08)`, fontFamily:"'Nunito',sans-serif" }} />
-            <span style={{ position:"absolute", left:"16px", top:"50%", transform:"translateY(-50%)", fontSize:"15px" }}>🔍</span>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search destinations, trips, activities…" style={{ width:"100%", padding:"10px 18px 10px 42px", borderRadius:"50px", border:`1.5px solid ${C.tide}`, fontSize:"13px", outline:"none", boxSizing:"border-box", background:C.white, color:C.slate, boxShadow:`0 2px 12px rgba(28,43,58,0.07)`, fontFamily:"'Nunito',sans-serif" }} />
+            <span style={{ position:"absolute", left:"14px", top:"50%", transform:"translateY(-50%)", fontSize:"14px" }}>🔍</span>
           </div>
         </div>
       </div>
