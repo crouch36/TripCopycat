@@ -1,7 +1,7 @@
 import { ImageResponse } from "@vercel/og";
 
 const SUPABASE_URL = "https://wnjxtjeospeblvqdqsdj.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_8usxe69F1Loh3l3-dYHp4g_dnXxwWY7";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Induanh0amVvc3BlYmx2cWRxc2RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MTI2MjQsImV4cCI6MjA4OTI4ODYyNH0.l3OHQ9_v5__lkX_AryEkmg2uYGgxnTR4KqViV8foNlssb_publishable_8usxe69F1Loh3l3-dYHp4g_dnXxwWY7";
 const SITE_URL = "https://tripcopycat.com";
 
 export default async function handler(req) {
