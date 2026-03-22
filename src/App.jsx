@@ -994,6 +994,9 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark }) {
   const [tab, setTab] = useState("all");
   const [showExport, setShowExport] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [lightboxIdx, setLightboxIdx] = useState(null);
+
+  const gallery = trip.gallery || [];
 
   const related = (allTrips || []).filter(t =>
     t.id !== trip.id && (t.region === trip.region || t.author === trip.author)
@@ -1046,6 +1049,36 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark }) {
               <button key={t.id} onClick={() => setView(t.id)} style={{ padding:"12px 20px", fontSize:"13px", fontWeight:700, border:"none", cursor:"pointer", background:"transparent", color:view===t.id?C.azureDeep:C.muted, borderBottom:view===t.id?`2px solid ${C.amber}`:"2px solid transparent", transition:"all .15s" }}>{t.l}</button>
             ))}
           </div>
+
+          {/* Gallery strip */}
+          {gallery.length > 0 && (
+            <div style={{ padding:"12px 20px", borderBottom:`1px solid ${C.tide}`, background:C.white, display:"flex", gap:"8px", overflowX:"auto" }}>
+              {gallery.map((g, idx) => (
+                <div key={idx} onClick={() => setLightboxIdx(idx)} style={{ flexShrink:0, width:"80px", height:"60px", borderRadius:"6px", overflow:"hidden", cursor:"pointer", border:`1.5px solid ${C.tide}`, position:"relative" }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor=C.amber}
+                  onMouseLeave={e => e.currentTarget.style.borderColor=C.tide}>
+                  <img src={g.url} alt={g.caption||""} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
+                </div>
+              ))}
+              <div style={{ flexShrink:0, display:"flex", alignItems:"center", paddingLeft:"4px" }}>
+                <span style={{ fontSize:"10px", color:C.muted, fontWeight:600 }}>{gallery.length} photo{gallery.length!==1?"s":""}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Lightbox */}
+          {lightboxIdx !== null && (
+            <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.92)", zIndex:9000, display:"flex", alignItems:"center", justifyContent:"center" }} onClick={() => setLightboxIdx(null)}>
+              <button onClick={e => { e.stopPropagation(); setLightboxIdx(i => Math.max(0, i-1)); }} style={{ position:"absolute", left:"20px", background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", borderRadius:"50%", width:"44px", height:"44px", fontSize:"20px", cursor:"pointer", display:lightboxIdx===0?"none":"flex", alignItems:"center", justifyContent:"center" }}>‹</button>
+              <div onClick={e => e.stopPropagation()} style={{ maxWidth:"90vw", maxHeight:"85vh", display:"flex", flexDirection:"column", alignItems:"center" }}>
+                <img src={gallery[lightboxIdx]?.url} alt={gallery[lightboxIdx]?.caption||""} style={{ maxWidth:"100%", maxHeight:"75vh", objectFit:"contain", borderRadius:"8px" }} />
+                {gallery[lightboxIdx]?.caption && <div style={{ color:"rgba(255,255,255,0.8)", fontSize:"13px", marginTop:"12px", textAlign:"center" }}>{gallery[lightboxIdx].caption}</div>}
+                <div style={{ color:"rgba(255,255,255,0.4)", fontSize:"11px", marginTop:"8px" }}>{lightboxIdx+1} / {gallery.length}</div>
+              </div>
+              <button onClick={e => { e.stopPropagation(); setLightboxIdx(i => Math.min(gallery.length-1, i+1)); }} style={{ position:"absolute", right:"20px", background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", borderRadius:"50%", width:"44px", height:"44px", fontSize:"20px", cursor:"pointer", display:lightboxIdx===gallery.length-1?"none":"flex", alignItems:"center", justifyContent:"center" }}>›</button>
+              <button onClick={() => setLightboxIdx(null)} style={{ position:"absolute", top:"20px", right:"20px", background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", borderRadius:"50%", width:"36px", height:"36px", fontSize:"18px", cursor:"pointer" }}>×</button>
+            </div>
+          )}
 
           {view === "overview" && (
             <div>
@@ -1307,7 +1340,7 @@ const EMPTY_FORM = {
   title:"", destination:"", region:"Europe", duration:"", travelers:"", date:"", tags:[], loves:"", doNext:"",
   airfare:[{item:"",detail:"",tip:""}], hotels:[{item:"",detail:"",tip:""}],
   restaurants:[{item:"",detail:"",tip:""}], bars:[{item:"",detail:"",tip:""}],
-  activities:[{item:"",detail:"",tip:""}], days:[], focalPoint:{x:50,y:50}
+  activities:[{item:"",detail:"",tip:""}], days:[], focalPoint:{x:50,y:50}, gallery:[]
 };
 
 function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, prefillData }) {
@@ -1323,6 +1356,9 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
   const [photoError, setPhotoError] = useState("");
   const [focalPoint, setFocalPoint] = useState({ x: 50, y: 50 });
   const focalDragging = useRef(false);
+  const [galleryFiles, setGalleryFiles] = useState([]); // [{file, preview, caption}]
+  const [galleryError, setGalleryError] = useState("");
+  const galleryRef = useRef();
   const [draftExists, setDraftExists] = useState(false);
   const [draftSaving, setDraftSaving] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
@@ -1386,6 +1422,56 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
     if (error) { console.error("Photo upload error:", error); return null; }
     const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
     return data.publicUrl;
+  };
+
+  const compressForUpload = (file) => new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 1200 / img.width);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => { URL.revokeObjectURL(url); resolve(blob); }, "image/jpeg", 0.7);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+
+  const uploadGallery = async () => {
+    if (!galleryFiles.length) return [];
+    const urls = [];
+    for (const gf of galleryFiles) {
+      const compressed = await compressForUpload(gf.file);
+      if (!compressed) continue;
+      const path = `gallery-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+      const { error } = await supabase.storage.from("trip-photos").upload(path, compressed, { contentType: "image/jpeg", upsert: false });
+      if (error) { console.error("Gallery upload error:", error); continue; }
+      const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
+      urls.push({ url: data.publicUrl, caption: gf.caption || "" });
+    }
+    return urls;
+  };
+
+  const handleGalleryAdd = (e) => {
+    const files = Array.from(e.target.files);
+    const allowed = ["image/jpeg","image/png","image/webp","image/heic","image/heif"];
+    const valid = files.filter(f => allowed.includes(f.type) && f.size <= 5*1024*1024);
+    if (valid.length < files.length) setGalleryError("Some files were skipped (unsupported type or over 5MB).");
+    else setGalleryError("");
+    const remaining = 5 - galleryFiles.length;
+    const toAdd = valid.slice(0, remaining).map(f => ({ file: f, preview: URL.createObjectURL(f), caption: "" }));
+    setGalleryFiles(p => [...p, ...toAdd]);
+    e.target.value = "";
+  };
+
+  const removeGalleryPhoto = (idx) => {
+    setGalleryFiles(p => { URL.revokeObjectURL(p[idx].preview); return p.filter((_,i) => i !== idx); });
+  };
+
+  const updateCaption = (idx, caption) => {
+    setGalleryFiles(p => p.map((g,i) => i === idx ? {...g, caption} : g));
   };
   const [form, setForm] = useState(() => prefillData ? {
     title: prefillData?.destination ? `${prefillData.destination} Trip` : "",
@@ -1469,7 +1555,8 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
     if (!submitterName || !submitterEmail) { alert("Please add your name and email."); return; }
     setStep("submitting");
     const photoUrl = await uploadPhoto();
-    const tripWithPhoto = { ...form, image: photoUrl || "", focalPoint };
+    const galleryUrls = await uploadGallery();
+    const tripWithPhoto = { ...form, image: photoUrl || "", focalPoint, gallery: galleryUrls };
     const result = runContentFilter(tripWithPhoto);
     setFilterResult(result);
     await supabase.from("submissions").insert([{
@@ -1692,6 +1779,41 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                 </div>
               )}
               {photoError && <div style={{ fontSize:"11px", color:C.red, marginBottom:"6px" }}>{photoError}</div>}
+
+              {/* Gallery Photos */}
+              <div style={{ borderTop:`1px solid ${C.tide}`, paddingTop:"14px", marginTop:"6px", marginBottom:"6px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px" }}>
+                  <div style={{ fontSize:"12px", fontWeight:700, color:C.slate }}>📷 Gallery Photos <span style={{ fontWeight:400, color:C.muted }}>(up to 5 · optional)</span></div>
+                  <span style={{ fontSize:"10px", color:C.muted }}>{galleryFiles.length}/5</span>
+                </div>
+                <input ref={galleryRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple style={{ display:"none" }} onChange={handleGalleryAdd} />
+                {galleryFiles.length > 0 && (
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))", gap:"8px", marginBottom:"8px" }}>
+                    {galleryFiles.map((gf, idx) => (
+                      <div key={idx} style={{ borderRadius:"8px", overflow:"hidden", border:`1px solid ${C.tide}`, position:"relative" }}>
+                        <div style={{ height:"80px", position:"relative" }}>
+                          <img src={gf.preview} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
+                          <button onClick={() => removeGalleryPhoto(idx)} style={{ position:"absolute", top:"4px", right:"4px", background:"rgba(0,0,0,0.55)", border:"none", color:"#fff", borderRadius:"50%", width:"20px", height:"20px", cursor:"pointer", fontSize:"12px", display:"flex", alignItems:"center", justifyContent:"center", lineHeight:1 }}>×</button>
+                        </div>
+                        <input
+                          placeholder="Caption (optional)"
+                          value={gf.caption}
+                          onChange={e => updateCaption(idx, e.target.value)}
+                          style={{ width:"100%", padding:"5px 7px", border:"none", borderTop:`1px solid ${C.tide}`, fontSize:"10px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {galleryFiles.length < 5 && (
+                  <div onClick={() => galleryRef.current.click()} style={{ border:`2px dashed ${C.tide}`, borderRadius:"8px", padding:"12px", textAlign:"center", cursor:"pointer", background:C.seafoam, fontSize:"11px", color:C.slateMid, fontWeight:600 }}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=C.amber}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor=C.tide}>
+                    + Add photos ({5 - galleryFiles.length} remaining)
+                  </div>
+                )}
+                {galleryError && <div style={{ fontSize:"11px", color:C.amber, marginTop:"4px" }}>{galleryError}</div>}
+              </div>
             </div>
 
             <div style={{ borderTop:`1px solid ${C.tide}`, paddingTop:"14px", marginTop:"6px" }}>
@@ -1770,7 +1892,7 @@ function AdminQueueModal({ onClose, onApprove }) {
       tags:t.tags||[], loves:t.loves, do_next:t.do_next||t.doNext||"",
       airfare:t.airfare||[], hotels:t.hotels||[], restaurants:t.restaurants||[],
       bars:t.bars||[], activities:t.activities||[], days:t.days||[],
-      image:t.image||"", status:"published", user_id:sub.user_id||null, focal_point:t.focalPoint||{x:50,y:50}
+      image:t.image||"", status:"published", user_id:sub.user_id||null, focal_point:t.focalPoint||{x:50,y:50}, gallery:t.gallery||[]
     }]);
     await supabase.from("submissions").update({ status:"approved", reviewed_at:new Date().toISOString() }).eq("id",sub.id);
     setSubmissions(p => p.map(s => s.id===sub.id ? {...s,status:"approved"} : s));
@@ -2486,7 +2608,7 @@ export default function App() {
             tags:t.tags||[], loves:t.loves, doNext:t.do_next,
             airfare:t.airfare||[], hotels:t.hotels||[], restaurants:t.restaurants||[],
             bars:t.bars||[], activities:t.activities||[], days:t.days||[],
-            image:t.image||"", userId:t.user_id||null, featured:t.featured||false, focalPoint:t.focal_point||{x:50,y:50}
+            image:t.image||"", userId:t.user_id||null, featured:t.featured||false, focalPoint:t.focal_point||{x:50,y:50}, gallery:t.gallery||[]
           }));
           setDbTrips(mapped);
         }
@@ -2599,7 +2721,7 @@ export default function App() {
       tags: updated.tags, loves: updated.loves, do_next: updated.doNext,
       airfare: updated.airfare, hotels: updated.hotels, restaurants: updated.restaurants,
       bars: updated.bars, activities: updated.activities, days: updated.days,
-      image: updated.image || "", featured: updated.featured || false, focal_point: updated.focalPoint || {x:50,y:50}
+      image: updated.image || "", featured: updated.featured || false, focal_point: updated.focalPoint || {x:50,y:50}, gallery: updated.gallery || []
     }).eq("id", updated.id);
     setTrips(p => p.map(t => t.id === updated.id ? updated : t));
     setDbTrips(p => p.map(t => t.id === updated.id ? updated : t));
