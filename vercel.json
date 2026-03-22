@@ -1,8 +1,6 @@
 {
   "functions": {
-    "api/og.jsx": {
-      "runtime": "edge"
-    }
+    "api/og.jsx": {}
   },
   "rewrites": [
     { "source": "/((?!api/)(?!sitemap.xml$).*)", "destination": "/index.html" }
