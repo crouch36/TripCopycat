@@ -1607,34 +1607,100 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                 </div>
               </div>
             )}
-            <div style={{ textAlign:"center", marginBottom:"24px" }}>
-              <div style={{ fontSize:"32px", marginBottom:"10px" }}>✈️</div>
-              <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>How would you like to build your itinerary?</div>
-              <div style={{ fontSize:"13px", color:C.slateLight, lineHeight:1.6 }}>Choose the fastest path for you.</div>
+            <div style={{ textAlign:"center", marginBottom:"20px" }}>
+              <div style={{ fontSize:"28px", marginBottom:"8px" }}>✈️</div>
+              <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"4px" }}>Tell us about your trip</div>
+              <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.6 }}>Brain dump what you remember — then add photos and let AI fill in the gaps. You can always come back later to add more detail.</div>
             </div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"12px" }}>
-              <button onClick={() => setStep("ai-prompt")} style={{ padding:"18px", borderRadius:"12px", border:`2px solid ${C.azure}`, background:C.seafoam, cursor:"pointer", textAlign:"left" }}>
-                <div style={{ fontSize:"22px", marginBottom:"8px" }}>🤖</div>
-                <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Use AI Prompt</div>
-                <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"3px", lineHeight:1.5 }}>Paste into Claude or ChatGPT, answer questions, paste back. Fastest way to build.</div>
-              </button>
-              <button onClick={() => setStep("form")} style={{ padding:"18px", borderRadius:"12px", border:`1px solid ${C.tide}`, background:C.white, cursor:"pointer", textAlign:"left" }}>
-                <div style={{ fontSize:"22px", marginBottom:"8px" }}>✏️</div>
-                <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Fill Form Manually</div>
-                <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"3px", lineHeight:1.5 }}>Enter your trip details directly into the form fields.</div>
-              </button>
-            </div>
-            <button onClick={() => setStep("photo-import")} style={{ width:"100%", padding:"18px", borderRadius:"12px", border:`2px solid ${C.amber}`, background:C.amberBg, cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:"16px" }}>
-              <div style={{ fontSize:"28px", flexShrink:0 }}>📸</div>
-              <div>
-                <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"3px" }}>
-                  <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Smart Import From Photos</div>
-                  <span style={{ fontSize:"9px", fontWeight:700, background:C.amber, color:C.white, padding:"2px 7px", borderRadius:"20px" }}>NEW</span>
-                </div>
-                <div style={{ fontSize:"11px", color:C.slateLight, lineHeight:1.5 }}>Upload up to 30 trip photos. AI reads GPS, identifies venues from signage, and reconstructs your itinerary automatically.</div>
+
+            {/* Hybrid: text + photos */}
+            <div style={{ background:C.seafoam, borderRadius:"14px", border:`1.5px solid ${C.amber}`, padding:"18px", marginBottom:"14px" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"12px" }}>
+                <span style={{ fontSize:"18px" }}>🧠</span>
+                <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Step 1 — Brain dump</div>
+                <span style={{ fontSize:"9px", fontWeight:700, background:C.amber, color:C.white, padding:"2px 8px", borderRadius:"20px" }}>Start here</span>
               </div>
-            </button>
+              <div style={{ fontSize:"11px", color:C.slateMid, marginBottom:"8px", lineHeight:1.6 }}>
+                Write anything you remember — as little or as much as you like. Destination, dates, who you went with, hotels, restaurants, highlights, costs. Don't worry about format.
+              </div>
+              <textarea
+                id="hybrid-brain-dump"
+                placeholder={`e.g. "Ireland trip, 4 guys, 4 days in October. Flew into Dublin, stayed at The Meyrick in Galway for 3 nights. Highlights: Cliffs of Moher, Sean's Bar was incredible, Bowe's in Dublin. Rented a car ~€80/day. Recommend going in shoulder season."`}
+                style={{ width:"100%", minHeight:"90px", padding:"10px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"12px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate, resize:"vertical", lineHeight:1.6 }}
+              />
+
+              <div style={{ display:"flex", alignItems:"center", gap:"8px", marginTop:"14px", marginBottom:"10px" }}>
+                <span style={{ fontSize:"18px" }}>📸</span>
+                <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Step 2 — Add photos <span style={{ fontSize:"11px", fontWeight:400, color:C.muted }}>(optional but powerful)</span></div>
+              </div>
+              <div style={{ fontSize:"11px", color:C.slateMid, marginBottom:"10px", lineHeight:1.6, background:C.white, borderRadius:"8px", padding:"10px 12px", border:`1px solid ${C.tide}` }}>
+                <strong style={{ color:C.slate }}>These photos are for AI analysis only</strong> — they won't be published with your trip. AI reads GPS location data and identifies venues from signage to fill in details your brain dump might have missed. You'll add your actual cover photo and gallery separately.
+              </div>
+              <HybridPhotoSelector onChange={(files) => { window.__hybridPhotos = files; }} />
+
+              <button
+                onClick={() => {
+                  const text = document.getElementById("hybrid-brain-dump")?.value || "";
+                  const photos = window.__hybridPhotos || [];
+                  if (!text.trim() && !photos.length) { alert("Please add some text or photos to get started."); return; }
+                  setStep("hybrid-processing");
+                  window.__hybridText = text;
+                }}
+                style={{ width:"100%", marginTop:"14px", padding:"12px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
+                Build My Itinerary →
+              </button>
+            </div>
+
+            {/* Secondary options */}
+            <div style={{ display:"flex", gap:"8px", alignItems:"stretch" }}>
+              <button onClick={() => setStep("ai-prompt")} style={{ flex:1, padding:"12px", borderRadius:"10px", border:`1px solid ${C.tide}`, background:C.white, cursor:"pointer", textAlign:"left" }}>
+                <div style={{ fontSize:"16px", marginBottom:"4px" }}>🤖</div>
+                <div style={{ fontSize:"12px", fontWeight:700, color:C.slate }}>AI Prompt</div>
+                <div style={{ fontSize:"10px", color:C.slateLight, marginTop:"2px", lineHeight:1.4 }}>Chat with Claude or ChatGPT, paste the output back</div>
+              </button>
+              <button onClick={() => setStep("photo-import")} style={{ flex:1, padding:"12px", borderRadius:"10px", border:`1px solid ${C.tide}`, background:C.white, cursor:"pointer", textAlign:"left" }}>
+                <div style={{ fontSize:"16px", marginBottom:"4px" }}>📷</div>
+                <div style={{ fontSize:"12px", fontWeight:700, color:C.slate }}>Photos Only</div>
+                <div style={{ fontSize:"10px", color:C.slateLight, marginTop:"2px", lineHeight:1.4 }}>Upload photos and let AI reconstruct everything</div>
+              </button>
+              <button onClick={() => setStep("form")} style={{ flex:1, padding:"12px", borderRadius:"10px", border:`1px solid ${C.tide}`, background:C.white, cursor:"pointer", textAlign:"left" }}>
+                <div style={{ fontSize:"16px", marginBottom:"4px" }}>✏️</div>
+                <div style={{ fontSize:"12px", fontWeight:700, color:C.slate }}>Manual</div>
+                <div style={{ fontSize:"10px", color:C.slateLight, marginTop:"2px", lineHeight:1.4 }}>Fill the form fields yourself</div>
+              </button>
+            </div>
           </div>
+        )}
+
+        {step === "hybrid-processing" && (
+          <HybridProcessor
+            text={typeof window !== "undefined" ? window.__hybridText || "" : ""}
+            photos={typeof window !== "undefined" ? window.__hybridPhotos || [] : []}
+            onComplete={(data) => {
+              setForm(p => ({
+                ...p,
+                title:        data.title        || p.title,
+                destination:  data.destination  || p.destination,
+                region:       data.region       || p.region,
+                date:         data.date         || p.date,
+                duration:     data.duration     || p.duration,
+                travelers:    data.travelers    || p.travelers,
+                tags:         data.tags?.length ? data.tags : p.tags,
+                loves:        data.loves        || p.loves,
+                doNext:       data.doNext       || p.doNext,
+                airfare:      data.airfare?.length ? data.airfare : p.airfare,
+                hotels:       data.hotels?.length ? data.hotels : p.hotels,
+                restaurants:  data.restaurants?.length ? data.restaurants : p.restaurants,
+                bars:         data.bars?.length ? data.bars : p.bars,
+                activities:   data.activities?.length ? data.activities : p.activities,
+                days:         data.days?.length ? data.days : p.days,
+              }));
+              window.__hybridPhotos = [];
+              window.__hybridText = "";
+              setStep("form");
+            }}
+            onBack={() => setStep("prompt")}
+          />
         )}
 
         {step === "photo-import" && (
@@ -1685,6 +1751,12 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
 
         {step === "form" && (
           <div style={{ padding:"20px 28px", maxHeight:"65vh", overflowY:"auto" }}>
+            <div style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"10px", padding:"10px 14px", marginBottom:"14px", display:"flex", alignItems:"flex-start", gap:"10px" }}>
+              <span style={{ fontSize:"16px", flexShrink:0 }}>💾</span>
+              <div style={{ fontSize:"11px", color:C.slateMid, lineHeight:1.6 }}>
+                <strong style={{ color:C.slate }}>Fill in what you know — come back anytime.</strong> Your draft saves automatically. You don't need to complete everything now. Submit a partial trip and edit it later, or save a draft and return when you have more details.
+              </div>
+            </div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px", marginBottom:"14px" }}>
               <div style={{ gridColumn:"1/-1" }}><label style={lbl}>Trip Title</label><input style={inp} value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))} /></div>
               <div><label style={lbl}>Destination</label><input style={inp} value={form.destination} onChange={e=>setForm(p=>({...p,destination:e.target.value}))} /></div>
@@ -1976,6 +2048,188 @@ function AdminQueueModal({ onClose, onApprove }) {
 // ── Auth & Profile Components ─────────────────────────────────────────────────
 
 // ── Auth Modal (Login / Register) ─────────────────────────────────────────────
+// ── Hybrid Processor ──────────────────────────────────────────────────────────
+function HybridProcessor({ text, photos, onComplete, onBack }) {
+  const [progress, setProgress] = useState(0);
+  const [label, setLabel] = useState("Preparing...");
+  const [error, setError] = useState(null);
+
+  const compressOne = (file) => new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 1200 / img.width);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => {
+        URL.revokeObjectURL(url);
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result.split(",")[1]);
+        reader.readAsDataURL(blob);
+      }, "image/jpeg", 0.65);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+
+  useEffect(() => {
+    const run = async () => {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) { setError("API key not configured."); return; }
+
+      // Step 1: compress photos
+      const compressed = [];
+      if (photos.length > 0) {
+        setLabel(`Compressing ${photos.length} photo${photos.length!==1?"s":""}...`);
+        for (let i = 0; i < photos.length; i++) {
+          const b64 = await compressOne(photos[i]);
+          if (b64) compressed.push(b64);
+          setProgress(Math.round((i + 1) / photos.length * 40));
+        }
+      } else {
+        setProgress(40);
+      }
+
+      setLabel("Analysing with AI...");
+      setProgress(50);
+
+      const hasText = text.trim().length > 0;
+      const hasPhotos = compressed.length > 0;
+
+      const prompt = `You are helping a traveller document a trip for a crowd-sourced travel platform called TripCopycat.
+
+${hasText ? `The traveller wrote this brain dump about their trip:\n\n"${text}"\n\n` : ""}${hasPhotos ? `They have also provided ${compressed.length} photos from the trip. Use GPS data, visible signage, and landmarks in the photos to identify specific venues and locations.\n\n` : ""}Your job is to extract and structure everything into a trip itinerary. Be as specific as possible — use real venue names from the text or photos. For anything not mentioned, leave it as an empty string or empty array rather than guessing.
+
+Return ONLY a valid JSON object with no other text:
+{
+  "title": "Short descriptive trip title",
+  "destination": "City/Region, Country",
+  "region": "Europe|Asia|North America|Central America|South America|Africa|Oceania",
+  "date": "Month Year",
+  "duration": "N days",
+  "travelers": "e.g. Couple, Family of 4, Guys trip",
+  "tags": [],
+  "loves": "What stood out — be specific with place names if mentioned",
+  "doNext": "Honest advice for future travellers",
+  "airfare": [{"item": "Airline and route", "detail": "~$X per person", "tip": ""}],
+  "hotels": [{"item": "Hotel name", "detail": "N nights, ~$X/night", "tip": ""}],
+  "restaurants": [{"item": "Restaurant name", "detail": "cuisine, ~$X per person", "tip": ""}],
+  "bars": [{"item": "Bar name", "detail": "type", "tip": ""}],
+  "activities": [{"item": "Activity name", "detail": "~$X per person", "tip": ""}],
+  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"time": "", "type": "activity|restaurant|bar|hotel|transport", "label": "what happened", "note": ""}]}]
+}
+Valid tags: family-friendly, romantic, adventure, food & wine, culture, beach, wildlife, scenic drives`;
+
+      const parts = [{ text: prompt }];
+      compressed.forEach(b64 => parts.push({ inline_data: { mime_type: "image/jpeg", data: b64 } }));
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000);
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+          { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ contents:[{ parts }] }), signal:controller.signal }
+        );
+        clearTimeout(timeout);
+        setProgress(90);
+        const data = await res.json();
+        const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const jsonMatch = raw.replace(/```json\n?|```\n?/g, "").match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error("No JSON in response");
+        const parsed = JSON.parse(jsonMatch[0]);
+        setProgress(100);
+        setTimeout(() => onComplete(parsed), 300);
+      } catch(e) {
+        setError(e.name === "AbortError" ? "Request timed out — try with fewer photos or check your connection." : `Analysis failed: ${e.message}`);
+      }
+    };
+    run();
+  }, []);
+
+  if (error) return (
+    <div style={{ padding:"40px 28px", textAlign:"center" }}>
+      <div style={{ fontSize:"32px", marginBottom:"12px" }}>😕</div>
+      <div style={{ fontSize:"14px", fontWeight:700, color:"#2C3E50", marginBottom:"8px" }}>Something went wrong</div>
+      <div style={{ fontSize:"12px", color:"#7F8C8D", marginBottom:"20px", lineHeight:1.6 }}>{error}</div>
+      <div style={{ display:"flex", gap:"8px", justifyContent:"center" }}>
+        <button onClick={onBack} style={{ padding:"9px 20px", borderRadius:"8px", border:"1px solid #BDC3C7", background:"#fff", color:"#7F8C8D", fontSize:"12px", cursor:"pointer" }}>← Back</button>
+        <button onClick={() => { setError(null); setProgress(0); }} style={{ padding:"9px 20px", borderRadius:"8px", border:"none", background:"#C4A882", color:"#2C3E50", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>Try Again</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ padding:"56px 28px", textAlign:"center" }}>
+      <div style={{ fontSize:"40px", marginBottom:"16px" }}>
+        {progress < 40 ? "🗜️" : progress < 80 ? "🤖" : "✨"}
+      </div>
+      <div style={{ fontSize:"16px", fontWeight:700, color:"#2C3E50", marginBottom:"6px" }}>{label}</div>
+      <div style={{ fontSize:"12px", color:"#7F8C8D", marginBottom:"24px" }}>
+        {photos.length > 0 && text.trim() ? "Combining your notes and photos..." : photos.length > 0 ? "Reading your photos..." : "Structuring your notes..."}
+      </div>
+      <div style={{ maxWidth:"360px", margin:"0 auto 16px" }}>
+        <div style={{ height:"6px", background:"#ECF0F1", borderRadius:"3px", overflow:"hidden" }}>
+          <div style={{ height:"100%", background:"#C4A882", borderRadius:"3px", transition:"width .4s", width:`${progress}%` }} />
+        </div>
+        <div style={{ marginTop:"8px", fontSize:"11px", color:"#BDC3C7" }}>{progress}%</div>
+      </div>
+      <button onClick={onBack} style={{ padding:"7px 16px", borderRadius:"7px", border:"1px solid #BDC3C7", background:"#fff", color:"#7F8C8D", fontSize:"11px", cursor:"pointer" }}>Cancel</button>
+    </div>
+  );
+}
+
+// ── Hybrid Photo Selector ─────────────────────────────────────────────────────
+function HybridPhotoSelector({ onChange }) {
+  const [files, setFiles] = useState([]);
+  const ref = useRef();
+
+  const add = (e) => {
+    const added = Array.from(e.target.files).slice(0, 30 - files.length);
+    const newFiles = [...files, ...added].slice(0, 30);
+    setFiles(newFiles);
+    onChange && onChange(newFiles);
+    e.target.value = "";
+  };
+
+  const remove = (idx) => {
+    const updated = files.filter((_, i) => i !== idx);
+    setFiles(updated);
+    onChange && onChange(updated);
+  };
+
+  return (
+    <div>
+      <input ref={ref} type="file" multiple accept="image/*" style={{ display:"none" }} onChange={add} />
+      {files.length > 0 ? (
+        <div>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"8px" }}>
+            {files.map((f, i) => (
+              <div key={i} style={{ position:"relative", width:"52px", height:"52px", borderRadius:"6px", overflow:"hidden", border:`1px solid ${C.tide}` }}>
+                <img src={URL.createObjectURL(f)} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                <button onClick={() => remove(i)} style={{ position:"absolute", top:"1px", right:"1px", background:"rgba(0,0,0,0.6)", border:"none", color:"#fff", borderRadius:"50%", width:"16px", height:"16px", cursor:"pointer", fontSize:"10px", display:"flex", alignItems:"center", justifyContent:"center", lineHeight:1 }}>×</button>
+              </div>
+            ))}
+            {files.length < 30 && (
+              <div onClick={() => ref.current.click()} style={{ width:"52px", height:"52px", borderRadius:"6px", border:`2px dashed ${C.tide}`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:"20px", color:C.muted, background:C.seafoam }}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=C.amber}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=C.tide}>+</div>
+            )}
+          </div>
+          <div style={{ fontSize:"10px", color:C.muted }}>{files.length} photo{files.length!==1?"s":""} selected · {30-files.length} remaining · These are for AI analysis only, not published</div>
+        </div>
+      ) : (
+        <div onClick={() => ref.current.click()} style={{ border:`2px dashed ${C.tide}`, borderRadius:"8px", padding:"14px", textAlign:"center", cursor:"pointer", background:C.white, fontSize:"12px", color:C.slateMid }}
+          onMouseEnter={e=>e.currentTarget.style.borderColor=C.amber}
+          onMouseLeave={e=>e.currentTarget.style.borderColor=C.tide}>
+          Tap to add trip photos · up to 30 · AI analysis only, not published
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Reset Password Modal ──────────────────────────────────────────────────────
 function ResetPasswordModal({ onClose }) {
   const [password, setPassword] = useState("");
