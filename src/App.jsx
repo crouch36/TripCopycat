@@ -589,7 +589,7 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
   };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.7)", zIndex:3000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"28px 16px", overflowY:"auto", backdropFilter:"blur(8px)" }}>
+    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.7)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:"28px 16px", overflowY:"hidden", backdropFilter:"blur(8px)" }}>
       <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"680px", overflow:"hidden", boxShadow:`0 32px 64px rgba(44,62,80,0.22)`, border:`1px solid ${C.tide}` }}>
 
         {/* header */}
@@ -653,7 +653,7 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
 
         {/* review result */}
         {phase === "review" && result && (
-          <div style={{ padding:"24px 28px", maxHeight:"60vh", overflowY:"auto" }}>
+          <div style={{ padding:"24px 28px", maxHeight:"60vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
             <div style={{ background:C.greenBg, border:`1px solid ${C.green}`, borderRadius:"12px", padding:"14px 18px", marginBottom:"20px", display:"flex", alignItems:"center", gap:"10px" }}>
               <span style={{ fontSize:"20px" }}>✅</span>
               <div>
@@ -707,7 +707,7 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
             <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"8px" }}>Something went wrong</div>
             <div style={{ fontSize:"13px", color:C.slateLight, marginBottom:"16px" }}>{error}</div>
             {rawDebug && (
-              <div style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"10px 12px", marginBottom:"16px", textAlign:"left", maxHeight:"120px", overflowY:"auto" }}>
+              <div style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"10px 12px", marginBottom:"16px", textAlign:"left", maxHeight:"120px", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
                 <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, marginBottom:"4px" }}>DEBUG — API Response:</div>
                 <div style={{ fontSize:"10px", color:C.slateMid, wordBreak:"break-all", lineHeight:1.5 }}>{rawDebug}</div>
               </div>
@@ -741,7 +741,7 @@ function EmailImportModal({ onClose }) {
   const catIcon  = { airfare:"✈️", hotel:"🏨", activity:"🎯", restaurant:"🍽️" };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.7)", zIndex:3000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"28px 16px", overflowY:"auto", backdropFilter:"blur(8px)" }}>
+    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.7)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:"28px 16px", overflowY:"hidden", backdropFilter:"blur(8px)" }}>
       <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"740px", overflow:"hidden", boxShadow:`0 32px 64px rgba(44,62,80,0.22)`, border:`1px solid ${C.tide}` }}>
 
         <div style={{ padding:"22px 30px", borderBottom:`1px solid ${C.tide}`, display:"flex", justifyContent:"space-between", alignItems:"center", background:C.seafoam }}>
@@ -803,7 +803,7 @@ function EmailImportModal({ onClose }) {
               <div style={{ fontSize:"12px", color:C.slateLight }}><strong style={{ color:C.slate }}>{items.length}</strong> confirmations detected · <strong style={{ color:C.green }}>{nAcc}</strong> accepted</div>
               <button onClick={acceptAll} style={{ padding:"5px 14px", borderRadius:"7px", border:"none", background:C.green, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>Accept All</button>
             </div>
-            <div style={{ padding:"14px 22px", maxHeight:"400px", overflowY:"auto", background:C.white }}>
+            <div style={{ padding:"14px 22px", maxHeight:"400px", overflowY:"auto", WebkitOverflowScrolling:"touch", background:C.white }}>
               {items.map(item => (
                 <div key={item.id} style={{ background:C.white, borderRadius:"11px", padding:"14px 16px", marginBottom:"9px", border:`1px solid ${item.accepted===true?C.green:item.accepted===false?C.red:C.tide}`, display:"flex", gap:"12px", alignItems:"center", boxShadow:`0 1px 4px rgba(44,62,80,0.06)` }}>
                   <div style={{ fontSize:"22px", flexShrink:0 }}>{catIcon[item.category]||"📄"}</div>
@@ -917,7 +917,7 @@ function ExportModal({ trip, onClose }) {
   const copy = () => navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2200); });
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.7)", zIndex:3000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"36px 16px", overflowY:"auto", backdropFilter:"blur(8px)" }}
+    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.7)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:"36px 16px", overflowY:"hidden", backdropFilter:"blur(8px)" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"660px", overflow:"hidden", boxShadow:`0 32px 64px rgba(44,62,80,0.22)`, border:`1px solid ${C.tide}` }}>
         <div style={{ padding:"22px 26px", borderBottom:`1px solid ${C.tide}`, display:"flex", justifyContent:"space-between", alignItems:"center", background:C.seafoam }}>
@@ -932,7 +932,7 @@ function ExportModal({ trip, onClose }) {
             <button onClick={onClose} style={{ background:C.seafoamDeep, border:"none", color:C.slateLight, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>×</button>
           </div>
         </div>
-        <pre style={{ margin:0, padding:"22px 26px", fontSize:"11.5px", lineHeight:1.95, color:C.slateMid, fontFamily:"'Fira Code','Courier New',monospace", maxHeight:"540px", overflowY:"auto", whiteSpace:"pre-wrap", wordBreak:"break-word", background:C.seafoam }}>
+        <pre style={{ margin:0, padding:"22px 26px", fontSize:"11.5px", lineHeight:1.95, color:C.slateMid, fontFamily:"'Fira Code','Courier New',monospace", maxHeight:"540px", overflowY:"auto", WebkitOverflowScrolling:"touch", whiteSpace:"pre-wrap", wordBreak:"break-word", background:C.seafoam }}>
           {text}
         </pre>
         <div style={{ padding:"10px 26px", borderTop:`1px solid ${C.tide}`, background:C.white }}>
@@ -1016,7 +1016,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark }) {
 
   return (
     <>
-      <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.6)", zIndex:1000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"28px 16px", overflowY:"auto", backdropFilter:"blur(6px)" }}
+      <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:"28px 16px", overflowY:"hidden", backdropFilter:"blur(6px)" }}
         onClick={e => e.target === e.currentTarget && onClose()}>
         <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"880px", boxShadow:`0 32px 64px rgba(44,62,80,0.2)`, overflow:"hidden", border:`1px solid ${C.tide}` }}>
 
@@ -1260,7 +1260,7 @@ function AddTripModal({ onClose, onAdd }) {
   const lbl = { fontSize:"11px", fontWeight:600, color:C.slateMid, marginBottom:"3px", display:"block" };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.65)", zIndex:1000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"36px 16px", overflowY:"auto", backdropFilter:"blur(6px)" }}>
+    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.65)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:"36px 16px", overflowY:"hidden", backdropFilter:"blur(6px)" }}>
       <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"680px", overflow:"hidden", boxShadow:`0 32px 64px rgba(44,62,80,0.2)`, border:`1px solid ${C.tide}` }}>
         {/* header */}
         <div style={{ background:C.cta, padding:"24px 30px", color:C.white, display:"flex", justifyContent:"space-between" }}>
@@ -1631,7 +1631,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
   };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:2000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"28px 16px", overflowY:"auto", backdropFilter:"blur(8px)" }}>
+    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:2000, display:"flex", alignItems:"center", justifyContent:"center", padding:"28px 16px", overflowY:"hidden", backdropFilter:"blur(8px)" }}>
       <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"720px", overflow:"hidden", boxShadow:`0 32px 64px rgba(44,62,80,0.22)`, border:`1px solid ${C.tide}` }}>
         <div style={{ padding:"20px 28px", borderBottom:`1px solid ${C.tide}`, background:C.seafoam, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div>
@@ -1652,7 +1652,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
         </div>
 
         {step === "prompt" && (
-          <div style={{ padding:"28px", maxHeight:"70vh", overflowY:"auto" }}>
+          <div style={{ padding:"28px", maxHeight:"70vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
             {/* Draft resume banner */}
             {draftExists && !checkingDraft && (
               <div style={{ background:C.amberBg, border:`1px solid ${C.amber}`, borderRadius:"12px", padding:"14px 18px", marginBottom:"20px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:"12px", flexWrap:"wrap" }}>
@@ -1851,9 +1851,9 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
         )}
 
         {step === "ai-prompt" && (
-          <div style={{ padding:"24px 28px", maxHeight:"70vh", overflowY:"auto" }}>
+          <div style={{ padding:"24px 28px", maxHeight:"70vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
             <div style={{ fontSize:"13px", color:C.slateLight, marginBottom:"14px", lineHeight:1.6 }}>Copy this prompt and paste it into Claude, ChatGPT, or any AI. Answer its questions about your trip. When done, copy the full output and paste it below.</div>
-            <pre style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"10px", padding:"14px", fontSize:"10.5px", lineHeight:1.7, color:C.slateMid, whiteSpace:"pre-wrap", wordBreak:"break-word", maxHeight:"200px", overflowY:"auto", fontFamily:"monospace", marginBottom:"14px" }}>
+            <pre style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"10px", padding:"14px", fontSize:"10.5px", lineHeight:1.7, color:C.slateMid, whiteSpace:"pre-wrap", wordBreak:"break-word", maxHeight:"200px", overflowY:"auto", WebkitOverflowScrolling:"touch", fontFamily:"monospace", marginBottom:"14px" }}>
               {AI_SUBMISSION_PROMPT}
             </pre>
             <button onClick={copyPrompt} style={{ width:"100%", padding:"10px", borderRadius:"8px", border:"none", background:copiedPrompt?C.green:`linear-gradient(135deg,${C.azureDark},${C.azure})`, color:C.white, fontWeight:700, fontSize:"13px", cursor:"pointer", marginBottom:"16px", transition:"background .2s" }}>
@@ -1871,7 +1871,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
         )}
 
         {step === "form" && (
-          <div style={{ padding:"20px 28px", maxHeight:"65vh", overflowY:"auto" }}>
+          <div style={{ padding:"20px 28px", maxHeight:"65vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
             <div style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"10px", padding:"10px 14px", marginBottom:"14px" }}>
               <div style={{ display:"flex", alignItems:"flex-start", gap:"10px", marginBottom:"10px" }}>
                 <span style={{ fontSize:"16px", flexShrink:0 }}>💾</span>
@@ -2108,7 +2108,7 @@ function AdminQueueModal({ onClose, onApprove }) {
   const statusCol = { pending:C.amber, flagged:C.red, approved:C.green, rejected:C.muted };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:4000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"28px 16px", overflowY:"auto", backdropFilter:"blur(8px)" }}>
+    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:4000, display:"flex", alignItems:"center", justifyContent:"center", padding:"28px 16px", overflowY:"hidden", backdropFilter:"blur(8px)" }}>
       <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"800px", overflow:"hidden", boxShadow:`0 32px 64px rgba(44,62,80,0.22)`, border:`1px solid ${C.tide}` }}>
         <div style={{ padding:"20px 28px", borderBottom:`1px solid ${C.tide}`, background:C.seafoam, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div>
@@ -2117,7 +2117,7 @@ function AdminQueueModal({ onClose, onApprove }) {
           </div>
           <button onClick={onClose} style={{ background:C.seafoamDeep, border:"none", color:C.slateLight, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>x</button>
         </div>
-        <div style={{ padding:"16px 22px", maxHeight:"70vh", overflowY:"auto" }}>
+        <div style={{ padding:"16px 22px", maxHeight:"70vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
           {loading && <div style={{ textAlign:"center", padding:"40px", color:C.muted }}>Loading…</div>}
           {!loading && submissions.length === 0 && (
             <div style={{ textAlign:"center", padding:"40px", color:C.muted }}>
@@ -2153,7 +2153,7 @@ function AdminQueueModal({ onClose, onApprove }) {
       </div>
       {detail && (
         <div style={{ position:"fixed", inset:0, zIndex:5000, background:"rgba(44,62,80,0.85)", display:"flex", alignItems:"center", justifyContent:"center" }} onClick={() => setDetail(null)}>
-          <div style={{ background:C.white, borderRadius:"16px", padding:"24px", maxWidth:"540px", width:"92%", maxHeight:"80vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
+          <div style={{ background:C.white, borderRadius:"16px", padding:"24px", maxWidth:"540px", width:"92%", maxHeight:"80vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }} onClick={e=>e.stopPropagation()}>
             <div style={{ fontSize:"16px", fontWeight:800, color:C.slate, marginBottom:"4px" }}>{detail.trip_data?.title}</div>
             <div style={{ fontSize:"11px", color:C.slateLight, marginBottom:"14px" }}>by {detail.submitter_name} - {detail.submitter_email}</div>
             <pre style={{ fontSize:"11px", color:C.slateMid, whiteSpace:"pre-wrap", wordBreak:"break-word", background:C.seafoam, padding:"12px", borderRadius:"8px", marginBottom:"16px" }}>
@@ -2688,7 +2688,7 @@ function ProfilePage({ authorName, allTrips, onClose, onTripClick, currentUser, 
     : null;
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.7)", zIndex:2000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"28px 16px", overflowY:"auto", backdropFilter:"blur(6px)" }}
+    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.7)", zIndex:2000, display:"flex", alignItems:"center", justifyContent:"center", padding:"28px 16px", overflowY:"hidden", backdropFilter:"blur(6px)" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"880px", overflow:"hidden", boxShadow:`0 32px 64px rgba(28,43,58,0.2)`, border:`1px solid ${C.tide}` }}>
 
@@ -2826,7 +2826,7 @@ function AdminEditModal({ trip, onSave, onClose }) {
   const sect = { fontSize:"13px", fontWeight:800, color:C.slate, borderBottom:`2px solid ${C.tide}`, paddingBottom:"6px", marginBottom:"14px", marginTop:"22px" };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:4000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"24px 16px", overflowY:"auto", backdropFilter:"blur(8px)" }}>
+    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:4000, display:"flex", alignItems:"center", justifyContent:"center", padding:"24px 16px", overflowY:"hidden", backdropFilter:"blur(8px)" }}>
       <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"780px", overflow:"hidden", boxShadow:`0 32px 64px rgba(44,62,80,0.25)`, border:`1px solid ${C.tide}` }}>
 
         {/* header */}
@@ -2841,7 +2841,7 @@ function AdminEditModal({ trip, onSave, onClose }) {
           </div>
         </div>
 
-        <div style={{ padding:"24px 28px", overflowY:"auto", maxHeight:"76vh" }}>
+        <div style={{ padding:"24px 28px", overflowY:"auto", WebkitOverflowScrolling:"touch", maxHeight:"76vh" }}>
 
           {/* basics */}
           <div style={sect}>Trip Overview</div>
@@ -3081,7 +3081,7 @@ function LegalModal({ onClose }) {
   const bullet = { fontSize:"13px", color:C.slateMid, lineHeight:1.75, margin:"4px 0 4px 16px" };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:5000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"28px 16px", overflowY:"auto", backdropFilter:"blur(8px)" }}
+    <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:5000, display:"flex", alignItems:"center", justifyContent:"center", padding:"28px 16px", overflowY:"hidden", backdropFilter:"blur(8px)" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"720px", boxShadow:`0 32px 64px rgba(44,62,80,0.25)`, overflow:"hidden", border:`1px solid ${C.tide}` }}>
 
@@ -3095,7 +3095,7 @@ function LegalModal({ onClose }) {
         </div>
 
         {/* Body */}
-        <div style={{ padding:"28px 32px 40px", overflowY:"auto", maxHeight:"72vh" }}>
+        <div style={{ padding:"28px 32px 40px", overflowY:"auto", WebkitOverflowScrolling:"touch", maxHeight:"72vh" }}>
           <p style={{ ...body, color:C.muted, fontSize:"12px" }}>Last updated: {new Date().toLocaleDateString("en-US", { year:"numeric", month:"long", day:"numeric" })}</p>
 
           <div style={sect}>1. Ownership of TripCopycat Brand and Assets</div>
