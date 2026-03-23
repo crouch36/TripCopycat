@@ -2849,7 +2849,38 @@ function AdminEditModal({ trip, onSave, onClose }) {
             <div><label style={lbl}>Date</label><input style={inp} value={form.date} onChange={e=>updField("date",e.target.value)} /></div>
             <div><label style={lbl}>Travelers</label><input style={inp} value={form.travelers} onChange={e=>updField("travelers",e.target.value)} /></div>
             <div><label style={lbl}>Author</label><input style={inp} value={form.author} onChange={e=>updField("author",e.target.value)} /></div>
-            <div style={{ gridColumn:"1/-1" }}><label style={lbl}>🖼️ Cover Image URL <span style={{ fontWeight:400, color:C.muted }}>(e.g. /victoria-street.jpg or full https:// URL — leave blank for gradient)</span></label><input style={inp} value={form.image||""} onChange={e=>updField("image",e.target.value)} placeholder="/your-photo.jpg or https://..." /></div>
+            <div style={{ gridColumn:"1/-1" }}>
+              <label style={lbl}>🖼️ Cover Image URL <span style={{ fontWeight:400, color:C.muted }}>(e.g. /victoria-street.jpg or full https:// URL — leave blank for gradient)</span></label>
+              <div style={{ display:"flex", gap:"8px", alignItems:"center" }}>
+                <input style={{...inp, flex:1}} value={form.image||""} onChange={e=>updField("image",e.target.value)} placeholder="/your-photo.jpg or https://..." />
+                <label style={{ padding:"7px 12px", borderRadius:"7px", border:`1px solid ${C.amber}`, background:C.amberBg, color:C.slate, fontSize:"11px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0 }}>
+                  📤 Upload Photo
+                  <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display:"none" }} onChange={async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const scale = Math.min(1, 1200 / 1200);
+                    const canvas = document.createElement("canvas");
+                    const img = new Image();
+                    img.onload = async () => {
+                      const s = Math.min(1, 1200 / img.width);
+                      canvas.width = Math.round(img.width * s);
+                      canvas.height = Math.round(img.height * s);
+                      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+                      canvas.toBlob(async (blob) => {
+                        const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+                        const { error } = await supabase.storage.from("trip-photos").upload(path, blob, { contentType:"image/jpeg", upsert:false });
+                        if (!error) {
+                          const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
+                          updField("image", data.publicUrl);
+                        }
+                      }, "image/jpeg", 0.82);
+                    };
+                    img.src = URL.createObjectURL(file);
+                    e.target.value = "";
+                  }} />
+                </label>
+              </div>
+            </div>
             <div style={{ gridColumn:"1/-1" }}>
               <label style={{ display:"flex", alignItems:"center", gap:"10px", cursor:"pointer" }}>
                 <input type="checkbox" checked={form.featured||false} onChange={e=>updField("featured",e.target.checked)} style={{ width:"16px", height:"16px", accentColor:C.amber }} />
