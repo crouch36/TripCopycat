@@ -2807,6 +2807,8 @@ function AdminLoginModal({ onSuccess, onClose }) {
 // ── Admin Edit Trip Modal ─────────────────────────────────────────────────────
 function AdminEditModal({ trip, onSave, onClose }) {
   const [form, setForm] = useState(JSON.parse(JSON.stringify(trip)));
+  const focalDragging = useRef(false);
+  const focalPreviewRef = useRef();
 
   const updField = (f, v) => setForm(p => ({ ...p, [f]: v }));
   const updRow   = (cat, i, f, v) => setForm(p => { const u = [...p[cat]]; u[i] = { ...u[i], [f]: v }; return { ...p, [cat]: u }; });
@@ -2891,7 +2893,46 @@ function AdminEditModal({ trip, onSave, onClose }) {
           </div>
           {form.image && (
             <div style={{ marginBottom:"14px" }}>
-              <img src={form.image} alt="Cover preview" style={{ width:"100%", height:"140px", objectFit:"cover", borderRadius:"10px", border:`1px solid ${C.tide}` }} onError={e=>e.target.style.display="none"} />
+              <div style={{ fontSize:"10px", color:C.muted, marginBottom:"4px", fontWeight:600 }}>Drag to reposition focal point</div>
+              <div
+                ref={focalPreviewRef}
+                style={{ width:"100%", height:"160px", borderRadius:"10px", border:`1px solid ${C.tide}`, position:"relative", overflow:"hidden", cursor:"crosshair" }}
+                onMouseDown={e => {
+                  focalDragging.current = true;
+                  const r = focalPreviewRef.current.getBoundingClientRect();
+                  const x = Math.round(((e.clientX - r.left) / r.width) * 100);
+                  const y = Math.round(((e.clientY - r.top) / r.height) * 100);
+                  updField("focalPoint", { x, y });
+                }}
+                onMouseMove={e => {
+                  if (!focalDragging.current) return;
+                  const r = focalPreviewRef.current.getBoundingClientRect();
+                  const x = Math.round(Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100)));
+                  const y = Math.round(Math.min(100, Math.max(0, ((e.clientY - r.top) / r.height) * 100)));
+                  updField("focalPoint", { x, y });
+                }}
+                onMouseUp={() => { focalDragging.current = false; }}
+                onMouseLeave={() => { focalDragging.current = false; }}
+                onTouchStart={e => {
+                  focalDragging.current = true;
+                  const r = focalPreviewRef.current.getBoundingClientRect();
+                  const t = e.touches[0];
+                  updField("focalPoint", { x: Math.round(((t.clientX - r.left) / r.width) * 100), y: Math.round(((t.clientY - r.top) / r.height) * 100) });
+                }}
+                onTouchMove={e => {
+                  if (!focalDragging.current) return;
+                  const r = focalPreviewRef.current.getBoundingClientRect();
+                  const t = e.touches[0];
+                  updField("focalPoint", { x: Math.round(Math.min(100, Math.max(0, ((t.clientX - r.left) / r.width) * 100))), y: Math.round(Math.min(100, Math.max(0, ((t.clientY - r.top) / r.height) * 100))) });
+                }}
+                onTouchEnd={() => { focalDragging.current = false; }}
+              >
+                <img src={form.image} alt="Cover preview" style={{ width:"100%", height:"100%", objectFit:"cover", objectPosition:`${form.focalPoint?.x||50}% ${form.focalPoint?.y||50}%`, display:"block", pointerEvents:"none" }} onError={e=>e.target.style.display="none"} />
+                <div style={{ position:"absolute", left:`${form.focalPoint?.x||50}%`, top:`${form.focalPoint?.y||50}%`, transform:"translate(-50%,-50%)", pointerEvents:"none" }}>
+                  <div style={{ width:"28px", height:"28px", borderRadius:"50%", border:"2px solid #fff", boxShadow:"0 0 0 1px rgba(0,0,0,0.4)" }} />
+                  <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", width:"4px", height:"4px", borderRadius:"50%", background:"#fff" }} />
+                </div>
+              </div>
             </div>
           )}
           <div style={{ marginBottom:"12px" }}>
