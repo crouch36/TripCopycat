@@ -1004,12 +1004,12 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark }) {
   ).slice(0, 3);
 
   const handleShare = () => {
-    const url = `${window.location.origin}/#trip/${trip.id}`;
+    const url = `${window.location.origin}/trip/${trip.id}`;
     navigator.clipboard.writeText(url).then(() => { setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); });
   };
 
   const handleTwitterShare = () => {
-    const url = `${window.location.origin}/#trip/${trip.id}`;
+    const url = `${window.location.origin}/trip/${trip.id}`;
     const text = `Check out this trip: ${trip.title} on TripCopycat`;
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, "_blank");
   };
@@ -3273,25 +3273,24 @@ export default function App() {
 
   useEffect(() => { fetchTrips(); }, []);
 
-  const openTrip = (trip) => { setSelected(trip); window.history.pushState(null, "", `#trip/${trip.id}`); };
-  const closeTrip = () => { setSelected(null); window.history.pushState(null, "", window.location.pathname); };
+  const openTrip = (trip) => { setSelected(trip); window.history.pushState(null, "", `/trip/${trip.id}`); };
+  const closeTrip = () => { setSelected(null); window.history.pushState(null, "", "/"); };
 
   const allTrips = [...dbTrips, ...trips];
 
-  // URL hash routing for individual trips
+  // URL path routing for individual trips (/trip/:id)
   useEffect(() => {
     window.__openTrip = (trip) => setSelected(trip);
-    const handleHash = () => {
-      const hash = window.location.hash;
-      const m = hash.match(/#trip\/(.+)/);
+    const handlePath = () => {
+      const m = window.location.pathname.match(/^\/trip\/(.+)/);
       if (m && allTrips.length > 0) {
-        const found = allTrips.find(t => t.id === m[1] || slugify(t.title) === m[1]);
+        const found = allTrips.find(t => String(t.id) === m[1] || slugify(t.title) === m[1]);
         if (found) setSelected(found);
       }
     };
-    window.addEventListener("hashchange", handleHash);
-    handleHash();
-    return () => window.removeEventListener("hashchange", handleHash);
+    window.addEventListener("popstate", handlePath);
+    handlePath();
+    return () => window.removeEventListener("popstate", handlePath);
   }, [allTrips]);
 
   // Auth state

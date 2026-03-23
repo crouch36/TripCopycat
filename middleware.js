@@ -1,95 +1,103 @@
-const SUPABASE_URL = "https://wnjxtjeospeblvqdqsdj.supabase.co";
-const SITE_URL = "https://tripcopycat.com";
+import { NextResponse } from "next/server";
 
-const CRAWLERS = [
-  "Twitterbot",
-  "facebookexternalhit",
-  "WhatsApp",
-  "Slackbot",
-  "TelegramBot",
-  "LinkedInBot",
-  "iMessage",
-];
+export const config = {
+  matcher: ["/trip/:id*"],
+};
+
+const SUPABASE_URL = "https://wnjxtjeospeblvqdqsdj.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Induanh0amVvc3BlYmx2cWRxc2RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MTI2MjQsImV4cCI6MjA4OTI4ODYyNH0.l3OHQ9_v5__lkX_AryEkmg2uYGgxnTR4KqViV8foNls";
+const SITE_URL = "https://www.tripcopycat.com";
+
+export default async function middleware(req) {
+  const url = new URL(req.url);
+  // Extract trip ID from /trip/123
+  const match = url.pathname.match(/^\/trip\/([^/]+)/);
+  if (!match) return NextResponse.next();
+
+  const id = match[1];
+
+  let title = "TripCopycat — Real Itineraries from Real Travelers";
+  let description = "Copy real trips planned by real travelers. Browse free travel itineraries and submit your own.";
+  let ogImage = `${SITE_URL}/TripCopycat_OG.png`;
+  let canonicalUrl = `${SITE_URL}/trip/${id}`;
+
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/trips?id=eq.${id}&status=eq.published&select=title,destination,image,duration,region,loves&limit=1`,
+      {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+        signal: AbortSignal.timeout(4000),
+      }
+    );
+    if (res.ok) {
+      const rows = await res.json();
+      const trip = rows?.[0];
+      if (trip) {
+        title = `${trip.title} — TripCopycat`;
+        description = trip.loves
+          ? trip.loves.slice(0, 160)
+          : `${trip.destination} · ${trip.duration} · Real traveler itinerary on TripCopycat`;
+        if (trip.image) {
+          ogImage = trip.image.startsWith("http") ? trip.image : `${SITE_URL}${trip.image}`;
+        } else {
+          // Fall back to generated OG image
+          ogImage = `${SITE_URL}/api/og?id=${id}`;
+        }
+      }
+    }
+  } catch (_) {
+    // Fall through to defaults
+  }
+
+  // Rewrite to index.html but inject meta tags via response headers isn't possible —
+  // we need to return modified HTML. Fetch the base index.html and inject.
+  const indexRes = await fetch(`${SITE_URL}/index.html`);
+  let html = await indexRes.text();
+
+  // Replace generic OG tags with trip-specific ones
+  html = html
+    .replace(
+      /<title>[^<]*<\/title>/,
+      `<title>${escapeHtml(title)}</title>`
+    )
+    .replace(
+      /<meta name="description"[^>]*>/,
+      `<meta name="description" content="${escapeHtml(description)}" />`
+    )
+    .replace(
+      /<meta property="og:title"[^>]*>/,
+      `<meta property="og:title" content="${escapeHtml(title)}" />`
+    )
+    .replace(
+      /<meta property="og:description"[^>]*>/,
+      `<meta property="og:description" content="${escapeHtml(description)}" />`
+    )
+    .replace(
+      /<meta property="og:url"[^>]*>/,
+      `<meta property="og:url" content="${canonicalUrl}" />`
+    )
+    .replace(
+      /<meta property="og:image"[^>]*>/,
+      `<meta property="og:image" content="${ogImage}" />`
+    )
+    .replace(
+      /<meta property="og:image:secure_url"[^>]*>/,
+      `<meta property="og:image:secure_url" content="${ogImage}" />`
+    )
+    .replace(
+      /<link rel="canonical"[^>]*>/,
+      `<link rel="canonical" href="${canonicalUrl}" />`
+    );
+
+  return new NextResponse(html, {
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
 
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-export const config = {
-  matcher: "/trips/:id+",
-};
-
-export default async function middleware(req) {
-  const ua = req.headers.get("user-agent") || "";
-  if (!CRAWLERS.some((bot) => ua.includes(bot))) {
-    return; // pass through — human users hit the SPA rewrite normally
-  }
-
-  const url = new URL(req.url);
-  const id = url.pathname.replace(/^\/trips\//, "");
-
-  const key = process.env.SUPABASE_ANON_KEY;
-  let title = "TripCopycat";
-  let description = "Real itineraries from real travelers.";
-
-  try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/trips?id=eq.${encodeURIComponent(id)}&status=eq.published&select=title,destination&limit=1`,
-      {
-        headers: {
-          apikey: key,
-          Authorization: `Bearer ${key}`,
-        },
-      }
-    );
-    const rows = await res.json();
-    const trip = rows?.[0];
-    if (trip) {
-      if (trip.title) title = trip.title;
-      const dest = trip.destination ?? "";
-      description = dest
-        ? `A travel itinerary for ${dest} — real trip, real days, real costs.`
-        : "A real travel itinerary shared on TripCopycat.";
-    }
-  } catch (_) {
-    // Serve branded fallback on Supabase error
-  }
-
-  const pageTitle =
-    title === "TripCopycat" ? title : `${title} | TripCopycat`;
-  const ogImage = `${SITE_URL}/api/og?id=${encodeURIComponent(id)}`;
-  const ogUrl = `${SITE_URL}/trips/${encodeURIComponent(id)}`;
-
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>${escapeHtml(pageTitle)}</title>
-<meta property="og:type" content="article" />
-<meta property="og:site_name" content="TripCopycat" />
-<meta property="og:title" content="${escapeHtml(pageTitle)}" />
-<meta property="og:description" content="${escapeHtml(description)}" />
-<meta property="og:url" content="${ogUrl}" />
-<meta property="og:image" content="${ogImage}" />
-<meta property="og:image:secure_url" content="${ogImage}" />
-<meta property="og:image:type" content="image/png" />
-<meta property="og:image:width" content="1200" />
-<meta property="og:image:height" content="630" />
-<meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="${escapeHtml(pageTitle)}" />
-<meta name="twitter:description" content="${escapeHtml(description)}" />
-<meta name="twitter:image" content="${ogImage}" />
-<meta http-equiv="refresh" content="0; url=${ogUrl}" />
-</head>
-<body></body>
-</html>`;
-
-  return new Response(html, {
-    status: 200,
-    headers: { "content-type": "text/html; charset=utf-8" },
-  });
+    .replace(/>/g, "&gt;");
 }
