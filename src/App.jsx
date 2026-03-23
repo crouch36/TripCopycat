@@ -1706,7 +1706,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                 <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Step 2 — Add photos <span style={{ fontSize:"11px", fontWeight:400, color:C.muted }}>(optional but powerful)</span></div>
               </div>
               <div style={{ fontSize:"11px", color:C.slateMid, marginBottom:"10px", lineHeight:1.6, background:C.white, borderRadius:"8px", padding:"10px 12px", border:`1px solid ${C.tide}` }}>
-                <strong style={{ color:C.slate }}>These photos are for AI analysis only</strong> — they won't be published with your trip. AI reads GPS location data and identifies venues from signage to fill in details your brain dump might have missed. You'll add your actual cover photo and gallery separately.
+                <strong style={{ color:C.slate }}>These photos are for AI analysis only</strong> — AI reads GPS location data and identifies venues from signage to fill in details your brain dump might have missed. You'll add your actual cover photo and gallery on the next step.
               </div>
               <HybridPhotoSelector onChange={(files) => { window.__hybridPhotos = files; }} />
 
@@ -1807,7 +1807,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
               </div>
             </div>
             <div style={{ background:C.amberBg, border:`1px solid ${C.amber}44`, borderRadius:"10px", padding:"10px 14px", marginBottom:"16px", fontSize:"11px", color:C.slateMid, lineHeight:1.6 }}>
-              <strong style={{ color:C.slate }}>These photos are for AI analysis only</strong> — they won't be published. AI will enhance vague entries with specific names from signage (e.g. "a hotel" → "The Meyrick Hotel"), add new venues it spots, and fill any gaps — without removing data you've already entered.
+              <strong style={{ color:C.slate }}>These photos are for AI analysis only</strong> — AI will enhance vague entries with specific names from signage (e.g. "a hotel" → "The Meyrick Hotel"), add new venues it spots, and fill any gaps — without removing data you've already entered.
             </div>
             <HybridPhotoSelector onChange={(files) => { window.__supplementPhotos = files; }} />
             <button
@@ -2229,6 +2229,8 @@ function HybridProcessor({ text, photos, onComplete, onBack }) {
 
 ${hasText ? `The traveller wrote this brain dump about their trip:\n\n"${text}"\n\n` : ""}${hasPhotos ? `They have also provided ${compressed.length} photos from the trip. Use GPS data, visible signage, and landmarks in the photos to identify specific venues and locations.\n\n` : ""}Your job is to extract and structure everything into a trip itinerary. Be as specific as possible — use real venue names from the text or photos. For anything not mentioned, leave it as an empty string or empty array rather than guessing.
 
+IMPORTANT: Never reference photos by number (e.g. "photo 1", "image 3", "in photo 17") anywhere in the output. Never mention photos at all in any field values. All output must read as if written by the traveller from memory, not derived from images.
+
 Return ONLY a valid JSON object with no other text:
 {
   "title": "Short descriptive trip title",
@@ -2465,13 +2467,13 @@ function HybridPhotoSelector({ onChange }) {
                 onMouseLeave={e=>e.currentTarget.style.borderColor=C.tide}>+</div>
             )}
           </div>
-          <div style={{ fontSize:"10px", color:C.muted }}>{files.length} photo{files.length!==1?"s":""} selected · {30-files.length} remaining · These are for AI analysis only, not published</div>
+          <div style={{ fontSize:"10px", color:C.muted }}>{files.length} photo{files.length!==1?"s":""} selected · {30-files.length} remaining · Used for AI analysis only</div>
         </div>
       ) : (
         <div onClick={() => ref.current.click()} style={{ border:`2px dashed ${C.tide}`, borderRadius:"8px", padding:"14px", textAlign:"center", cursor:"pointer", background:C.white, fontSize:"12px", color:C.slateMid }}
           onMouseEnter={e=>e.currentTarget.style.borderColor=C.amber}
           onMouseLeave={e=>e.currentTarget.style.borderColor=C.tide}>
-          Tap to add trip photos · up to 30 · AI analysis only, not published
+          Tap to add trip photos · up to 30 · Used for AI analysis only
         </div>
       )}
     </div>
