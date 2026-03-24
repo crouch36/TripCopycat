@@ -1016,12 +1016,12 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark }) {
 
   return (
     <>
-      <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.6)", zIndex:1000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"28px 16px", overflowY:"auto", WebkitOverflowScrolling:"touch", backdropFilter:"blur(6px)" }}
+      <div style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.6)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:"16px", overflow:"hidden", backdropFilter:"blur(6px)" }}
         onClick={e => e.target === e.currentTarget && onClose()}>
-        <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"880px", boxShadow:`0 32px 64px rgba(44,62,80,0.2)`, overflow:"hidden", border:`1px solid ${C.tide}`, marginTop:"auto", marginBottom:"auto" }}>
+        <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"880px", boxShadow:`0 32px 64px rgba(44,62,80,0.2)`, border:`1px solid ${C.tide}`, display:"flex", flexDirection:"column", maxHeight:"92vh", overflow:"hidden" }}>
 
           {/* header */}
-          <div style={{ position:"relative", background:`linear-gradient(135deg,#2C1810 0%,#3D2B1F 100%)`, padding:"26px 30px", color:C.white, overflow:"hidden" }}>
+          <div style={{ position:"relative", background:`linear-gradient(135deg,#2C1810 0%,#3D2B1F 100%)`, padding:"20px 20px 20px 30px", color:C.white, overflow:"visible", flexShrink:0 }}>
             {trip.image && <img src={trip.image} alt={trip.title} style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:`${trip.focalPoint?.x||50}% ${trip.focalPoint?.y||50}%`, opacity:0.35 }} />}
             <div style={{ position:"relative", zIndex:1, display:"flex", justifyContent:"space-between" }}>
               <div>
@@ -1029,15 +1029,13 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark }) {
                 <h2 style={{ margin:0, fontSize:"27px", fontWeight:700, fontFamily:"'Playfair Display',Georgia,serif", color:"#FFFFFF", textShadow:"0 2px 8px rgba(0,0,0,0.5)" }}>{trip.title}</h2>
                 <div style={{ marginTop:"4px", fontSize:"14px", color:"rgba(255,255,255,0.95)", fontWeight:500, textShadow:"0 1px 4px rgba(0,0,0,0.5)" }}>{trip.destination}</div>
               </div>
-              <div style={{ display:"flex", flexDirection:"column", gap:"6px", alignItems:"flex-end" }}>
-                {/* Close button — always on top, full size */}
-                <button onClick={e => { e.stopPropagation(); onClose(); }} style={{ background:"rgba(0,0,0,0.35)", border:"2px solid rgba(255,255,255,0.4)", color:"#fff", borderRadius:"50%", width:"44px", height:"44px", cursor:"pointer", fontSize:"22px", touchAction:"manipulation", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", lineHeight:1 }}>×</button>
-                {/* Action buttons row */}
-                <div style={{ display:"flex", gap:"6px", flexWrap:"wrap", justifyContent:"flex-end" }}>
-                  <button onClick={handleShare} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"6px 11px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>{shareCopied ? "✓ Copied!" : "🔗 Share"}</button>
-                  <button onClick={handleTwitterShare} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"6px 11px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>𝕏</button>
-                  <button onClick={() => onBookmark && onBookmark(trip.id)} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"6px 11px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }} title={isBookmarked ? "Remove bookmark" : "Bookmark"}>{isBookmarked ? "🔖 Saved" : "🏷️ Save"}</button>
-                  <button onClick={() => setShowExport(true)} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"6px 11px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>📤 Export</button>
+              <div style={{ display:"flex", flexDirection:"column", gap:"8px", alignItems:"flex-end", flexShrink:0 }}>
+                <button onClick={e => { e.stopPropagation(); onClose(); }} style={{ background:"rgba(0,0,0,0.4)", border:"2px solid rgba(255,255,255,0.5)", color:"#fff", borderRadius:"50%", width:"44px", height:"44px", cursor:"pointer", fontSize:"22px", touchAction:"manipulation", display:"flex", alignItems:"center", justifyContent:"center", lineHeight:1, flexShrink:0 }}>×</button>
+                <div style={{ display:"flex", gap:"5px", flexWrap:"wrap", justifyContent:"flex-end" }}>
+                  <button onClick={handleShare} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>{shareCopied ? "✓" : "🔗"}</button>
+                  <button onClick={handleTwitterShare} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>𝕏</button>
+                  <button onClick={() => onBookmark && onBookmark(trip.id)} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>{isBookmarked ? "🔖" : "🏷️"}</button>
+                  <button onClick={() => setShowExport(true)} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>📤</button>
                 </div>
               </div>
             </div>
@@ -1048,6 +1046,8 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark }) {
             </div>
           </div>
 
+          {/* scrollable body */}
+          <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch", flex:1 }}>
           {/* tabs */}
           <div style={{ display:"flex", borderBottom:`1px solid ${C.tide}`, background:C.seafoam }}>
             {[{id:"overview",l:"Overview"},{id:"daily",l:"📅 Daily Itinerary"},{id:"details",l:"🗂️ All Details"}].map(t => (
@@ -1189,6 +1189,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark }) {
               );
             })}
           </div>
+          </div>{/* end scrollable body */}
         </div>
       )}
       {showExport && <ExportModal trip={trip} onClose={() => setShowExport(false)} />}
