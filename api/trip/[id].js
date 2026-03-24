@@ -72,34 +72,37 @@ export default async function handler(req, res) {
     // Fall through to defaults
   }
 
-  const html = `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/copycat.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${escapeHtml(title)}</title>
-    <meta name="description" content="${escapeHtml(description)}" />
-    <link rel="canonical" href="${canonicalUrl}" />
+  // Fetch the real built index.html and inject our meta tags into it
+  let html = "";
+  try {
+    const indexRes = await fetch(`${SITE_URL}/index.html`, { signal: AbortSignal.timeout(4000) });
+    html = await indexRes.text();
+  } catch (_) {
+    res.status(500).send("Could not load index.html");
+    return;
+  }
+
+  const ogTags = `
     <meta property="og:title" content="${escapeHtml(title)}" />
     <meta property="og:description" content="${escapeHtml(description)}" />
     <meta property="og:url" content="${canonicalUrl}" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="${escapeHtml(ogImage)}" />
     <meta property="og:image:secure_url" content="${escapeHtml(ogImage)}" />
-    <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="${escapeHtml(title)}" />
-    <meta name="twitter:description" content="${escapeHtml(description)}" />
-    <meta name="twitter:image" content="${escapeHtml(ogImage)}" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
-</html>`;
+    <meta name="twitter:image" content="${escapeHtml(ogImage)}" />`;
+
+  // Replace existing OG tags and inject trip-specific ones
+  html = html
+    .replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(title)}</title>`)
+    .replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${escapeHtml(description)}" />`)
+    .replace(/<meta property="og:title"[^>]*>/, `<meta property="og:title" content="${escapeHtml(title)}" />`)
+    .replace(/<meta property="og:description"[^>]*>/, `<meta property="og:description" content="${escapeHtml(description)}" />`)
+    .replace(/<meta property="og:url"[^>]*>/, `<meta property="og:url" content="${canonicalUrl}" />`)
+    .replace(/<meta property="og:image"[^>]*>/, `<meta property="og:image" content="${escapeHtml(ogImage)}" />`)
+    .replace(/<meta property="og:image:secure_url"[^>]*>/, `<meta property="og:image:secure_url" content="${escapeHtml(ogImage)}" />`);
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=86400");
