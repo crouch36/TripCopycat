@@ -2872,13 +2872,12 @@ function AdminEditModal({ trip, onSave, onClose }) {
                     onDragStart={() => { dragIdx.current = idx; }}
                     onDragOver={e => { e.preventDefault(); dragOverIdx.current = idx; }}
                     onDrop={() => {
-                      const from = dragIdx.current;
-                      const to = dragOverIdx.current;
-                      if (from === null || to === null || from === to) return;
+                      const fromI = dragIdx.current;
+                      const toI = dragOverIdx.current;
+                      if (fromI === null || toI === null || fromI === toI) return;
                       setForm(p => {
                         const g2 = [...p.gallery];
-                        const [moved] = g2.splice(from, 1);
-                        g2.splice(to, 0, moved);
+                        g2.splice(toI, 0, g2.splice(fromI, 1)[0]);
                         return { ...p, gallery: g2 };
                       });
                       dragIdx.current = null;
