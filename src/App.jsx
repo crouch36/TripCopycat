@@ -2659,6 +2659,8 @@ function AdminEditModal({ trip, onSave, onClose }) {
   const editGalleryRef = useRef();
   const [editGalleryUploading, setEditGalleryUploading] = useState(false);
   const [editGalleryError, setEditGalleryError] = useState("");
+  const dragIdx = useRef(null);
+  const dragOverIdx = useRef(null);
 
   const updField = (f, v) => setForm(p => ({ ...p, [f]: v }));
   const updRow   = (cat, i, f, v) => setForm(p => { const u = [...p[cat]]; u[i] = { ...u[i], [f]: v }; return { ...p, [cat]: u }; });
@@ -2865,16 +2867,35 @@ function AdminEditModal({ trip, onSave, onClose }) {
             {(form.gallery||[]).length > 0 ? (
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(100px, 1fr))", gap:"8px" }}>
                 {(form.gallery||[]).map((g, idx) => (
-                  <div key={idx} style={{ position:"relative", borderRadius:"8px", overflow:"hidden", border:`1px solid ${C.tide}`, aspectRatio:"1" }}>
-                    <img src={g.url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
+                  <div key={idx}
+                    draggable
+                    onDragStart={() => { dragIdx.current = idx; }}
+                    onDragOver={e => { e.preventDefault(); dragOverIdx.current = idx; }}
+                    onDrop={() => {
+                      const from = dragIdx.current;
+                      const to = dragOverIdx.current;
+                      if (from === null || to === null || from === to) return;
+                      setForm(p => {
+                        const g2 = [...p.gallery];
+                        const [moved] = g2.splice(from, 1);
+                        g2.splice(to, 0, moved);
+                        return { ...p, gallery: g2 };
+                      });
+                      dragIdx.current = null;
+                      dragOverIdx.current = null;
+                    }}
+                    onDragEnd={() => { dragIdx.current = null; dragOverIdx.current = null; }}
+                    style={{ position:"relative", borderRadius:"8px", overflow:"hidden", border:`1px solid ${C.tide}`, aspectRatio:"1", cursor:"grab" }}>
+                    <div style={{ position:"absolute", top:"4px", left:"4px", fontSize:"10px", color:"rgba(255,255,255,0.7)", zIndex:2, pointerEvents:"none" }}>⠿</div>
+                    <img src={g.url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block", pointerEvents:"none" }} />
                     <button
                       onClick={() => setForm(p => ({ ...p, gallery: p.gallery.filter((_,i)=>i!==idx) }))}
-                      style={{ position:"absolute", top:"4px", right:"4px", background:"rgba(0,0,0,0.55)", border:"none", color:"#fff", borderRadius:"50%", width:"22px", height:"22px", fontSize:"13px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", lineHeight:1 }}>×</button>
+                      style={{ position:"absolute", top:"4px", right:"4px", background:"rgba(0,0,0,0.55)", border:"none", color:"#fff", borderRadius:"50%", width:"22px", height:"22px", fontSize:"13px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", lineHeight:1, zIndex:2 }}>×</button>
                     <input
                       value={g.caption||""}
                       onChange={e => setForm(p => { const g2=[...p.gallery]; g2[idx]={...g2[idx],caption:e.target.value}; return {...p,gallery:g2}; })}
                       placeholder="Caption…"
-                      style={{ position:"absolute", bottom:0, left:0, right:0, background:"rgba(0,0,0,0.55)", border:"none", color:"#fff", fontSize:"9px", padding:"3px 6px", fontFamily:"inherit", outline:"none" }} />
+                      style={{ position:"absolute", bottom:0, left:0, right:0, background:"rgba(0,0,0,0.55)", border:"none", color:"#fff", fontSize:"9px", padding:"3px 6px", fontFamily:"inherit", outline:"none", zIndex:2 }} />
                   </div>
                 ))}
               </div>
