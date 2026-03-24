@@ -3217,7 +3217,7 @@ function LegalModal({ onClose }) {
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [trips, setTrips] = useState([]);
+  const [trips, setTrips] = useState(SAMPLE_TRIPS);
   const [dbTrips, setDbTrips] = useState([]);
   const [tripsLoading, setTripsLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -3277,6 +3277,22 @@ export default function App() {
   const closeTrip = () => { setSelected(null); window.history.pushState(null, "", "/"); };
 
   const allTrips = [...dbTrips, ...trips];
+
+  // On first load, open trip modal if URL is /trip/:id
+  useEffect(() => {
+    const m = window.location.pathname.match(/^\/trip\/(.+)/);
+    if (!m) return;
+    const id = m[1];
+    // Check immediately in case trips are already available
+    const immediate = allTrips.find(t => String(t.id) === id || slugify(t.title) === id);
+    if (immediate) { setSelected(immediate); return; }
+    // Otherwise wait for trips to load
+    const interval = setInterval(() => {
+      const found = [...dbTrips, ...trips].find(t => String(t.id) === id || slugify(t.title) === id);
+      if (found) { setSelected(found); clearInterval(interval); }
+    }, 100);
+    setTimeout(() => clearInterval(interval), 5000);
+  }, []);
 
   // URL path routing for individual trips (/trip/:id)
   useEffect(() => {
