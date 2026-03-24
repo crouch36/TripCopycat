@@ -3446,6 +3446,7 @@ export default function App() {
                       {isAdmin && (
                         <div style={{ position:"absolute", top:"12px", right:"12px", display:"flex", gap:"6px", zIndex:10 }}>
                           <button onClick={e => { e.stopPropagation(); setEditingTrip(trip); }} style={{ padding:"5px 10px", borderRadius:"7px", border:"none", background:C.azure, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>✏️</button>
+                          <button onClick={async e => { e.stopPropagation(); await supabase.from("trips").update({ featured: !trip.featured }).eq("id", trip.id); fetchTrips(); }} style={{ padding:"5px 10px", borderRadius:"7px", border:"none", background:trip.featured?"#C4A882":C.seafoamDeep, color:trip.featured?C.white:C.amber, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>✦</button>
                           <button onClick={e => { e.stopPropagation(); setConfirmDelete(trip); }} style={{ padding:"5px 10px", borderRadius:"7px", border:"none", background:C.red, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>🗑️</button>
                         </div>
                       )}
@@ -3491,6 +3492,7 @@ export default function App() {
                 {isAdmin && (
                   <div style={{ position:"absolute", top:"12px", right:"12px", display:"flex", gap:"6px", zIndex:10 }}>
                     <button onClick={e => { e.stopPropagation(); setEditingTrip(trip); }} style={{ padding:"5px 10px", borderRadius:"7px", border:"none", background:C.azure, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>✏️</button>
+                    <button onClick={async e => { e.stopPropagation(); await supabase.from("trips").update({ featured: !trip.featured }).eq("id", trip.id); fetchTrips(); }} style={{ padding:"5px 10px", borderRadius:"7px", border:"none", background:trip.featured?"#C4A882":C.seafoamDeep, color:trip.featured?C.white:C.amber, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>✦</button>
                     <button onClick={e => { e.stopPropagation(); setConfirmDelete(trip); }} style={{ padding:"5px 10px", borderRadius:"7px", border:"none", background:C.red, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>🗑️</button>
                   </div>
                 )}
