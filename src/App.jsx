@@ -2677,6 +2677,7 @@ function AdminEditModal({ trip, onSave, onClose }) {
   const [editGalleryError, setEditGalleryError] = useState("");
   const dragIdx = useRef(null);
   const dragOverIdx = useRef(null);
+  const [saving, setSaving] = useState(false);
 
   const updField = (f, v) => setForm(p => ({ ...p, [f]: v }));
   const updRow   = (cat, i, f, v) => setForm(p => { const u = [...p[cat]]; u[i] = { ...u[i], [f]: v }; return { ...p, [cat]: u }; });
@@ -2743,7 +2744,7 @@ function AdminEditModal({ trip, onSave, onClose }) {
             <div style={{ fontSize:"18px", fontWeight:800, color:C.white, fontFamily:"'Playfair Display',Georgia,serif", marginTop:"2px" }}>{form.title}</div>
           </div>
           <div style={{ display:"flex", gap:"8px" }}>
-            <button onClick={() => onSave(form)} style={{ padding:"8px 20px", borderRadius:"8px", border:"none", background:C.white, color:C.azureDark, fontSize:"12px", fontWeight:800, cursor:"pointer" }}>✓ Save Changes</button>
+            <button onClick={async () => { setSaving(true); await onSave(form); setSaving(false); }} disabled={saving} style={{ padding:"8px 20px", borderRadius:"8px", border:"none", background:saving?"#ddd":C.white, color:C.azureDark, fontSize:"12px", fontWeight:800, cursor:saving?"not-allowed":"pointer" }}>{saving ? "⏳ Saving…" : "✓ Save"}</button>
             <button onClick={onClose} style={{ background:"rgba(255,255,255,0.2)", border:"none", color:C.white, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>×</button>
           </div>
         </div>
@@ -2846,11 +2847,11 @@ function AdminEditModal({ trip, onSave, onClose }) {
           )}
           <div style={{ marginBottom:"12px" }}>
             <label style={{...lbl,color:C.green}}>❤️ What They Loved</label>
-            <textarea style={{...inp,height:"80px",resize:"vertical"}} value={form.loves} onChange={e=>updField("loves",e.target.value)} />
+            <textarea style={{...inp,minHeight:"100px",height:"auto",resize:"vertical"}} value={form.loves} onChange={e=>{ updField("loves",e.target.value); e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }} onFocus={e=>{ e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }} rows={4} />
           </div>
           <div>
             <label style={{...lbl,color:C.amber}}>🔄 Do Differently</label>
-            <textarea style={{...inp,height:"80px",resize:"vertical"}} value={form.doNext} onChange={e=>updField("doNext",e.target.value)} />
+            <textarea style={{...inp,minHeight:"100px",height:"auto",resize:"vertical"}} value={form.doNext} onChange={e=>{ updField("doNext",e.target.value); e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }} onFocus={e=>{ e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }} rows={4} />
           </div>
 
           {/* categories */}
@@ -2861,7 +2862,7 @@ function AdminEditModal({ trip, onSave, onClose }) {
                 <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr auto", gap:"6px", marginBottom:"7px", alignItems:"center" }}>
                   <input style={inp} placeholder="Name" value={row.item} onChange={e=>updRow(key,i,"item",e.target.value)} />
                   <input style={inp} placeholder="Details" value={row.detail} onChange={e=>updRow(key,i,"detail",e.target.value)} />
-                  <input style={inp} placeholder="Tip" value={row.tip} onChange={e=>updRow(key,i,"tip",e.target.value)} />
+                  <textarea style={{...inp,minHeight:"36px",height:"auto",resize:"none",overflow:"hidden"}} placeholder="Tip" value={row.tip} onChange={e=>{ updRow(key,i,"tip",e.target.value); e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }} onFocus={e=>{ e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }} rows={1} />
                   <button onClick={()=>delRow(key,i)} style={{ padding:"6px 10px", borderRadius:"6px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"13px", fontWeight:700, flexShrink:0 }}>✕</button>
                 </div>
               ))}
@@ -2938,7 +2939,7 @@ function AdminEditModal({ trip, onSave, onClose }) {
                     {["hotel","restaurant","bar","activity","transport"].map(t=><option key={t}>{t}</option>)}
                   </select>
                   <input style={{...inp,fontSize:"11px"}} placeholder="Label" value={item.label} onChange={e=>updDayItem(di,ii,"label",e.target.value)} />
-                  <input style={{...inp,fontSize:"11px"}} placeholder="Note" value={item.note} onChange={e=>updDayItem(di,ii,"note",e.target.value)} />
+                  <textarea style={{...inp,fontSize:"11px",minHeight:"32px",height:"auto",resize:"none",overflow:"hidden"}} placeholder="Note" value={item.note} onChange={e=>{ updDayItem(di,ii,"note",e.target.value); e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }} onFocus={e=>{ e.target.style.height="auto"; e.target.style.height=e.target.scrollHeight+"px"; }} rows={1} />
                   <button onClick={()=>delDayItem(di,ii)} style={{ padding:"5px 8px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px" }}>✕</button>
                 </div>
               ))}
@@ -2950,7 +2951,7 @@ function AdminEditModal({ trip, onSave, onClose }) {
         {/* footer */}
         <div style={{ padding:"16px 28px", borderTop:`1px solid ${C.tide}`, background:C.seafoam, display:"flex", justifyContent:"space-between" }}>
           <button onClick={onClose} style={{ padding:"9px 20px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>Cancel</button>
-          <button onClick={() => onSave(form)} style={{ padding:"9px 24px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>✓ Save Changes</button>
+          <button onClick={async () => { setSaving(true); await onSave(form); setSaving(false); }} disabled={saving} style={{ padding:"9px 24px", borderRadius:"8px", border:"none", background:saving?"#aaa":C.cta, color:C.ctaText, fontSize:"12px", fontWeight:700, cursor:saving?"not-allowed":"pointer" }}>{saving ? "⏳ Saving…" : "✓ Save Changes"}</button>
         </div>
       </div>
     </div>
@@ -3267,7 +3268,7 @@ export default function App() {
         return;
       }
     }
-    await supabase.from("trips").update({
+    const payload = {
       title: updated.title, destination: updated.destination, region: updated.region,
       author_name: updated.author,
       date: updated.date, duration: updated.duration, travelers: updated.travelers,
@@ -3275,10 +3276,23 @@ export default function App() {
       airfare: updated.airfare, hotels: updated.hotels, restaurants: updated.restaurants,
       bars: updated.bars, activities: updated.activities, days: updated.days,
       image: updated.image || "", featured: updated.featured || false, focal_point: updated.focalPoint || {x:50,y:50}, gallery: updated.gallery || []
-    }).eq("id", updated.id);
-    setTrips(p => p.map(t => t.id === updated.id ? updated : t));
-    setDbTrips(p => p.map(t => t.id === updated.id ? updated : t));
-    setEditingTrip(null);
+    };
+    // Retry up to 3 times on failure
+    let lastError = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const { error } = await supabase.from("trips").update(payload).eq("id", updated.id);
+        if (error) throw error;
+        setTrips(p => p.map(t => t.id === updated.id ? updated : t));
+        setDbTrips(p => p.map(t => t.id === updated.id ? updated : t));
+        setEditingTrip(null);
+        return;
+      } catch (err) {
+        lastError = err;
+        if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      }
+    }
+    alert("Save failed after 3 attempts. Please check your connection and try again. Your changes are still in the form.");
   };
   const handleDeleteTrip = async (id) => {
     await supabase.from("trips").delete().eq("id", id);
