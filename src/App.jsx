@@ -1,12 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-// ── Supabase client ───────────────────────────────────────────────────────────
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
-  { auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true } }
-);
+import supabase from "./supabaseClient.js";
 
 // ── Content Filter ────────────────────────────────────────────────────────────
 const PROFANITY = ["spam","scam","xxx","porn","casino","viagra"];
