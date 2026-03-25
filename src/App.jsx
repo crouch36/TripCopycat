@@ -2015,22 +2015,37 @@ function AdminQueueModal({ onClose, onApprove }) {
           ))}
         </div>
       </div>
-      {detail && (
-        <div style={{ position:"fixed", inset:0, zIndex:5000, background:"rgba(44,62,80,0.85)", display:"flex", alignItems:"center", justifyContent:"center" }} onClick={() => setDetail(null)}>
-          <div style={{ background:C.white, borderRadius:"16px", padding:"24px", maxWidth:"540px", width:"92%", maxHeight:"80vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }} onClick={e=>e.stopPropagation()}>
-            <div style={{ fontSize:"16px", fontWeight:800, color:C.slate, marginBottom:"4px" }}>{detail.trip_data?.title}</div>
-            <div style={{ fontSize:"11px", color:C.slateLight, marginBottom:"14px" }}>by {detail.submitter_name} - {detail.submitter_email}</div>
-            <pre style={{ fontSize:"11px", color:C.slateMid, whiteSpace:"pre-wrap", wordBreak:"break-word", background:C.seafoam, padding:"12px", borderRadius:"8px", marginBottom:"16px" }}>
-              {JSON.stringify(detail.trip_data, null, 2)}
-            </pre>
-            <div style={{ display:"flex", gap:"8px" }}>
-              <button onClick={() => approve(detail)} style={{ flex:1, padding:"10px", borderRadius:"8px", border:"none", background:C.green, color:C.white, fontWeight:700, cursor:"pointer" }}>Approve</button>
-              <button onClick={() => reject(detail)} style={{ flex:1, padding:"10px", borderRadius:"8px", border:"none", background:C.red, color:C.white, fontWeight:700, cursor:"pointer" }}>Reject</button>
-              <button onClick={() => setDetail(null)} style={{ padding:"10px 14px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, cursor:"pointer" }}>Close</button>
+      {detail && (() => {
+        // Map submission trip_data to TripModal-compatible shape
+        const previewTrip = {
+          ...detail.trip_data,
+          id: detail.id,
+          author: detail.submitter_name,
+          doNext: detail.trip_data?.doNext || detail.trip_data?.do_next || "",
+          focalPoint: detail.trip_data?.focalPoint || { x:50, y:50 },
+          gallery: detail.trip_data?.gallery || [],
+          tags: detail.trip_data?.tags || [],
+          featured: false,
+        };
+        return (
+          <div style={{ position:"fixed", inset:0, zIndex:5000 }}>
+            <TripModal
+              trip={previewTrip}
+              onClose={() => setDetail(null)}
+              allTrips={[]}
+              isBookmarked={false}
+              onBookmark={null}
+            />
+            {/* Admin action bar pinned above the fixed X button */}
+            <div style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:6000, background:"rgba(28,43,58,0.97)", padding:"14px 20px", display:"flex", gap:"10px", justifyContent:"center", alignItems:"center", borderTop:"2px solid rgba(255,255,255,0.1)" }}>
+              <div style={{ fontSize:"12px", color:"rgba(255,255,255,0.6)", marginRight:"8px" }}>Admin Review — {detail.submitter_name}</div>
+              <button onClick={() => approve(detail)} style={{ padding:"10px 28px", borderRadius:"8px", border:"none", background:C.green, color:C.white, fontWeight:700, fontSize:"13px", cursor:"pointer" }}>✓ Approve</button>
+              <button onClick={() => reject(detail)} style={{ padding:"10px 28px", borderRadius:"8px", border:"none", background:C.red, color:C.white, fontWeight:700, fontSize:"13px", cursor:"pointer" }}>✕ Reject</button>
+              <button onClick={() => setDetail(null)} style={{ padding:"10px 18px", borderRadius:"8px", border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"rgba(255,255,255,0.7)", fontSize:"12px", cursor:"pointer" }}>Cancel</button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
