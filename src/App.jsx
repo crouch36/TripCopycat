@@ -873,7 +873,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark }) {
                 <div style={{ marginTop:"4px", fontSize:"14px", color:"rgba(255,255,255,0.95)", fontWeight:500, textShadow:"0 1px 4px rgba(0,0,0,0.5)" }}>{trip.destination}</div>
               </div>
               <div style={{ display:"flex", flexDirection:"column", gap:"8px", alignItems:"flex-end", flexShrink:0 }}>
-                <button onClick={e => { e.stopPropagation(); onClose(); }} style={{ background:"rgba(0,0,0,0.4)", border:"2px solid rgba(255,255,255,0.5)", color:"#fff", borderRadius:"50%", width:"44px", height:"44px", cursor:"pointer", fontSize:"22px", touchAction:"manipulation", display:"flex", alignItems:"center", justifyContent:"center", lineHeight:1, flexShrink:0 }}>×</button>
+                <button onClick={e => { e.stopPropagation(); onClose(); }} onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onClose(); }} style={{ background:"rgba(0,0,0,0.4)", border:"2px solid rgba(255,255,255,0.5)", color:"#fff", borderRadius:"50%", width:"44px", height:"44px", cursor:"pointer", fontSize:"22px", touchAction:"manipulation", display:"flex", alignItems:"center", justifyContent:"center", lineHeight:1, flexShrink:0 }}>×</button>
                 <div style={{ display:"flex", gap:"5px", flexWrap:"wrap", justifyContent:"flex-end" }}>
                   <button onClick={handleShare} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>{shareCopied ? "✓" : "🔗"}</button>
                   <button onClick={handleTwitterShare} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>𝕏</button>
@@ -3100,7 +3100,12 @@ function LegalModal({ onClose }) {
 
 export default function App() {
   const [trips, setTrips] = useState(SAMPLE_TRIPS);
-  const [dbTrips, setDbTrips] = useState([]);
+  const [dbTrips, setDbTrips] = useState(() => {
+    try {
+      const cached = localStorage.getItem("tc_trips_cache");
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  });
   const [tripsLoading, setTripsLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -3148,6 +3153,7 @@ export default function App() {
             image:t.image??null, userId:t.user_id||null, featured:t.featured||false, focalPoint:t.focal_point||{x:50,y:50}, gallery:t.gallery||[]
           }));
           setDbTrips(mapped);
+          try { localStorage.setItem("tc_trips_cache", JSON.stringify(mapped)); } catch {}
         }
         setTripsLoading(false);
       });
