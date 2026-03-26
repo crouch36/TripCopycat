@@ -72,6 +72,13 @@ const GLOBAL_STYLES = `
   /* Sidebar/filter hover */
   .tc-sidebar-btn:hover { background-color: rgba(196,168,130,0.1) !important; }
 
+  /* iOS safe area for modal footers */
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .tc-modal-footer {
+      padding-bottom: calc(14px + env(safe-area-inset-bottom)) !important;
+    }
+  }
+
   /* Spinner animation */
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
@@ -2030,7 +2037,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
           </div>
         )}
         {step === "form" && (
-          <div style={{ padding:"14px 28px", borderTop:`1px solid ${C.tide}`, background:C.seafoam }}>
+          <div style={{ padding:"14px 28px", paddingBottom:"calc(14px + env(safe-area-inset-bottom))", borderTop:`1px solid ${C.tide}`, background:C.seafoam }}>
             <label style={{ display:"flex", alignItems:"flex-start", gap:"10px", marginBottom:"12px", cursor:"pointer" }}>
               <input type="checkbox" checked={agreedToTerms} onChange={e=>setAgreedToTerms(e.target.checked)} style={{ marginTop:"2px", accentColor:C.amber, width:"15px", height:"15px", flexShrink:0 }} />
               <span style={{ fontSize:"11px", color:C.slateMid, lineHeight:1.6 }}>
@@ -3077,7 +3084,7 @@ function AdminEditModal({ trip, onSave, onClose }) {
         </div>
 
         {/* footer */}
-        <div style={{ padding:"16px 28px", borderTop:`1px solid ${C.tide}`, background:C.seafoam, display:"flex", justifyContent:"space-between" }}>
+        <div className="tc-modal-footer" style={{ padding:"16px 28px", borderTop:`1px solid ${C.tide}`, background:C.seafoam, display:"flex", justifyContent:"space-between" }}>
           <button onClick={onClose} style={{ padding:"9px 20px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>Cancel</button>
           <button onClick={async () => { setSaving(true); await onSave(form); setSaving(false); }} disabled={saving} style={{ padding:"9px 24px", borderRadius:"8px", border:"none", background:saving?"#aaa":C.cta, color:C.ctaText, fontSize:"12px", fontWeight:700, cursor:saving?"not-allowed":"pointer" }}>{saving ? "⏳ Saving…" : "✓ Save Changes"}</button>
         </div>
