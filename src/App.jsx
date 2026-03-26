@@ -3275,6 +3275,7 @@ export default function App() {
   }, [allTrips]);
 
   // URL path routing for individual trips (/trip/:id)
+  // Only fires on actual browser back/forward — not on every allTrips update
   useEffect(() => {
     window.__openTrip = (trip) => setSelected(trip);
     const handlePath = () => {
@@ -3282,10 +3283,12 @@ export default function App() {
       if (m && allTrips.length > 0) {
         const found = allTrips.find(t => String(t.id) === m[1] || slugify(t.title) === m[1]);
         if (found) setSelected(found);
+      } else if (!m) {
+        // URL is now /, make sure modal is closed
+        setSelected(null);
       }
     };
     window.addEventListener("popstate", handlePath);
-    handlePath();
     return () => window.removeEventListener("popstate", handlePath);
   }, [allTrips]);
 
