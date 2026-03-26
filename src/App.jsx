@@ -2564,7 +2564,7 @@ function AuthModal({ onClose, onSuccess }) {
     setLoading(true); setError("");
     const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
     if (loginError) { setError(loginError.message); setLoading(false); return; }
-    const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).maybeSingle();
     setLoading(false);
     onSuccess({ user: data.user, displayName: profile?.display_name || email });
   };
@@ -3360,7 +3360,7 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        supabase.from("profiles").select("*").eq("id", session.user.id).single()
+        supabase.from("profiles").select("*").eq("id", session.user.id).maybeSingle()
           .then(({ data }) => {
             setCurrentUser(session.user);
             setCurrentDisplayName(data?.display_name || session.user.email);
