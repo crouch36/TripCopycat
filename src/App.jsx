@@ -1,6 +1,27 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import supabase from "./supabaseClient.js";
 
+// ── Analytics ─────────────────────────────────────────────────────────────────
+const getSessionId = () => {
+  let sid = sessionStorage.getItem("tc_sid");
+  if (!sid) {
+    sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sessionStorage.setItem("tc_sid", sid);
+  }
+  return sid;
+};
+
+const trackEvent = (eventType, eventData = {}) => {
+  // Fire and forget — never block UI
+  try {
+    supabase.from("analytics_events").insert([{
+      event_type: eventType,
+      event_data: eventData,
+      session_id: getSessionId(),
+    }]).then(() => {});
+  } catch (_) {}
+};
+
 // ── Global interaction styles injected once ───────────────────────────────────
 const GLOBAL_STYLES = `
   /* Remove iOS tap flash on all interactive elements */
@@ -950,6 +971,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark }) {
   const handleShare = () => {
     const url = `${window.location.origin}/trip/${trip.id}`;
     navigator.clipboard.writeText(url).then(() => { setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); });
+    trackEvent("share_click", { trip_id: String(trip.id), title: trip.title });
   };
 
   const handleTwitterShare = () => {
@@ -990,7 +1012,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark }) {
           {/* tabs */}
           <div style={{ display:"flex", borderBottom:`1px solid ${C.tide}`, background:C.seafoam }}>
             {[{id:"overview",l:"Overview"},{id:"daily",l:"📅 Daily Itinerary"},{id:"details",l:"🗂️ All Details"}].map(t => (
-              <button key={t.id} onClick={() => setView(t.id)} style={{ padding:"12px 20px", fontSize:"13px", fontWeight:700, border:"none", cursor:"pointer", background:"transparent", color:view===t.id?C.azureDeep:C.muted, borderBottom:view===t.id?`2px solid ${C.amber}`:"2px solid transparent", transition:"background-color .15s ease, box-shadow .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease" }}>{t.l}</button>
+              <button key={t.id} onClick={() => { setView(t.id); trackEvent("tab_click", { tab: t.id, trip_id: String(trip.id) }); }} style={{ padding:"12px 20px", fontSize:"13px", fontWeight:700, border:"none", cursor:"pointer", background:"transparent", color:view===t.id?C.azureDeep:C.muted, borderBottom:view===t.id?`2px solid ${C.amber}`:"2px solid transparent", transition:"background-color .15s ease, box-shadow .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease" }}>{t.l}</button>
             ))}
           </div>
 
@@ -1576,6 +1598,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
     if (!submitterName || !submitterEmail) { alert("Please add your name and email."); return; }
     setSubmitError("");
     setStep("submitting");
+    trackEvent("submit_start", { has_photo: !!coverPhoto, gallery_count: galleryFiles.length });
     try {
       // Upload photos with 30s timeout each
       const photoUrl = await Promise.race([
@@ -1603,6 +1626,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
 
       // Clear draft on successful submit
       if (currentUser) await supabase.from("drafts").delete().eq("user_id", currentUser.id);
+      trackEvent("submit_complete", { has_photo: !!photoUrl, gallery_count: galleryUrls.length });
       setStep("flagged");
     } catch (err) {
       console.error("Submit error:", err);
@@ -2556,6 +2580,7 @@ function AuthModal({ onClose, onSuccess }) {
       }]);
     }
     setLoading(false);
+    trackEvent("sign_up");
     onSuccess({ user: data.user, displayName: displayName.trim() });
   };
 
@@ -3095,6 +3120,206 @@ function AdminEditModal({ trip, onSave, onClose }) {
 
 // ── Feedback Modal ────────────────────────────────────────────────────────────
 
+
+// ── Analytics Dashboard ───────────────────────────────────────────────────────
+function AnalyticsDashboard({ onClose }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState(7); // days
+
+  useEffect(() => {
+    const since = new Date(Date.now() - range * 24 * 60 * 60 * 1000).toISOString();
+    supabase.from("analytics_events")
+      .select("event_type, event_data, session_id, created_at")
+      .gte("created_at", since)
+      .order("created_at", { ascending: true })
+      .then(({ data: rows }) => {
+        if (!rows) { setLoading(false); return; }
+
+        // Sessions = unique session IDs
+        const sessions = new Set(rows.map(r => r.session_id)).size;
+
+        // Page views
+        const pageViews = rows.filter(r => r.event_type === "page_view").length;
+
+        // Trip views
+        const tripViews = rows.filter(r => r.event_type === "trip_view");
+
+        // Most viewed trips
+        const tripCounts = {};
+        tripViews.forEach(r => {
+          const title = r.event_data?.title || r.event_data?.trip_id || "Unknown";
+          tripCounts[title] = (tripCounts[title] || 0) + 1;
+        });
+        const topTrips = Object.entries(tripCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([title, count]) => ({ title: title.length > 28 ? title.slice(0, 28) + "…" : title, count }));
+
+        // Shares
+        const shares = rows.filter(r => r.event_type === "share_click").length;
+
+        // Tab clicks
+        const tabCounts = { overview: 0, daily: 0, details: 0 };
+        rows.filter(r => r.event_type === "tab_click").forEach(r => {
+          const tab = r.event_data?.tab;
+          if (tab && tabCounts[tab] !== undefined) tabCounts[tab]++;
+        });
+
+        // Submissions
+        const submitStarts = rows.filter(r => r.event_type === "submit_start").length;
+        const submitCompletes = rows.filter(r => r.event_type === "submit_complete").length;
+
+        // Daily traffic — group by day
+        const dayMap = {};
+        for (let i = range - 1; i >= 0; i--) {
+          const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+          const key = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          dayMap[key] = { day: key, views: 0, sessions: new Set() };
+        }
+        rows.filter(r => r.event_type === "page_view").forEach(r => {
+          const key = new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          if (dayMap[key]) {
+            dayMap[key].views++;
+            if (r.session_id) dayMap[key].sessions.add(r.session_id);
+          }
+        });
+        const dailyData = Object.values(dayMap).map(d => ({ day: d.day, views: d.views, sessions: d.sessions.size }));
+
+        setData({ sessions, pageViews, topTrips, shares, tabCounts, submitStarts, submitCompletes, dailyData, totalEvents: rows.length });
+        setLoading(false);
+      });
+  }, [range]);
+
+  const stat = (label, value, sub) => (
+    <div style={{ background:C.white, borderRadius:"12px", border:`1px solid ${C.tide}`, padding:"16px 20px", textAlign:"center" }}>
+      <div style={{ fontSize:"28px", fontWeight:800, color:C.slate }}>{value}</div>
+      <div style={{ fontSize:"11px", fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.07em", marginTop:"2px" }}>{label}</div>
+      {sub && <div style={{ fontSize:"10px", color:C.muted, marginTop:"3px" }}>{sub}</div>}
+    </div>
+  );
+
+  const barColor = "#C4A882";
+  const maxBar = data?.topTrips?.[0]?.count || 1;
+
+  return (
+    <div className="tc-modal-overlay" style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:5000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"20px 16px", overflowY:"auto", WebkitOverflowScrolling:"touch", backdropFilter:"blur(8px)" }}>
+      <div className="tc-modal-card" style={{ background:C.seafoam, borderRadius:"20px", width:"100%", maxWidth:"780px", overflow:"hidden", boxShadow:`0 32px 64px rgba(44,62,80,0.25)`, border:`1px solid ${C.tide}`, marginBottom:"20px" }}>
+
+        {/* Header */}
+        <div style={{ background:C.slate, padding:"20px 28px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div>
+            <div style={{ fontSize:"18px", fontWeight:800, color:C.white, fontFamily:"'Playfair Display',Georgia,serif" }}>📊 Analytics</div>
+            <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.6)", marginTop:"2px" }}>TripCopycat visitor data</div>
+          </div>
+          <div style={{ display:"flex", gap:"8px", alignItems:"center" }}>
+            {[7, 14, 30].map(d => (
+              <button key={d} onClick={() => { setRange(d); setLoading(true); }}
+                style={{ padding:"5px 12px", borderRadius:"6px", border:"none", background:range===d?"rgba(196,168,130,0.3)":"transparent", color:range===d?C.cta:"rgba(255,255,255,0.5)", fontSize:"11px", fontWeight:700, cursor:"pointer" }}>
+                {d}d
+              </button>
+            ))}
+            <button onClick={onClose} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:C.white, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"18px" }}>×</button>
+          </div>
+        </div>
+
+        <div style={{ padding:"24px 28px" }}>
+          {loading ? (
+            <div style={{ textAlign:"center", padding:"60px", color:C.muted }}>
+              <div style={{ fontSize:"32px", marginBottom:"12px" }}>⏳</div>
+              <div style={{ fontWeight:600 }}>Loading analytics…</div>
+            </div>
+          ) : !data ? (
+            <div style={{ textAlign:"center", padding:"60px", color:C.muted }}>No data yet</div>
+          ) : (
+            <>
+              {/* Key stats */}
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(130px, 1fr))", gap:"12px", marginBottom:"28px" }}>
+                {stat("Unique Sessions", data.sessions)}
+                {stat("Page Views", data.pageViews)}
+                {stat("Trip Views", data.topTrips.reduce((s, t) => s + t.count, 0))}
+                {stat("Shares", data.shares)}
+                {stat("Submit Starts", data.submitStarts, data.submitCompletes > 0 ? `${data.submitCompletes} completed` : "0 completed")}
+              </div>
+
+              {/* Daily traffic chart */}
+              <div style={{ background:C.white, borderRadius:"14px", border:`1px solid ${C.tide}`, padding:"20px 24px", marginBottom:"20px" }}>
+                <div style={{ fontSize:"13px", fontWeight:700, color:C.slate, marginBottom:"16px" }}>Daily Traffic — Last {range} Days</div>
+                <div style={{ display:"flex", alignItems:"flex-end", gap:"6px", height:"80px" }}>
+                  {data.dailyData.map((d, i) => {
+                    const maxV = Math.max(...data.dailyData.map(x => x.views), 1);
+                    const h = Math.max(4, Math.round((d.views / maxV) * 72));
+                    return (
+                      <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:"4px" }}>
+                        <div style={{ fontSize:"9px", color:C.muted, fontWeight:600 }}>{d.views || ""}</div>
+                        <div style={{ width:"100%", height:`${h}px`, background:barColor, borderRadius:"3px 3px 0 0", opacity:0.85 }} title={`${d.day}: ${d.views} views, ${d.sessions} sessions`} />
+                        <div style={{ fontSize:"8px", color:C.muted, textAlign:"center", lineHeight:1.2 }}>{d.day.split(" ")[1]}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Top trips */}
+              {data.topTrips.length > 0 && (
+                <div style={{ background:C.white, borderRadius:"14px", border:`1px solid ${C.tide}`, padding:"20px 24px", marginBottom:"20px" }}>
+                  <div style={{ fontSize:"13px", fontWeight:700, color:C.slate, marginBottom:"14px" }}>Most Viewed Trips</div>
+                  {data.topTrips.map((t, i) => (
+                    <div key={i} style={{ marginBottom:"10px" }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"3px" }}>
+                        <div style={{ fontSize:"11px", fontWeight:600, color:C.slate }}>{t.title}</div>
+                        <div style={{ fontSize:"11px", fontWeight:700, color:C.amber }}>{t.count}</div>
+                      </div>
+                      <div style={{ height:"6px", background:C.seafoam, borderRadius:"3px", overflow:"hidden" }}>
+                        <div style={{ height:"100%", width:`${Math.round((t.count / maxBar) * 100)}%`, background:barColor, borderRadius:"3px" }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Tab engagement + Shares */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px" }}>
+                <div style={{ background:C.white, borderRadius:"14px", border:`1px solid ${C.tide}`, padding:"20px 24px" }}>
+                  <div style={{ fontSize:"13px", fontWeight:700, color:C.slate, marginBottom:"14px" }}>Tab Engagement</div>
+                  {[["overview","Overview"],["daily","Daily Itinerary"],["details","All Details"]].map(([key, label]) => {
+                    const maxT = Math.max(data.tabCounts.overview, data.tabCounts.daily, data.tabCounts.details, 1);
+                    return (
+                      <div key={key} style={{ marginBottom:"10px" }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"3px" }}>
+                          <div style={{ fontSize:"11px", color:C.slate }}>{label}</div>
+                          <div style={{ fontSize:"11px", fontWeight:700, color:C.amber }}>{data.tabCounts[key]}</div>
+                        </div>
+                        <div style={{ height:"5px", background:C.seafoam, borderRadius:"3px", overflow:"hidden" }}>
+                          <div style={{ height:"100%", width:`${Math.round((data.tabCounts[key] / maxT) * 100)}%`, background:barColor, borderRadius:"3px" }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ background:C.white, borderRadius:"14px", border:`1px solid ${C.tide}`, padding:"20px 24px" }}>
+                  <div style={{ fontSize:"13px", fontWeight:700, color:C.slate, marginBottom:"14px" }}>Conversion</div>
+                  {[
+                    ["Views → Shares", data.pageViews > 0 ? `${Math.round((data.shares/data.pageViews)*100)}%` : "—"],
+                    ["Submit Start → Complete", data.submitStarts > 0 ? `${Math.round((data.submitCompletes/data.submitStarts)*100)}%` : "—"],
+                    ["Trip Views", data.topTrips.reduce((s,t)=>s+t.count,0)],
+                    ["Total Events", data.totalEvents],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${C.seafoam}` }}>
+                      <div style={{ fontSize:"11px", color:C.slateMid }}>{label}</div>
+                      <div style={{ fontSize:"11px", fontWeight:700, color:C.slate }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FeedbackModal({ onClose }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -3294,9 +3519,12 @@ export default function App() {
       });
   };
 
-  useEffect(() => { fetchTrips(); }, []);
+  useEffect(() => {
+    fetchTrips();
+    trackEvent("page_view", { path: window.location.pathname });
+  }, []);
 
-  const openTrip = (trip) => { setSelected(trip); window.history.pushState(null, "", `/trip/${trip.id}`); };
+  const openTrip = (trip) => { setSelected(trip); window.history.pushState(null, "", `/trip/${trip.id}`); trackEvent("trip_view", { trip_id: String(trip.id), title: trip.title, region: trip.region }); };
   const closeTrip = () => { setSelected(null); window.history.pushState(null, "", "/"); window.__closeTripModal = null; };
   useEffect(() => { window.__closeTripModal = selected ? closeTrip : null; }, [selected]);
 
@@ -3387,6 +3615,7 @@ export default function App() {
   const isAdminUrl = window.location.pathname === "/admin" || window.location.hash === "#admin";
   const [showAdminLogin, setShowAdminLogin] = useState(isAdminUrl);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Trigger admin login if navigated to #admin after mount
   useEffect(() => {
@@ -3502,6 +3731,7 @@ export default function App() {
               + Submit a Trip
               {hasDraft && <span style={{ position:"absolute", top:"-4px", right:"-4px", width:"8px", height:"8px", borderRadius:"50%", background:C.amber, border:`1.5px solid ${C.white}` }} />}
             </button>}
+            {isAdmin && <button onClick={() => setShowAnalytics(true)} style={{ background:"rgba(91,143,185,0.12)", color:C.azureDeep, border:`1px solid ${C.azure}44`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>📊 Analytics</button>}
             {isAdmin && <button onClick={() => setShowQueue(true)} style={{ background:C.amberBg, color:C.amber, border:`1px solid ${C.amber}44`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>📋 Queue</button>}
             {isAdmin && <button onClick={() => setShowImport(true)} style={{ background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>🤖 Import</button>}
             {isAdmin && <button onClick={() => setShowAdd(true)} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"8px", padding:"7px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>+ Add</button>}
@@ -3743,6 +3973,7 @@ export default function App() {
       {showQueue     && <AdminQueueModal onClose={() => setShowQueue(false)} onApprove={fetchTrips} />}
       {showAdminLogin && <AdminLoginModal onSuccess={handleAdminLogin} onClose={() => setShowAdminLogin(false)} />}
       {editingTrip   && <AdminEditModal trip={editingTrip} onSave={handleSaveTrip} onClose={() => setEditingTrip(null)} />}
+      {showAnalytics && <AnalyticsDashboard onClose={() => setShowAnalytics(false)} />}
       {showLegal     && <LegalModal onClose={() => setShowLegal(false)} />}
       {showFeedback  && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
