@@ -14,13 +14,23 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Disable thinking to get clean JSON output and avoid parsing issues
+    const body = {
+      ...req.body,
+      generationConfig: {
+        ...(req.body.generationConfig || {}),
+        thinkingConfig: { thinkingBudget: 0 },
+        responseMimeType: "application/json",
+      },
+    };
+
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 90000); // 90s server timeout
+    const timeout = setTimeout(() => controller.abort(), 90000);
 
     const upstream = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
 
@@ -29,7 +39,8 @@ export default async function handler(req, res) {
     const data = await upstream.json();
 
     if (!upstream.ok) {
-      res.status(upstream.status).json({ error: data?.error?.message || "Gemini API error" });
+      console.error("Gemini API error:", JSON.stringify(data).slice(0, 500));
+      res.status(upstream.status).json({ error: data?.error?.message || "Gemini API error", detail: data });
       return;
     }
 
