@@ -102,6 +102,11 @@ const GLOBAL_STYLES = `
 
   /* Spinner animation */
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes progress-pulse {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(60%); }
+    100% { transform: translateX(200%); }
+  }
 
   /* Modal entry animation */
   @keyframes tc-modal-in {
@@ -1140,7 +1145,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark }) {
                   const grad = REGION_GRADIENTS[t.region] || "linear-gradient(135deg,#8B7355,#C4A882)";
                   const isSameAuthor = t.author === trip.author;
                   return (
-                    <div key={t.id} onClick={() => { setShowRelated(false); setTimeout(() => window.__openTrip && window.__openTrip(t), 100); }}
+                    <div key={t.id} onClick={() => { window.__openTrip && window.__openTrip(t); }}
                       style={{ background:C.white, borderRadius:"12px", border:`1px solid ${C.tide}`, overflow:"hidden", cursor:"pointer", transition:"background-color .15s ease, box-shadow .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease" }}
                       className="tc-hover-border">
                       <div style={{ height:"65px", background:t.image?"transparent":grad, position:"relative", overflow:"hidden" }}>
@@ -1232,7 +1237,7 @@ function AddTripModal({ onClose, onAdd }) {
 
   const updRow   = (cat,i,f,v) => setForm(p => { const u=[...p[cat]]; u[i]={...u[i],[f]:v}; return {...p,[cat]:u}; });
   const addRow   = cat => setForm(p => ({...p,[cat]:[...p[cat],{item:"",detail:"",tip:""}]}));
-  const toggleTag = tag => setForm(p => ({...p,tags:p.tags.includes(tag)?p.tags.filter(t=>t!==tag):[...p.tags,tag]}));
+  const toggleTag = tag => setForm(p => { if (!p.tags.includes(tag) && p.tags.length >= 8) return p; return {...p, tags: p.tags.includes(tag) ? p.tags.filter(t=>t!==tag) : [...p.tags, tag]}; });
   const inp = { width:"100%", padding:"8px 11px", borderRadius:"7px", border:`1px solid ${C.tide}`, fontSize:"12px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate };
   const lbl = { fontSize:"11px", fontWeight:600, color:C.slateMid, marginBottom:"3px", display:"block" };
 
@@ -1344,6 +1349,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
   const photoRef = useRef(null);
   const autoSaveTimer = useRef(null);
   const [submitError, setSubmitError] = useState("");
+  const [uploadStatus, setUploadStatus] = useState("");
 
   // Check for existing draft on mount — also check localStorage fallback
   useEffect(() => {
@@ -1476,10 +1482,12 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
     img.src = url;
   });
 
-  const uploadGallery = async () => {
+  const uploadGallery = async (onProgress) => {
     if (!galleryFiles.length) return [];
     const urls = [];
-    for (const gf of galleryFiles) {
+    for (let i = 0; i < galleryFiles.length; i++) {
+      const gf = galleryFiles[i];
+      if (onProgress) onProgress(`Uploading photo ${i + 1} of ${galleryFiles.length}…`);
       const compressed = await compressForUpload(gf.file);
       if (!compressed) continue;
       const path = `gallery-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
@@ -1532,7 +1540,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
   useEffect(() => {
     if (step !== "form" || !currentUser) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(() => saveDraft(form), 3000);
+    autoSaveTimer.current = setTimeout(() => saveDraft(form), 10000);
     return () => clearTimeout(autoSaveTimer.current);
   }, [form, step]);
 
@@ -1586,7 +1594,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
   const updRow = (cat,i,f,v) => setForm(p => { const u=[...p[cat]]; u[i]={...u[i],[f]:v}; return {...p,[cat]:u}; });
   const addRow = cat => setForm(p => ({...p,[cat]:[...p[cat],{item:"",detail:"",tip:""}]}));
   const delRow = (cat,i) => setForm(p => ({...p,[cat]:p[cat].filter((_,idx)=>idx!==i)}));
-  const toggleTag = tag => setForm(p => ({...p,tags:p.tags.includes(tag)?p.tags.filter(t=>t!==tag):[...p.tags,tag]}));
+  const toggleTag = tag => setForm(p => { if (!p.tags.includes(tag) && p.tags.length >= 8) return p; return {...p, tags: p.tags.includes(tag) ? p.tags.filter(t=>t!==tag) : [...p.tags, tag]}; });
 
   const handleSubmit = async () => {
     if (!submitterName || !submitterEmail) { alert("Please add your name and email."); return; }
@@ -1599,10 +1607,12 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
         uploadPhoto(),
         new Promise((_, rej) => setTimeout(() => rej(new Error("Photo upload timed out")), 30000))
       ]).catch(() => null);
+      if (galleryFiles.length > 0) setUploadStatus(`Uploading cover photo…`);
       const galleryUrls = await Promise.race([
-        uploadGallery(),
+        uploadGallery((msg) => setUploadStatus(msg)),
         new Promise((_, rej) => setTimeout(() => rej(new Error("Gallery upload timed out")), 30000))
       ]).catch(() => []);
+      setUploadStatus("Saving your trip…");
 
       const tripWithPhoto = { ...form, image: photoUrl || "", focalPoint, gallery: galleryUrls };
       const result = runContentFilter(tripWithPhoto);
@@ -2026,8 +2036,13 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
           <div style={{ padding:"60px 28px", textAlign:"center" }}>
             <div style={{ fontSize:"36px", marginBottom:"14px", animation:"spin 1.5s linear infinite", display:"inline-block" }}>⏳</div>
             <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>Submitting your trip…</div>
-            <div style={{ fontSize:"12px", color:C.slateLight, marginBottom:"24px" }}>Uploading photos and saving. This may take a moment on slower connections.</div>
-            <button onClick={() => { setStep("form"); setSubmitError("Submission cancelled — your draft is still here."); }} style={{ fontSize:"11px", color:C.muted, background:"none", border:`1px solid ${C.tide}`, borderRadius:"6px", padding:"6px 16px", cursor:"pointer" }}>Cancel</button>
+            <div style={{ fontSize:"12px", color:C.slateLight, marginBottom:"8px" }}>
+              {uploadStatus || "Uploading photos and saving…"}
+            </div>
+            <div style={{ width:"200px", height:"4px", background:C.seafoam, borderRadius:"2px", margin:"0 auto 24px", overflow:"hidden" }}>
+              <div style={{ height:"100%", background:C.amber, borderRadius:"2px", animation:"progress-pulse 1.5s ease-in-out infinite", width:"60%" }} />
+            </div>
+            <button onClick={() => { setStep("form"); setSubmitError("Submission cancelled — your draft is still here."); setUploadStatus(""); }} style={{ fontSize:"11px", color:C.muted, background:"none", border:`1px solid ${C.tide}`, borderRadius:"6px", padding:"6px 16px", cursor:"pointer" }}>Cancel</button>
           </div>
         )}
 
@@ -3480,10 +3495,14 @@ export default function App() {
   const [sortBy, setSortBy] = useState("default");
   const [duration, setDuration] = useState("Any Length");
   const { bookmarks, toggle: toggleBookmark } = useBookmarks();
-  const isMobile = () => window.innerWidth < 640;
-  const [sidebarOpen, setSidebarOpen] = useState(!isMobile());
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 640);
   useEffect(() => {
-    const onResize = () => { if (isMobile()) setSidebarOpen(false); };
+    const onResize = () => {
+      const mobile = window.innerWidth < 640;
+      setIsMobile(mobile);
+      if (mobile) setSidebarOpen(false);
+    };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
@@ -3974,9 +3993,9 @@ export default function App() {
 
       {/* Floating feedback button — bottom-left on mobile to avoid covering trip cards */}
       <button onClick={() => setShowFeedback(true)}
-        style={{ position:"fixed", bottom:"20px", left:isMobile()?"16px":"auto", right:isMobile()?"auto":"24px", zIndex:500, background:`linear-gradient(135deg, #1C2B3A, #C1692A)`, color:C.white, border:"none", borderRadius:"50px", padding:isMobile()?"9px 14px":"11px 20px", fontSize:isMobile()?"11px":"12px", fontWeight:700, cursor:"pointer", boxShadow:`0 4px 18px rgba(28,43,58,0.35)`, display:"flex", alignItems:"center", gap:"6px", transition:"transform .15s" }}
+        style={{ position:"fixed", bottom:"20px", left:isMobile?"16px":"auto", right:isMobile?"auto":"24px", zIndex:500, background:`linear-gradient(135deg, #1C2B3A, #C1692A)`, color:C.white, border:"none", borderRadius:"50px", padding:isMobile?"9px 14px":"11px 20px", fontSize:isMobile?"11px":"12px", fontWeight:700, cursor:"pointer", boxShadow:`0 4px 18px rgba(28,43,58,0.35)`, display:"flex", alignItems:"center", gap:"6px", transition:"transform .15s" }}
         >
-        {isMobile() ? "💬" : "💬 Feedback"}
+        {isMobile ? "💬" : "💬 Feedback"}
       </button>
 
       {/* Site footer */}
