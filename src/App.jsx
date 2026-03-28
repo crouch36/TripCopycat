@@ -3549,7 +3549,7 @@ export default function App() {
     const id = window.__INITIAL_TRIP_ID__;
     if (!id) return;
     const found = allTrips.find(t => String(t.id) === id || slugify(t.title) === id);
-    if (found) setSelected(found);
+    if (found) { window.__INITIAL_TRIP_ID__ = null; setSelected(found); }
   }, [allTrips]);
 
   // URL path routing for individual trips (/trip/:id)
