@@ -28,8 +28,9 @@ function buildDescription(trip) {
 }
 
 function buildJsonLd(trip, canonicalUrl, ogImage) {
-  const ld = {
-    "@context": "https://schema.org",
+  const graphs = [];
+
+  const touristTrip = {
     "@type": "TouristTrip",
     "name": trip.title,
     "description": buildDescription(trip),
@@ -42,41 +43,54 @@ function buildJsonLd(trip, canonicalUrl, ogImage) {
     }
   };
 
-  if (trip.author_name) {
-    ld.author = { "@type": "Person", "name": trip.author_name };
-  }
+  if (trip.author_name) touristTrip.author = { "@type": "Person", "name": trip.author_name };
+  if (trip.travelers)   touristTrip.touristType = trip.travelers;
 
-  if (trip.travelers) {
-    ld.touristType = trip.travelers;
-  }
-
-  if (trip.destination) {
-    ld.touristType = ld.touristType || trip.travelers;
-    ld.itinerary = ld.itinerary || {};
-  }
-
-  // Day-by-day itinerary as ItemList — Google loves this
   if (Array.isArray(trip.days) && trip.days.length > 0) {
-    ld.itinerary = {
+    touristTrip.itinerary = {
       "@type": "ItemList",
       "itemListElement": trip.days.map((day, i) => ({
         "@type": "ListItem",
         "position": i + 1,
         "name": day.title || `Day ${day.day}`,
-        "description": Array.isArray(day.items)
-          ? day.items.map(item => item.label).join(", ")
-          : ""
+        "description": Array.isArray(day.items) ? day.items.map(item => item.label).join(", ") : ""
       }))
     };
   }
 
-  return JSON.stringify(ld, null, 0);
+  graphs.push(touristTrip);
+
+  const faqs = [];
+  if (trip.loves) {
+    faqs.push({
+      "@type": "Question",
+      "name": `What are the highlights of this ${trip.destination} trip?`,
+      "acceptedAnswer": { "@type": "Answer", "text": trip.loves.slice(0, 500) }
+    });
+  }
+  if (trip.do_next) {
+    faqs.push({
+      "@type": "Question",
+      "name": `What would you do differently on a return trip to ${trip.destination}?`,
+      "acceptedAnswer": { "@type": "Answer", "text": trip.do_next.slice(0, 500) }
+    });
+  }
+  if (trip.duration) {
+    faqs.push({
+      "@type": "Question",
+      "name": `How long is this ${trip.destination} itinerary?`,
+      "acceptedAnswer": { "@type": "Answer", "text": `This trip is ${trip.duration}. Shared by a real traveler on TripCopycat.` }
+    });
+  }
+
+  if (faqs.length > 0) {
+    graphs.push({ "@type": "FAQPage", "mainEntity": faqs });
+  }
+
+  return JSON.stringify({ "@context": "https://schema.org", "@graph": graphs }, null, 0);
 }
 
 function buildServerContent(trip, canonicalUrl) {
-  // Visually hidden, Google-readable content block.
-  // Not cloaking — identical content to what React renders, just pre-rendered.
-  // Standard SSR pattern used by Next.js, Nuxt, etc.
   const days = Array.isArray(trip.days) ? trip.days : [];
   const tags = Array.isArray(trip.tags) ? trip.tags.join(", ") : "";
 
@@ -119,7 +133,6 @@ export default async function handler(req, res) {
   let tripData    = null;
   const canonicalUrl = `${SITE_URL}/trip/${id}`;
 
-  // Fetch from Supabase — expanded select to include all SEO-useful fields
   try {
     const r = await fetch(
       `${SUPABASE_URL}/rest/v1/trips?id=eq.${encodeURIComponent(id)}&status=eq.published` +
@@ -142,7 +155,6 @@ export default async function handler(req, res) {
     }
   } catch (_) {}
 
-  // Fetch the real built index.html (has correct Vite asset hashes)
   let html = "";
   try {
     const r = await fetch(`${SITE_URL}/`, { signal: AbortSignal.timeout(4000) });
@@ -151,14 +163,12 @@ export default async function handler(req, res) {
     res.status(500).send("Failed to load app"); return;
   }
 
-  // Replace OG placeholder tokens
   html = html
     .replace(/__OG_TITLE__/g,       escapeHtml(title))
     .replace(/__OG_DESCRIPTION__/g, escapeHtml(description))
     .replace(/__OG_URL__/g,         canonicalUrl)
     .replace(/__OG_IMAGE__/g,       escapeHtml(ogImage));
 
-  // Inject into <head>: canonical + JSON-LD + initial trip script
   const canonicalTag = `<link rel="canonical" href="${canonicalUrl}" />`;
   const jsonLdTag    = tripData
     ? `<script type="application/ld+json">${buildJsonLd(tripData, canonicalUrl, ogImage)}</script>`
@@ -170,7 +180,6 @@ export default async function handler(req, res) {
     `  ${canonicalTag}\n  ${jsonLdTag}\n  ${tripScript}\n</head>`
   );
 
-  // Inject server-rendered content into <body> for Google
   if (tripData) {
     html = html.replace("</body>", `${buildServerContent(tripData, canonicalUrl)}\n</body>`);
   }
