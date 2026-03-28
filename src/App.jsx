@@ -500,9 +500,6 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
     }).join("\n");
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) throw new Error("No API key configured");
-
       const parts = [
         {
           text: `You are analysing travel photos to reconstruct a trip itinerary. Here is the GPS and timestamp metadata extracted from each photo:\n\n${metaSummary}\n\nIMPORTANT: Use the GPS location data to identify SPECIFIC venue names. If GPS shows a photo was taken at a specific street address or named place, use that exact place name. Do not use generic descriptions like "local restaurant" or "hotel balcony" — always try to name the specific venue based on GPS coordinates, visible signage, or recognisable landmarks.\n\nReturn ONLY a JSON object with this exact structure, no other text:\n{\n  "destination": "City, Country",\n  "region": "Europe|Asia|North America|Central America|South America|Africa|Oceania",\n  "duration": "N days",\n  "travelers": "description e.g. Couple, Family, Guys trip",\n  "tags": ["tag1", "tag2"],\n  "loves": "2-4 sentences about specific highlights visible in the photos — name actual places",\n  "doNext": "1-2 sentences of honest advice",\n  "hotels": [{"item": "hotel name from GPS or signage", "detail": "location", "tip": ""}],\n  "restaurants": [{"item": "restaurant name from GPS or signage", "detail": "cuisine type", "tip": ""}],\n  "bars": [{"item": "bar name from GPS or signage", "detail": "type", "tip": ""}],\n  "activities": [{"item": "specific activity or landmark name", "detail": "description", "tip": ""}],\n  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"time": "", "type": "activity|restaurant|bar|hotel|transport", "label": "specific venue or activity name", "note": ""}]}]\n}`
@@ -515,15 +512,12 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 45000);
 
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
+      const res = await fetch("/api/gemini", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contents: [{ parts }] }),
           signal: controller.signal
-        }
-      );
+        });
       clearTimeout(timeoutId);
       const data = await res.json();
       const rawText = JSON.stringify(data).slice(0, 800);
@@ -2226,8 +2220,7 @@ function HybridProcessor({ text, photos, onComplete, onBack }) {
 
   useEffect(() => {
     const run = async () => {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) { setError("API key not configured."); return; }
+
 
       // Step 1: compress photos
       const compressed = [];
@@ -2280,10 +2273,12 @@ Valid tags: family-friendly, romantic, adventure, food & wine, culture, beach, w
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 60000);
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-          { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ contents:[{ parts }] }), signal:controller.signal }
-        );
+        const res = await fetch("/api/gemini", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts }] }),
+          signal: controller.signal,
+        });
         clearTimeout(timeout);
         setProgress(90);
         const data = await res.json();
