@@ -3656,6 +3656,17 @@ export default function App() {
         return;
       }
     }
+
+    // Failsafe: always fetch live gallery from DB before saving.
+    // Prevents stale localStorage cache from wiping real gallery data.
+    let safeGallery = updated.gallery || [];
+    if (safeGallery.length === 0) {
+      try {
+        const { data: liveRow } = await supabase.from("trips").select("gallery").eq("id", updated.id).maybeSingle();
+        if (liveRow?.gallery?.length > 0) safeGallery = liveRow.gallery;
+      } catch (_) {}
+    }
+
     const payload = {
       title: updated.title, destination: updated.destination, region: updated.region,
       author_name: updated.author,
@@ -3663,7 +3674,7 @@ export default function App() {
       tags: updated.tags, loves: updated.loves, do_next: updated.doNext,
       airfare: updated.airfare, hotels: updated.hotels, restaurants: updated.restaurants,
       bars: updated.bars, activities: updated.activities, days: updated.days,
-      image: updated.image || "", featured: updated.featured || false, focal_point: updated.focalPoint || {x:50,y:50}, gallery: updated.gallery || []
+      image: updated.image || "", featured: updated.featured || false, focal_point: updated.focalPoint || {x:50,y:50}, gallery: safeGallery
     };
     // Retry up to 3 times on failure
     let lastError = null;
@@ -3671,8 +3682,8 @@ export default function App() {
       try {
         const { error } = await supabase.from("trips").update(payload).eq("id", updated.id);
         if (error) throw error;
-        setTrips(p => p.map(t => t.id === updated.id ? updated : t));
-        setDbTrips(p => p.map(t => t.id === updated.id ? updated : t));
+        setTrips(p => p.map(t => t.id === updated.id ? { ...updated, gallery: safeGallery } : t));
+        setDbTrips(p => p.map(t => t.id === updated.id ? { ...updated, gallery: safeGallery } : t));
         setEditingTrip(null);
         return;
       } catch (err) {
