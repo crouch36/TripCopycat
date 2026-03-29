@@ -3449,7 +3449,10 @@ function LegalModal({ onClose }) {
           <p style={sub}>No Compensation</p>
           <p style={body}>You understand that you will not receive financial compensation for submitting Content to TripCopycat, unless otherwise agreed upon in a separate written agreement.</p>
 
-          <div style={sect}>3. Copyright Infringement (DMCA)</div>
+          <div style={sect}>3. Affiliate Disclosure</div>
+          <p style={body}>TripCopycat participates in affiliate programs including Travelpayouts and Amazon Associates. When you click certain links and make a purchase or booking, we may earn a small commission at no extra cost to you. These commissions help cover the cost of running and improving the platform. This never influences which trips or products are featured — all itineraries are real trips submitted by real travelers.</p>
+
+          <div style={sect}>4. Copyright Infringement (DMCA)</div>
           <p style={body}>We respect the intellectual property rights of others. It is our policy to respond to any claim that Content posted on the Service infringes on the copyright or other intellectual property rights of any person or entity. If you believe your work has been copied in a way that constitutes copyright infringement, please contact us with a description of the allegedly infringing material and your contact information.</p>
 
           <div style={{ marginTop:"32px", padding:"16px 20px", background:C.seafoam, borderRadius:"12px", border:`1px solid ${C.tide}` }}>
@@ -3656,17 +3659,6 @@ export default function App() {
         return;
       }
     }
-
-    // Failsafe: always fetch live gallery from DB before saving.
-    // Prevents stale localStorage cache from wiping real gallery data.
-    let safeGallery = updated.gallery || [];
-    if (safeGallery.length === 0) {
-      try {
-        const { data: liveRow } = await supabase.from("trips").select("gallery").eq("id", updated.id).maybeSingle();
-        if (liveRow?.gallery?.length > 0) safeGallery = liveRow.gallery;
-      } catch (_) {}
-    }
-
     const payload = {
       title: updated.title, destination: updated.destination, region: updated.region,
       author_name: updated.author,
@@ -3674,7 +3666,7 @@ export default function App() {
       tags: updated.tags, loves: updated.loves, do_next: updated.doNext,
       airfare: updated.airfare, hotels: updated.hotels, restaurants: updated.restaurants,
       bars: updated.bars, activities: updated.activities, days: updated.days,
-      image: updated.image || "", featured: updated.featured || false, focal_point: updated.focalPoint || {x:50,y:50}, gallery: safeGallery
+      image: updated.image || "", featured: updated.featured || false, focal_point: updated.focalPoint || {x:50,y:50}, gallery: updated.gallery || []
     };
     // Retry up to 3 times on failure
     let lastError = null;
@@ -3682,8 +3674,8 @@ export default function App() {
       try {
         const { error } = await supabase.from("trips").update(payload).eq("id", updated.id);
         if (error) throw error;
-        setTrips(p => p.map(t => t.id === updated.id ? { ...updated, gallery: safeGallery } : t));
-        setDbTrips(p => p.map(t => t.id === updated.id ? { ...updated, gallery: safeGallery } : t));
+        setTrips(p => p.map(t => t.id === updated.id ? updated : t));
+        setDbTrips(p => p.map(t => t.id === updated.id ? updated : t));
         setEditingTrip(null);
         return;
       } catch (err) {
@@ -4010,9 +4002,14 @@ export default function App() {
       </button>
 
       {/* Site footer */}
-      <footer style={{ borderTop:`1px solid ${C.tide}`, background:C.white, padding:"16px 32px", display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:"40px" }}>
-        <span style={{ fontSize:"11px", color:C.muted }}>© {new Date().getFullYear()} TripCopycat™. All rights reserved.</span>
-        <button onClick={() => setShowLegal(true)} style={{ fontSize:"11px", color:C.muted, background:"none", border:"none", cursor:"pointer", textDecoration:"underline", fontFamily:"inherit" }}>Terms of Service</button>
+      <footer style={{ borderTop:`1px solid ${C.tide}`, background:C.white, padding:"16px 32px", marginTop:"40px" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px" }}>
+          <span style={{ fontSize:"11px", color:C.muted }}>© {new Date().getFullYear()} TripCopycat™. All rights reserved.</span>
+          <button onClick={() => setShowLegal(true)} style={{ fontSize:"11px", color:C.muted, background:"none", border:"none", cursor:"pointer", textDecoration:"underline", fontFamily:"inherit" }}>Terms of Service</button>
+        </div>
+        <div style={{ textAlign:"center" }}>
+          <span style={{ fontSize:"11px", color:C.muted }}>Some links may earn us a small commission — it helps keep the lights on and never costs you more.</span>
+        </div>
       </footer>
     </div>
   );
