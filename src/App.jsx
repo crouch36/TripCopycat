@@ -3558,35 +3558,63 @@ function BlueprintPage({ tripId, onClose }) {
     }).catch(() => setAiAlternatives(null)).finally(() => setAiLoading(false));
   }, [trip]);
 
-  const generateKML = () => {
+  const [kmlGenerating, setKmlGenerating] = useState(false);
+
+  const generateKML = async () => {
     if (!trip) return;
+    setKmlGenerating(true);
+
     const cats = [
-      { key: "hotels", color: "ff0000ff", icon: "lodging" },
-      { key: "restaurants", color: "ff00ff00", icon: "restaurant" },
-      { key: "bars", color: "ffff00ff", icon: "bar" },
-      { key: "activities", color: "ffffff00", icon: "camera" },
+      { key: "hotels",      color: "ff0000ff", label: "Hotels" },
+      { key: "restaurants", color: "ff00ff00", label: "Restaurants" },
+      { key: "bars",        color: "ffff00ff", label: "Bars" },
+      { key: "activities",  color: "ffffff00", label: "Activities" },
     ];
-    const placemarks = cats.flatMap(cat =>
-      (trip[cat.key] || []).filter(p => p.item).map(p => `
+
+    const geocode = async (name) => {
+      try {
+        const q = encodeURIComponent(`${name} ${trip.destination}`);
+        const res = await fetch(`https://photon.komoot.io/api/?q=${q}&limit=1`);
+        const data = await res.json();
+        const coords = data?.features?.[0]?.geometry?.coordinates;
+        if (coords) return { lon: coords[0], lat: coords[1] };
+      } catch {}
+      return null;
+    };
+
+    const placemarkParts = [];
+    for (const cat of cats) {
+      const venues = (trip[cat.key] || []).filter(p => p.item);
+      for (const p of venues) {
+        const coords = await geocode(p.item);
+        const pointTag = coords
+          ? `<Point><coordinates>${coords.lon},${coords.lat},0</coordinates></Point>`
+          : "";
+        placemarkParts.push(`
     <Placemark>
-      <name>${p.item}</name>
-      <description>${p.detail || ""} ${p.tip ? "| Tip: " + p.tip : ""}</description>
-      <StyleMap><Pair><key>normal</key><Style><IconStyle><color>${cat.color}</color></IconStyle></Style></Pair></StyleMap>
-    </Placemark>`).join("")
-    );
+      <n>${p.item}</n>
+      <description>${cat.label}${p.detail ? " — " + p.detail : ""}${p.tip ? " | Tip: " + p.tip : ""}</description>
+      <Style><IconStyle><color>${cat.color}</color></IconStyle></Style>
+      ${pointTag}
+    </Placemark>`);
+      }
+    }
+
     const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>${trip.title}</name>
+    <n>${trip.title}</n>
     <description>Trip Blueprint from TripCopycat — tripcopycat.com/trip/${trip.id}</description>
-    ${placemarks}
+    ${placemarkParts.join("")}
   </Document>
 </kml>`;
+
     const blob = new Blob([kml], { type: "application/vnd.google-earth.kml+xml" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${trip.title.replace(/\s+/g,"-")}-blueprint.kml`;
+    a.download = `${trip.title.replace(/\s+/g, "-")}-blueprint.kml`;
     a.click();
+    setKmlGenerating(false);
   };
 
   if (loading) return (
@@ -3626,7 +3654,7 @@ function BlueprintPage({ tripId, onClose }) {
           {/* Action buttons */}
           <div style={{ display:"flex", gap:"10px", marginTop:"24px", flexWrap:"wrap", fontFamily:"'DM Sans',sans-serif" }}>
             <button onClick={() => window.print()} style={{ padding:"10px 20px", borderRadius:"8px", border:"none", background:C.amber, color:C.slate, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>⬇ Download PDF</button>
-            <button onClick={generateKML} style={{ padding:"10px 20px", borderRadius:"8px", border:"1px solid rgba(196,168,130,0.5)", background:"transparent", color:C.amber, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>🗺 Open in Google Maps</button>
+            <button onClick={generateKML} disabled={kmlGenerating} style={{ padding:"10px 20px", borderRadius:"8px", border:"1px solid rgba(196,168,130,0.5)", background:"transparent", color:C.amber, fontSize:"12px", fontWeight:700, cursor:kmlGenerating?"wait":"pointer", opacity:kmlGenerating?0.7:1 }}>{kmlGenerating ? "Geocoding venues…" : "🗺 Open in Google Maps"}</button>
             <button onClick={() => { navigator.clipboard.writeText(window.location.href); alert("Link copied!"); }} style={{ padding:"10px 20px", borderRadius:"8px", border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"rgba(255,255,255,0.8)", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>🔗 Share Blueprint</button>
           </div>
         </div>
@@ -3718,7 +3746,7 @@ function BlueprintPage({ tripId, onClose }) {
             src={`https://www.google.com/maps/embed/v1/search?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY || ""}&q=${encodeURIComponent(trip.destination)}`}
           />
           <div style={{ marginTop:"12px" }}>
-            <button onClick={generateKML} style={{ padding:"8px 16px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.seafoam, color:C.slate, fontSize:"12px", fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>⬇ Download KML — Open All Pins in Google Maps</button>
+            <button onClick={generateKML} disabled={kmlGenerating} style={{ padding:"8px 16px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.seafoam, color:C.slate, fontSize:"12px", fontWeight:600, cursor:kmlGenerating?"wait":"pointer", opacity:kmlGenerating?0.7:1, fontFamily:"'DM Sans',sans-serif" }}>{kmlGenerating ? "⏳ Geocoding venues…" : "⬇ Download KML — Open All Pins in Google Maps"}</button>
           </div>
         </div>
 
