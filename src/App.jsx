@@ -3506,8 +3506,8 @@ function GearPage({ onClose }) {
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(min(280px,100%),1fr))", gap:"20px" }}>
           {filtered.map(item => (
             <div key={item.id} className="tc-lift" style={{ background:C.white, border:`1px solid ${C.tide}`, borderRadius:"16px", overflow:"hidden", display:"flex", flexDirection:"column", transition:"transform .15s,box-shadow .15s,border-color .15s" }}>
-              <div style={{ width:"100%", height:"200px", overflow:"hidden", background:C.seafoam, display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <img src={item.image} alt={item.name} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} onError={e => { e.target.style.display="none"; }} />
+              <div style={{ width:"100%", height:"200px", overflow:"hidden", background:"#fff", display:"flex", alignItems:"center", justifyContent:"center", padding:"16px", boxSizing:"border-box" }}>
+                <img src={item.image} alt={item.name} style={{ maxWidth:"100%", maxHeight:"100%", objectFit:"contain", display:"block" }} onError={e => { e.target.style.display="none"; }} />
               </div>
               <div style={{ padding:"16px 18px", flex:1, display:"flex", flexDirection:"column", gap:"8px" }}>
                 <div style={{ fontSize:"10px", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.1em", color:C.amber }}>{item.category}</div>
