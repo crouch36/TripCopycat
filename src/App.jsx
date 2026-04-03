@@ -3484,10 +3484,8 @@ const GEAR_CATEGORIES = ["All", "Family Travel", "Sleep & Rest", "Power & Adapte
 function GearPage({ onClose }) {
   const [activeCategory, setActiveCategory] = useState("All");
   const filtered = activeCategory === "All" ? GEAR_ITEMS : GEAR_ITEMS.filter(g => g.category === activeCategory);
-
   return (
     <div style={{ minHeight:"100vh", background:C.seafoam, fontFamily:"'DM Sans',sans-serif" }}>
-      {/* Header */}
       <div style={{ background:C.slate, padding:"32px 32px 28px", borderBottom:`1px solid rgba(196,168,130,0.2)` }}>
         <div style={{ maxWidth:"960px", margin:"0 auto" }}>
           <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.15)", color:"rgba(255,255,255,0.7)", borderRadius:"8px", padding:"6px 14px", cursor:"pointer", fontSize:"12px", marginBottom:"20px", fontFamily:"inherit" }}>← Back</button>
@@ -3497,8 +3495,6 @@ function GearPage({ onClose }) {
           <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.4)", background:"rgba(255,255,255,0.06)", display:"inline-block", padding:"4px 12px", borderRadius:"20px" }}>Some links are affiliate links — commissions help keep TripCopycat free and never cost you more.</div>
         </div>
       </div>
-
-      {/* Category filter */}
       <div style={{ background:C.white, borderBottom:`1px solid ${C.tide}`, padding:"0 32px" }}>
         <div style={{ maxWidth:"960px", margin:"0 auto", display:"flex", gap:"4px", overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
           {GEAR_CATEGORIES.map(cat => (
@@ -3506,8 +3502,6 @@ function GearPage({ onClose }) {
           ))}
         </div>
       </div>
-
-      {/* Grid */}
       <div style={{ maxWidth:"960px", margin:"0 auto", padding:"32px 24px" }}>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(min(280px,100%),1fr))", gap:"20px" }}>
           {filtered.map(item => (
@@ -3540,7 +3534,7 @@ function GearPage({ onClose }) {
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [showGear, setShowGear] = useState(false);
+  const [showGear, setShowGear] = useState(window.location.pathname === "/gear");
   const [trips, setTrips] = useState(SAMPLE_TRIPS);
   const [dbTrips, setDbTrips] = useState(() => {
     try {
@@ -3813,9 +3807,9 @@ export default function App() {
             <span style={{ fontSize:"9px", background:C.seafoamDeep, color:C.azureDeep, fontWeight:700, padding:"2px 7px", borderRadius:"20px", border:`1px solid ${C.tide}` }}>beta</span>
           </div>
           <div style={{ display:"flex", gap:"7px" }}>
-            <button onClick={() => { window.history.pushState(null, "", "/gear"); window.location.reload(); }} style={{ background:"transparent", color:C.slate, border:`1px solid ${C.tide}`, borderRadius:"6px", padding:"6px 14px", fontSize:"11px", fontWeight:500, cursor:"pointer", whiteSpace:"nowrap" }}>Gear We Love</button>
-            {!isAdmin && <button onClick={() => openSubmit()} style={{ background:"transparent", color:C.slate, border:`1.5px solid ${C.slate}`, borderRadius:"6px", padding:"6px 14px", fontSize:"11px", fontWeight:500, cursor:"pointer", whiteSpace:"nowrap", position:"relative" }}>
-              + Submit a Trip
+            {!isMobile && <button onClick={() => { setShowGear(true); window.history.pushState(null, "", "/gear"); }} style={{ background:"#C1692A", color:"#FAF7F2", border:"none", borderRadius:"6px", padding:"6px 14px", fontSize:"11px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>Gear We Love</button>}
+            {!isAdmin && <button onClick={() => openSubmit()} style={{ background:"transparent", color:C.slate, border:`1.5px solid ${C.slate}`, borderRadius:"6px", padding:isMobile?"6px 10px":"6px 14px", fontSize:"11px", fontWeight:500, cursor:"pointer", whiteSpace:"nowrap", position:"relative" }}>
+              {isMobile ? "+" : "+ Submit a Trip"}
               {hasDraft && <span style={{ position:"absolute", top:"-4px", right:"-4px", width:"8px", height:"8px", borderRadius:"50%", background:C.amber, border:`1.5px solid ${C.white}` }} />}
             </button>}
             {isAdmin && <button onClick={() => setShowAnalytics(true)} style={{ background:"rgba(91,143,185,0.12)", color:C.azureDeep, border:`1px solid ${C.azure}44`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>📊 Analytics</button>}
@@ -3948,6 +3942,20 @@ export default function App() {
             </div>
           )}
 
+          {/* Gear We Love banner — desktop only, above trip grid */}
+          {!isMobile && (
+            <div onClick={() => { setShowGear(true); window.history.pushState(null, "", "/gear"); }} style={{ background:C.slate, backgroundImage:"radial-gradient(rgba(196,168,130,0.12) 1px,transparent 1px)", backgroundSize:"12px 12px", borderRadius:"12px", padding:"20px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"20px", cursor:"pointer", border:`1px solid rgba(196,168,130,0.2)` }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"18px" }}>
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="15" stroke="#C4A882" strokeWidth="1.5" fill="none"/><circle cx="20" cy="20" r="5" stroke="#C4A882" strokeWidth="1.2" fill="none"/><line x1="20" y1="5" x2="20" y2="11" stroke="#C4A882" strokeWidth="1.5"/><line x1="20" y1="29" x2="20" y2="35" stroke="#C4A882" strokeWidth="1.5"/><line x1="5" y1="20" x2="11" y2="20" stroke="#C4A882" strokeWidth="1.5"/><line x1="29" y1="20" x2="35" y2="20" stroke="#C4A882" strokeWidth="1.5"/></svg>
+                <div>
+                  <div style={{ fontSize:"16px", fontWeight:800, color:"#FAF7F2", fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"4px" }}>Gear We Love</div>
+                  <div style={{ fontSize:"12px", color:"rgba(196,168,130,0.85)" }}>Handpicked travel essentials from real family trips — personally tested.</div>
+                </div>
+              </div>
+              <button onClick={e => { e.stopPropagation(); setShowGear(true); window.history.pushState(null, "", "/gear"); }} style={{ background:"#C1692A", color:"#FAF7F2", border:"none", borderRadius:"8px", padding:"10px 20px", fontSize:"12px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"inherit", flexShrink:0 }}>Browse now →</button>
+            </div>
+          )}
+
           {/* Featured section — only show when no active filters */}
           {!search && region==="All Regions" && tag==="All" && duration==="Any Length" && sortBy==="default" && (() => {
             const featuredTrips = allTrips.filter(t => t.featured);
@@ -4050,6 +4058,7 @@ export default function App() {
         </div>
       )}
 
+      {showGear     && <GearPage onClose={() => { setShowGear(false); window.history.pushState(null, "", "/"); }} />}
       {selected      && <TripModal trip={selected} onClose={closeTrip} allTrips={allTrips} isBookmarked={bookmarks.includes(selected.id)} onBookmark={toggleBookmark} />}
       {showAdd       && <AddTripModal onClose={() => setShowAdd(false)} onAdd={t => setTrips(p=>[t,...p])} />}
       {showImport    && <SmartImportHub onClose={() => setShowImport(false)} onPhotoComplete={(data) => { setPhotoImportData(data); setShowImport(false); openSubmit(); }} />}
