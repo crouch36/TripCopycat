@@ -3956,7 +3956,7 @@ export default function App() {
           ) : (
             <div onClick={() => { setShowGear(true); window.history.pushState(null, "", "/gear"); }} style={{ background:C.slate, backgroundImage:"radial-gradient(rgba(196,168,130,0.12) 1px,transparent 1px)", backgroundSize:"12px 12px", borderRadius:"12px", padding:"20px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"20px", cursor:"pointer", border:`1px solid rgba(196,168,130,0.2)` }}>
               <div style={{ display:"flex", alignItems:"center", gap:"18px" }}>
-                <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="15" stroke="#C4A882" strokeWidth="1.5" fill="none"/><circle cx="20" cy="20" r="5" stroke="#C4A882" strokeWidth="1.2" fill="none"/><line x1="20" y1="5" x2="20" y2="11" stroke="#C4A882" strokeWidth="1.5"/><line x1="20" y1="29" x2="20" y2="35" stroke="#C4A882" strokeWidth="1.5"/><line x1="5" y1="20" x2="11" y2="20" stroke="#C4A882" strokeWidth="1.5"/><line x1="29" y1="20" x2="35" y2="20" stroke="#C4A882" strokeWidth="1.5"/></svg>
+                <span style={{ fontSize:"32px" }}>🎒</span>
                 <div>
                   <div style={{ fontSize:"16px", fontWeight:800, color:"#FAF7F2", fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"4px" }}>Gear We Love</div>
                   <div style={{ fontSize:"12px", color:"rgba(196,168,130,0.85)" }}>Handpicked travel essentials from real family trips — personally tested.</div>
