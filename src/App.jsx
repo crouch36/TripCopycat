@@ -3485,7 +3485,7 @@ function GearPage({ onClose }) {
   const [activeCategory, setActiveCategory] = useState("All");
   const filtered = activeCategory === "All" ? GEAR_ITEMS : GEAR_ITEMS.filter(g => g.category === activeCategory);
   return (
-    <div style={{ minHeight:"100vh", background:C.seafoam, fontFamily:"'DM Sans',sans-serif" }}>
+    <div style={{ position:"fixed", inset:0, zIndex:1500, background:C.seafoam, fontFamily:"'DM Sans',sans-serif", overflowY:"auto" }}>
       <div style={{ background:C.slate, padding:"32px 32px 28px", borderBottom:`1px solid rgba(196,168,130,0.2)` }}>
         <div style={{ maxWidth:"960px", margin:"0 auto" }}>
           <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.15)", color:"rgba(255,255,255,0.7)", borderRadius:"8px", padding:"6px 14px", cursor:"pointer", fontSize:"12px", marginBottom:"20px", fontFamily:"inherit" }}>← Back</button>
