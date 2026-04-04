@@ -3546,9 +3546,40 @@ const SAMPLE_AI_ALTERNATIVES = {
 
 function SampleBlueprintPage({ onClose, setShowGear }) {
   const [kmlLoading, setKmlLoading] = useState(false);
+  const [mapUrl, setMapUrl] = useState("");
   const trip = SAMPLE_TRIP;
+  const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_KEY || "";
 
-  const generateKML = async () => {
+  // Geocode venues and build Static Maps URL with pins on load
+  useEffect(() => {
+    if (!mapsKey) return;
+    const geocode = async (name) => {
+      try {
+        const q = encodeURIComponent(name + " " + trip.destination);
+        const res = await fetch("https://photon.komoot.io/api/?q=" + q + "&limit=1");
+        const data = await res.json();
+        const coords = data?.features?.[0]?.geometry?.coordinates;
+        if (coords) return { lon: coords[0], lat: coords[1] };
+      } catch {}
+      return null;
+    };
+    const buildMap = async () => {
+      const colors = { hotels:"red", restaurants:"blue", bars:"purple", activities:"green" };
+      const markerGroups = [];
+      for (const [cat, color] of Object.entries(colors)) {
+        const venues = (trip[cat] || []).filter(v => v.item).slice(0, 3);
+        for (const v of venues) {
+          const coords = await geocode(v.item);
+          if (coords) markerGroups.push(`markers=color:${color}%7C${coords.lat},${coords.lon}`);
+        }
+      }
+      if (markerGroups.length > 0) {
+        const url = `https://maps.googleapis.com/maps/api/staticmap?size=800x400&maptype=roadmap&${markerGroups.join("&")}&key=${mapsKey}`;
+        setMapUrl(url);
+      }
+    };
+    buildMap();
+  }, [mapsKey]);
     setKmlLoading(true);
     const cats = [{key:"hotels",color:"ff0000ff",label:"Hotels"},{key:"restaurants",color:"ff00ff00",label:"Restaurants"},{key:"bars",color:"ffff00ff",label:"Bars"},{key:"activities",color:"ffffff00",label:"Activities"}];
     const geocode = async (name) => {
@@ -3577,8 +3608,6 @@ function SampleBlueprintPage({ onClose, setShowGear }) {
     a.click();
     setKmlLoading(false);
   };
-
-  const mapsKey = typeof window !== "undefined" && window.__mapsKey ? window.__mapsKey : "";
 
   return (
     <div style={{minHeight:"100vh",background:C.seafoam,fontFamily:"'DM Sans',sans-serif"}}>
@@ -3664,9 +3693,14 @@ function SampleBlueprintPage({ onClose, setShowGear }) {
         </div>
         {/* Map */}
         <div style={{background:C.white,borderRadius:"16px",padding:"24px 28px",marginBottom:"20px",border:`1px solid ${C.tide}`}}>
-          <div style={{fontSize:"11px",fontWeight:700,color:C.amber,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"14px"}}>🗺 Map</div>
-          <iframe title="Amalfi Coast Map" width="100%" height="300" style={{border:0,borderRadius:"8px"}} loading="lazy"
-            src={`https://www.google.com/maps/embed/v1/search?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY||""}&q=Positano,Amalfi+Coast,Italy`}/>
+          <div style={{fontSize:"11px",fontWeight:700,color:C.amber,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"14px"}}>🗺 Map — Venue Pins</div>
+          {mapUrl ? (
+            <img src={mapUrl} alt="Trip venues map" style={{width:"100%",borderRadius:"8px",display:"block"}} />
+          ) : (
+            <div style={{width:"100%",height:"300px",background:C.seafoam,borderRadius:"8px",display:"flex",alignItems:"center",justifyContent:"center",color:C.muted,fontSize:"13px"}}>
+              Loading map pins…
+            </div>
+          )}
           <div style={{marginTop:"12px"}}>
             <button onClick={generateKML} disabled={kmlLoading} style={{padding:"8px 16px",borderRadius:"8px",border:`1px solid ${C.tide}`,background:C.seafoam,color:C.slate,fontSize:"12px",fontWeight:600,cursor:"pointer"}}>{kmlLoading?"Geocoding venues…":"⬇ Download KML — Open All Pins in Google Maps"}</button>
           </div>
@@ -3984,6 +4018,13 @@ function BlueprintPage({ tripId, onClose }) {
 export default function App() {
   const [showGear, setShowGear] = useState(window.location.pathname === "/gear");
   const [showSampleBlueprint, setShowSampleBlueprint] = useState(window.location.pathname === "/blueprint/sample");
+
+  // Keep showSampleBlueprint in sync with URL
+  useEffect(() => {
+    const handlePop = () => setShowSampleBlueprint(window.location.pathname === "/blueprint/sample");
+    window.addEventListener("popstate", handlePop);
+    return () => window.removeEventListener("popstate", handlePop);
+  }, []);
   const [trips, setTrips] = useState(SAMPLE_TRIPS);
   const [dbTrips, setDbTrips] = useState(() => {
     try {
