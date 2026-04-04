@@ -995,12 +995,12 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                 <div style={{ marginTop:"4px", fontSize:"14px", color:"rgba(255,255,255,0.95)", fontWeight:500, textShadow:"0 1px 4px rgba(0,0,0,0.5)" }}>{trip.destination}</div>
               </div>
               <div style={{ display:"flex", gap:"5px", flexWrap:"wrap", justifyContent:"flex-end", alignSelf:"flex-start" }}>
-                  <button title="Copy link to this trip" onClick={handleShare} onTouchEnd={e=>{e.preventDefault();handleShare();}} style={{ background:"rgba(255,255,255,0.15)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>{shareCopied ? "✓" : "🔗"}</button>
-                  <button title="Share on X (Twitter)" onClick={handleTwitterShare} onTouchEnd={e=>{e.preventDefault();handleTwitterShare();}} style={{ background:"rgba(255,255,255,0.15)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>𝕏</button>
-                  <button title={isBookmarked ? "Remove bookmark" : "Bookmark this trip"} onClick={() => onBookmark && onBookmark(trip.id)} onTouchEnd={e=>{e.preventDefault(); onBookmark && onBookmark(trip.id);}} style={{ background:"rgba(255,255,255,0.15)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>{isBookmarked ? "🔖" : "🏷️"}</button>
-                  <button title="Export itinerary as plain text" onClick={() => setShowExport(true)} onTouchEnd={e=>{e.preventDefault();setShowExport(true);}} style={{ background:"rgba(255,255,255,0.15)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>📤</button>
-                  {/* Blueprint purchase button — visible to all */}
-                  {(() => {
+                  <button onClick={handleShare} onTouchEnd={e=>{e.preventDefault();handleShare();}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>{shareCopied ? "✓" : "🔗"}</button>
+                  <button onClick={handleTwitterShare} onTouchEnd={e=>{e.preventDefault();handleTwitterShare();}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>𝕏</button>
+                  <button onClick={() => onBookmark && onBookmark(trip.id)} onTouchEnd={e=>{e.preventDefault(); onBookmark && onBookmark(trip.id);}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>{isBookmarked ? "🔖" : "🏷️"}</button>
+                  <button onClick={() => setShowExport(true)} onTouchEnd={e=>{e.preventDefault();setShowExport(true);}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>📤</button>
+                  {/* Blueprint purchase button — admin only until launch */}
+                  {isAdmin && (() => {
                     const handleBlueprint = async () => {
                       try {
                         const res = await fetch("/api/create-checkout", {
@@ -1016,7 +1016,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                       }
                     };
                     return (
-                      <button title="Get a premium PDF export with AI suggestions, Google Maps pins & shareable link" onClick={handleBlueprint} onTouchEnd={e=>{e.preventDefault();handleBlueprint();}} style={{ background:"#FAF7F2", color:"#1C2B3A", border:"2px solid #C4A882", borderRadius:"6px", padding:"5px 12px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap", display:"inline-flex", alignItems:"center", gap:"7px" }}>
+                      <button onClick={handleBlueprint} onTouchEnd={e=>{e.preventDefault();handleBlueprint();}} style={{ background:"#FAF7F2", color:"#1C2B3A", border:"2px solid #C4A882", borderRadius:"6px", padding:"5px 12px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap", display:"inline-flex", alignItems:"center", gap:"7px" }}>
                         <span style={{ display:"inline-block", transform:"rotate(-45deg)", fontSize:"13px", lineHeight:1, color:"#C4A882" }}>▲</span>
                         GET BLUEPRINT
                         <span style={{ background:"#1C2B3A", color:"#C4A882", fontSize:"9px", fontWeight:700, padding:"1px 6px", borderRadius:"20px", letterSpacing:"0.05em" }}>PREMIUM</span>
@@ -1121,37 +1121,6 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                 <button onClick={() => setView("daily")} style={{ width:"100%", padding:"12px", background:C.cta, color:C.white, border:"none", borderRadius:"10px", fontSize:"13px", fontWeight:700, cursor:"pointer" }}>
                   📅 View Day-by-Day Itinerary →
                 </button>
-
-                {/* Blueprint CTA banner */}
-                {(() => {
-                  const handleBlueprint = async () => {
-                    try {
-                      const res = await fetch("/api/create-checkout", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ tripId: trip.id, tripTitle: trip.title }),
-                      });
-                      const { url, error } = await res.json();
-                      if (error) { alert("Could not start checkout: " + error); return; }
-                      window.location.href = url;
-                    } catch (e) {
-                      alert("Checkout failed. Please try again.");
-                    }
-                  };
-                  return (
-                    <div style={{ marginTop:"14px", background:C.slate, backgroundImage:"radial-gradient(rgba(196,168,130,0.1) 1px,transparent 1px)", backgroundSize:"10px 10px", borderRadius:"12px", padding:"16px 20px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:"12px", flexWrap:"wrap" }}>
-                      <div>
-                        <div style={{ fontSize:"13px", fontWeight:800, color:"#FAF7F2", fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"4px" }}>Get the Full Trip Blueprint</div>
-                        <div style={{ fontSize:"11px", color:"rgba(196,168,130,0.85)", lineHeight:1.5 }}>AI alternatives · Day-by-day PDF · Google Maps pins · Shareable link</div>
-                      </div>
-                      <button onClick={handleBlueprint} style={{ background:"#FAF7F2", color:"#1C2B3A", border:"2px solid #C4A882", borderRadius:"6px", padding:"8px 16px", cursor:"pointer", fontSize:"12px", fontWeight:700, whiteSpace:"nowrap", display:"inline-flex", alignItems:"center", gap:"7px", flexShrink:0 }}>
-                        <span style={{ display:"inline-block", transform:"rotate(-45deg)", fontSize:"13px", lineHeight:1, color:"#C4A882" }}>▲</span>
-                        GET BLUEPRINT
-                        <span style={{ background:"#C4A882", color:"#1C2B3A", fontSize:"9px", fontWeight:700, padding:"1px 6px", borderRadius:"20px" }}>$1.99</span>
-                      </button>
-                    </div>
-                  );
-                })()}
               </div>
             </div>
           )}
@@ -3543,6 +3512,209 @@ function LegalModal({ onClose }) {
 }
 
 
+// ── Sample Blueprint Page ─────────────────────────────────────────────────────
+// Static sample using Amalfi Coast trip — no payment required
+// Route: /blueprint/sample
+
+const SAMPLE_TRIP = {
+  id: "797fcf29-1f16-410f-bdc8-32446d816209",
+  title: "Amalfi Coast Itinerary: Positano & Beyond",
+  destination: "Positano, Amalfi Coast, Italy",
+  region: "Europe",
+  duration: "6 nights (Oct 15–21)",
+  date: "October 2025",
+  travelers: "Couple",
+  author: "Andrew C.",
+  loves: "Positano lived up to its post-card reputation. The cooking class at Amalfi Heaven Gardens was amazing — even my wife who was initially skeptical called it her highlight. Posides café was a gem where we lingered and connected with the owner and staff over excellent fresh food and housemade pasta. Dinner at Il Tridente delivered incredible atmosphere — a candlelit balcony overlooking the twinkling lights of Positano at night. The Amalfi Coast ferry system made day-tripping to Amalfi and Capri effortless and scenic.",
+  doNext: "We would likely skip Naples next time — it was overcrowded with cruise tourists and the food didn't justify the detour. Use it only as a logistical overnight if your flight requires it.",
+  hotels: [{ item:"Hotel Miramare", detail:"Positano", tip:"Book well in advance — fills up fast" }, { item:"Hotel Santa Lucia", detail:"Naples", tip:"Good location for early flights" }],
+  restaurants: [{ item:"Posides Café", detail:"Positano — fresh food, housemade pasta", tip:"Linger and connect with the owners" }, { item:"Il Tridente", detail:"Positano — candlelit balcony", tip:"Reserve the balcony table" }, { item:"Saraceno D'Oro", detail:"Positano — streetside pizza patio", tip:"Best pizza of the trip" }, { item:"Villa Verde", detail:"Capri", tip:"Great lunch spot" }, { item:"Casa Mele", detail:"Capri — modern Italian", tip:"Try the Taurasi wine" }, { item:"Al Ruotolo", detail:"Naples — second best pizza", tip:"Very affordable" }],
+  bars: [{ item:"Don't Worry Bar", detail:"Positano — speakeasy jazz vibes", tip:"Go after dinner" }, { item:"Hotel Palazzo Murat", detail:"Positano patio drinks", tip:"Stunning setting" }, { item:"Il Capitano", detail:"Positano — coastal views", tip:"Perfect for sunset" }],
+  activities: [{ item:"Amalfi Heaven Gardens Cooking Class", detail:"Made gnocchi with excellent hosts", tip:"Book ahead — trip highlight" }, { item:"Cathedral of Sant'Andrea", detail:"Amalfi — historic landmark", tip:"Go early to avoid crowds" }, { item:"Ferry to Capri", detail:"Scenic day trip", tip:"Buy tickets the night before" }, { item:"Ferry to Amalfi", detail:"Easy day trip from Positano", tip:"Check schedule in advance" }],
+  days: [
+    { day:1, date:"Oct 15", title:"Arrival in Positano", items:[{ time:"Afternoon", type:"hotel", label:"Hotel Miramare", note:"Check in and settle" }, { time:"Morning", type:"restaurant", label:"Posides Café", note:"Fresh food, friendly staff" }, { time:"Evening", type:"bar", label:"Don't Worry Bar", note:"Speakeasy jazz vibes" }, { time:"Dinner", type:"restaurant", label:"Saraceno D'Oro", note:"Best pizza of the trip on the streetside patio" }] },
+    { day:2, date:"Oct 16", title:"Exploring Positano", items:[{ time:"Morning", type:"restaurant", label:"Breakfast at hotel", note:"" }, { time:"Midday", type:"bar", label:"Hotel Palazzo Murat patio", note:"Stunning setting" }, { time:"Lunch", type:"restaurant", label:"Posides Café", note:"Housemade pasta" }, { time:"Afternoon", type:"bar", label:"Il Capitano", note:"Stunning coastal views" }, { time:"Dinner", type:"restaurant", label:"Il Tridente", note:"Unforgettable balcony atmosphere" }, { time:"Late", type:"activity", label:"Gelato on the street", note:"" }] },
+    { day:3, date:"Oct 17", title:"Day Trip to Amalfi", items:[{ time:"Morning", type:"restaurant", label:"Breakfast at hotel", note:"" }, { time:"Late Morning", type:"activity", label:"Ferry to Amalfi", note:"Scenic coastal ride" }, { time:"Midday", type:"activity", label:"Cathedral of Sant'Andrea", note:"Go early to avoid crowds" }, { time:"Afternoon", type:"bar", label:"Local brewery stop", note:"" }, { time:"Evening", type:"activity", label:"Amalfi Gardens Cooking Class", note:"Made gnocchi — trip highlight" }] },
+    { day:4, date:"Oct 18", title:"Day Trip to Capri", items:[{ time:"Morning", type:"activity", label:"Ferry to Capri", note:"Scenic day trip — buy tickets night before" }, { time:"Lunch", type:"restaurant", label:"Villa Verde", note:"Great lunch spot" }, { time:"Dinner", type:"restaurant", label:"Casa Mele", note:"Modern Italian — try the Taurasi" }] },
+    { day:5, date:"Oct 19", title:"Travel to Naples", items:[{ time:"Morning", type:"hotel", label:"Check out of Hotel Miramare", note:"" }, { time:"Midday", type:"activity", label:"Ferry to Naples", note:"" }, { time:"Evening", type:"restaurant", label:"Al Ruotolo", note:"Second best pizza of the trip" }, { time:"Dinner", type:"restaurant", label:"Bechamel di Giorgio Di Fusco", note:"Great value trattoria" }] },
+    { day:6, date:"Oct 20", title:"Departure", items:[{ time:"Morning", type:"activity", label:"Departed Naples for home via Dublin", note:"" }] },
+  ],
+  image: null,
+  focalPoint: { x:50, y:50 },
+  tags: ["romantic", "food & wine", "culture", "beach", "scenic drives"],
+};
+
+const SAMPLE_AI_ALTERNATIVES = {
+  hotels: [{ name:"Le Sirenuse", reason:"Iconic luxury hotel in Positano — if budget allows, the views are unmatched" }, { name:"Casa Mariantonia", reason:"Charming boutique on Capri, perfect base for island exploration" }],
+  restaurants: [{ name:"La Sponda at Le Sirenuse", reason:"Candlelit terrace dining — the most romantic restaurant on the coast" }, { name:"Da Adolfo", reason:"Legendary beach restaurant only accessible by boat — a unique Positano experience" }],
+  bars: [{ name:"Music on the Rocks", reason:"Built into a cliff cave — legendary Positano nightspot" }, { name:"Bar Calypso", reason:"Beachside bar with great aperitivo hour" }],
+  activities: [{ name:"Path of the Gods hike", reason:"Stunning clifftop trail with panoramic coast views — one of Italy's best walks" }, { name:"Private boat tour", reason:"Charter a small boat for the day to reach hidden coves and grottos" }],
+};
+
+function SampleBlueprintPage({ onClose }) {
+  const trip = SAMPLE_TRIP;
+  const catConfig = { hotels:"🏨", restaurants:"🍽", bars:"🍸", activities:"🎯" };
+
+  const generateKML = async () => {
+    const cats = [
+      { key:"hotels", color:"ff0000ff", label:"Hotels" },
+      { key:"restaurants", color:"ff00ff00", label:"Restaurants" },
+      { key:"bars", color:"ffff00ff", label:"Bars" },
+      { key:"activities", color:"ffffff00", label:"Activities" },
+    ];
+    const geocode = async (name) => {
+      try {
+        const q = encodeURIComponent(`${name} ${trip.destination}`);
+        const res = await fetch(`https://photon.komoot.io/api/?q=${q}&limit=1`);
+        const data = await res.json();
+        const coords = data?.features?.[0]?.geometry?.coordinates;
+        if (coords) return { lon: coords[0], lat: coords[1] };
+      } catch {}
+      return null;
+    };
+    const placemarkParts = [];
+    for (const cat of cats) {
+      const venues = (trip[cat.key] || []).filter(p => p.item);
+      for (const p of venues) {
+        const coords = await geocode(p.item);
+        const pointTag = coords ? `<Point><coordinates>${coords.lon},${coords.lat},0</coordinates></Point>` : "";
+        placemarkParts.push(`<Placemark><n>${p.item}</n><description>${cat.label}${p.detail ? " — " + p.detail : ""}${p.tip ? " | Tip: " + p.tip : ""}</description><Style><IconStyle><color>${cat.color}</color></IconStyle></Style>${pointTag}</Placemark>`);
+      }
+    }
+    const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><n>${trip.title}</n><description>Sample Trip Blueprint from TripCopycat</description>${placemarkParts.join("")}</Document></kml>`;
+    const blob = new Blob([kml], { type:"application/vnd.google-earth.kml+xml" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "amalfi-coast-sample-blueprint.kml";
+    a.click();
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", background:C.seafoam, fontFamily:"'DM Sans',sans-serif" }}>
+
+      {/* Sample banner */}
+      <div style={{ background:"linear-gradient(135deg,#1D6A3A,#2D9A57)", padding:"10px 24px", textAlign:"center", color:"#fff", fontSize:"13px", fontWeight:600 }}>
+        ✦ This is a free sample Blueprint — <span style={{ textDecoration:"underline", cursor:"pointer" }} onClick={onClose}>browse trips on TripCopycat</span> and get your own for $1.99
+      </div>
+
+      {/* Header */}
+      <div style={{ background:C.slate, padding:"32px 40px", position:"relative", overflow:"hidden" }}>
+        <div style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(rgba(196,168,130,0.08) 1px,transparent 1px)", backgroundSize:"20px 20px" }} />
+        <div style={{ position:"relative", maxWidth:"800px", margin:"0 auto" }}>
+          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.15)", color:"rgba(255,255,255,0.7)", borderRadius:"8px", padding:"6px 14px", cursor:"pointer", fontSize:"12px", marginBottom:"20px", fontFamily:"inherit" }}>← Back to TripCopycat</button>
+          <div style={{ fontSize:"11px", fontWeight:700, color:C.amber, textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:"10px" }}>{trip.region} · {trip.duration} · {trip.date}</div>
+          <h1 style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:"34px", fontWeight:900, color:"#fff", margin:"0 0 8px", lineHeight:1.1 }}>{trip.title}</h1>
+          <div style={{ fontSize:"15px", color:"rgba(255,255,255,0.8)", marginBottom:"6px" }}>{trip.destination}</div>
+          <div style={{ fontSize:"13px", color:C.amber, marginBottom:"24px" }}>by {trip.author} · {trip.travelers}</div>
+          <div style={{ display:"flex", gap:"10px", flexWrap:"wrap", fontFamily:"'DM Sans',sans-serif" }}>
+            <button onClick={() => window.print()} style={{ padding:"10px 20px", borderRadius:"8px", border:"none", background:C.amber, color:C.slate, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>⬇ Download PDF</button>
+            <button onClick={generateKML} style={{ padding:"10px 20px", borderRadius:"8px", border:"1px solid rgba(196,168,130,0.5)", background:"transparent", color:C.amber, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>🗺 Open in Google Maps</button>
+            <button onClick={() => { navigator.clipboard.writeText(window.location.href); alert("Link copied!"); }} style={{ padding:"10px 20px", borderRadius:"8px", border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"rgba(255,255,255,0.8)", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>🔗 Share Sample</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ maxWidth:"800px", margin:"0 auto", padding:"32px 24px" }}>
+
+        {/* Loves */}
+        <div style={{ background:C.white, borderRadius:"16px", padding:"24px 28px", marginBottom:"20px", border:`1px solid ${C.tide}` }}>
+          <div style={{ fontSize:"11px", fontWeight:700, color:C.amber, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:"10px" }}>❤️ What the traveler loved</div>
+          <p style={{ fontSize:"15px", color:C.slate, lineHeight:1.75, fontFamily:"'DM Sans',sans-serif", margin:0 }}>{trip.loves}</p>
+        </div>
+
+        {/* Do Next */}
+        <div style={{ background:C.white, borderRadius:"16px", padding:"24px 28px", marginBottom:"20px", border:`1px solid ${C.tide}` }}>
+          <div style={{ fontSize:"11px", fontWeight:700, color:C.amber, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:"10px" }}>🔄 What they'd do differently</div>
+          <p style={{ fontSize:"15px", color:C.slate, lineHeight:1.75, fontFamily:"'DM Sans',sans-serif", margin:0 }}>{trip.doNext}</p>
+        </div>
+
+        {/* Day-by-day */}
+        <div style={{ background:C.white, borderRadius:"16px", padding:"24px 28px", marginBottom:"20px", border:`1px solid ${C.tide}` }}>
+          <div style={{ fontSize:"11px", fontWeight:700, color:C.amber, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:"20px" }}>📅 Day-by-Day Itinerary</div>
+          {trip.days.map((day, di) => (
+            <div key={di} style={{ marginBottom:"24px" }}>
+              <div style={{ fontSize:"14px", fontWeight:800, color:C.slate, marginBottom:"12px", paddingBottom:"8px", borderBottom:`2px solid ${C.tide}` }}>Day {day.day} — {day.title} · {day.date}</div>
+              <div style={{ position:"relative", paddingLeft:"20px" }}>
+                <div style={{ position:"absolute", left:"6px", top:0, bottom:0, width:"2px", background:C.tide }} />
+                {day.items.map((item, ii) => (
+                  <div key={ii} style={{ position:"relative", marginBottom:"12px", fontFamily:"'DM Sans',sans-serif" }}>
+                    <div style={{ position:"absolute", left:"-17px", top:"4px", width:"10px", height:"10px", borderRadius:"50%", background:C.amber, border:`2px solid ${C.white}` }} />
+                    {item.time && <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, marginBottom:"2px" }}>{item.time}</div>}
+                    <div style={{ fontSize:"13px", fontWeight:600, color:C.slate }}>{item.label}</div>
+                    {item.note && <div style={{ fontSize:"12px", color:C.slateLight, marginTop:"2px" }}>{item.note}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Venue details */}
+        {["hotels","restaurants","bars","activities"].map(cat => (
+          trip[cat]?.length > 0 && (
+            <div key={cat} style={{ background:C.white, borderRadius:"16px", padding:"24px 28px", marginBottom:"20px", border:`1px solid ${C.tide}` }}>
+              <div style={{ fontSize:"11px", fontWeight:700, color:C.amber, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:"14px" }}>{catConfig[cat]} {cat.charAt(0).toUpperCase()+cat.slice(1)}</div>
+              {trip[cat].map((item, idx) => (
+                <div key={idx} style={{ padding:"10px 0", borderBottom:`1px solid ${C.seafoam}`, fontFamily:"'DM Sans',sans-serif" }}>
+                  <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>{item.item}</div>
+                  {item.detail && <div style={{ fontSize:"12px", color:C.slateLight, marginTop:"2px" }}>{item.detail}</div>}
+                  {item.tip && <div style={{ fontSize:"12px", color:C.amber, marginTop:"4px" }}>💡 {item.tip}</div>}
+                </div>
+              ))}
+            </div>
+          )
+        ))}
+
+        {/* AI Alternatives */}
+        <div style={{ background:C.white, borderRadius:"16px", padding:"24px 28px", marginBottom:"20px", border:`1px solid ${C.tide}` }}>
+          <div style={{ fontSize:"11px", fontWeight:700, color:C.amber, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:"14px" }}>✨ AI-Suggested Alternatives</div>
+          {Object.entries(SAMPLE_AI_ALTERNATIVES).map(([cat, alts]) => (
+            <div key={cat} style={{ marginBottom:"14px" }}>
+              <div style={{ fontSize:"12px", fontWeight:700, color:C.slate, marginBottom:"6px", fontFamily:"'DM Sans',sans-serif" }}>{catConfig[cat]} Alternative {cat}</div>
+              {alts.map((a, i) => (
+                <div key={i} style={{ padding:"8px 12px", background:C.seafoam, borderRadius:"8px", marginBottom:"6px", fontFamily:"'DM Sans',sans-serif" }}>
+                  <div style={{ fontSize:"13px", fontWeight:600, color:C.slate }}>{a.name}</div>
+                  <div style={{ fontSize:"12px", color:C.slateLight, marginTop:"2px" }}>{a.reason}</div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {/* Map */}
+        <div style={{ background:C.white, borderRadius:"16px", padding:"24px 28px", marginBottom:"20px", border:`1px solid ${C.tide}` }}>
+          <div style={{ fontSize:"11px", fontWeight:700, color:C.amber, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:"14px" }}>🗺 Map</div>
+          <iframe title="Amalfi Coast Map" width="100%" height="300" style={{ border:0, borderRadius:"8px" }} loading="lazy"
+            src={`https://www.google.com/maps/embed/v1/search?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY || ""}&q=Positano,Amalfi+Coast,Italy`} />
+          <div style={{ marginTop:"12px" }}>
+            <button onClick={generateKML} style={{ padding:"8px 16px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.seafoam, color:C.slate, fontSize:"12px", fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>⬇ Download KML — Open All Pins in Google Maps</button>
+          </div>
+        </div>
+
+        {/* CTA to purchase */}
+        <div style={{ background:C.slate, backgroundImage:"radial-gradient(rgba(196,168,130,0.1) 1px,transparent 1px)", backgroundSize:"10px 10px", borderRadius:"16px", padding:"28px", textAlign:"center", marginBottom:"20px" }}>
+          <div style={{ fontSize:"20px", fontWeight:900, color:"#fff", fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"8px" }}>Love what you see?</div>
+          <div style={{ fontSize:"13px", color:"rgba(196,168,130,0.85)", marginBottom:"20px", lineHeight:1.6 }}>Get a full Blueprint like this for any trip on TripCopycat — AI alternatives, PDF export, Google Maps pins, and a shareable link.</div>
+          <button onClick={onClose} style={{ background:"#FAF7F2", color:"#1C2B3A", border:"2px solid #C4A882", borderRadius:"8px", padding:"12px 28px", fontSize:"13px", fontWeight:700, cursor:"pointer", display:"inline-flex", alignItems:"center", gap:"8px" }}>
+            <span style={{ display:"inline-block", transform:"rotate(-45deg)", color:"#C4A882" }}>▲</span>
+            Browse Trips & Get Your Blueprint — $1.99
+          </button>
+        </div>
+
+        {/* Footer */}
+        <div style={{ textAlign:"center", padding:"20px 0", fontFamily:"'DM Sans',sans-serif" }}>
+          <div style={{ fontSize:"12px", color:C.muted, marginBottom:"4px" }}>Generated by TripCopycat · tripcopycat.com</div>
+          <div style={{ fontSize:"11px", color:C.muted }}>Views and recommendations are those of the traveler and not of TripCopycat.</div>
+        </div>
+      </div>
+
+      <style>{`@media print { button { display: none !important; } body { background: white !important; } }`}</style>
+    </div>
+  );
+}
+
+
 // ── Gear We Love Page ─────────────────────────────────────────────────────────
 const GEAR_ITEMS = [
   { id:1, name:"Wonderfold Wagon", category:"Family Travel", description:"Goes right through airport security and gate checks for free. The only catch — you'll need a minivan or SUV rental on the other end to fit it.", personalNote:"Provided a great spot for naps while on the beach or a patio.", image:"https://m.media-amazon.com/images/I/71K1Ct2KIpL._SL1500_.jpg", affiliateUrl:"https://amzn.to/4smV8W4" },
@@ -3835,6 +4007,7 @@ function BlueprintPage({ tripId, onClose }) {
 
 export default function App() {
   const [showGear, setShowGear] = useState(window.location.pathname === "/gear");
+  const [showSampleBlueprint, setShowSampleBlueprint] = useState(window.location.pathname === "/blueprint/sample");
   const [trips, setTrips] = useState(SAMPLE_TRIPS);
   const [dbTrips, setDbTrips] = useState(() => {
     try {
@@ -3844,6 +4017,11 @@ export default function App() {
   });
 
   // Blueprint route detection
+  // Sample Blueprint route
+  if (showSampleBlueprint) {
+    return <SampleBlueprintPage onClose={() => { setShowSampleBlueprint(false); window.history.pushState(null, "", "/"); }} />;
+  }
+
   const blueprintMatch = window.location.pathname.match(/^\/blueprint\/(.+)/);
   const blueprintId = blueprintMatch ? blueprintMatch[1] : null;
   if (blueprintId) {
@@ -4245,6 +4423,20 @@ export default function App() {
                 🔖 My Saved Trips ({bookmarks.length})
               </button>
               {tag==="__bookmarks__" && <button onClick={() => setTag("All")} style={{ fontSize:"11px", color:C.muted, background:"none", border:"none", cursor:"pointer" }}>× Clear</button>}
+            </div>
+          )}
+
+          {/* Sample Blueprint banner — desktop only */}
+          {!isMobile && (
+            <div onClick={() => { setShowSampleBlueprint(true); window.history.pushState(null, "", "/blueprint/sample"); }} style={{ background:"linear-gradient(135deg,#2C1810,#3D2B1F)", backgroundImage:"radial-gradient(rgba(196,168,130,0.08) 1px,transparent 1px)", backgroundSize:"12px 12px", borderRadius:"12px", padding:"20px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"14px", cursor:"pointer", border:`1px solid rgba(196,168,130,0.25)` }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"18px" }}>
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><rect x="4" y="4" width="32" height="32" rx="3" stroke="#C4A882" strokeWidth="1.5" fill="none"/><line x1="4" y1="13" x2="36" y2="13" stroke="#C4A882" strokeWidth="0.8" opacity="0.4"/><line x1="4" y1="22" x2="36" y2="22" stroke="#C4A882" strokeWidth="0.8" opacity="0.4"/><line x1="13" y1="4" x2="13" y2="36" stroke="#C4A882" strokeWidth="0.8" opacity="0.4"/><circle cx="20" cy="20" r="5" stroke="#C4A882" strokeWidth="1.5" fill="none"/><circle cx="20" cy="20" r="1.5" fill="#C4A882"/></svg>
+                <div>
+                  <div style={{ fontSize:"16px", fontWeight:800, color:"#FAF7F2", fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"4px" }}>✦ See a Sample Trip Blueprint</div>
+                  <div style={{ fontSize:"12px", color:"rgba(196,168,130,0.85)" }}>Amalfi Coast · AI alternatives, day-by-day PDF, Google Maps pins — free preview.</div>
+                </div>
+              </div>
+              <button onClick={e => { e.stopPropagation(); setShowSampleBlueprint(true); window.history.pushState(null, "", "/blueprint/sample"); }} style={{ background:"#C4A882", color:"#1C2B3A", border:"none", borderRadius:"8px", padding:"10px 20px", fontSize:"12px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"inherit", flexShrink:0 }}>View Sample →</button>
             </div>
           )}
 
