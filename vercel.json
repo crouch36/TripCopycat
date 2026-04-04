@@ -2,6 +2,7 @@
   "rewrites": [
     { "source": "/trip/:id", "destination": "/api/trip/:id" },
     { "source": "/sitemap.xml", "destination": "/api/sitemap.xml" },
+    { "source": "/blueprint/sample", "destination": "/sample-blueprint.html" },
     { "source": "/((?!api/)(?!sitemap\\.xml$).*)", "destination": "/index.html" }
   ],
   "functions": {
