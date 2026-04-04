@@ -1504,12 +1504,18 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
 
   const uploadPhoto = async () => {
     if (!coverPhoto) return null;
-    const ext = coverPhoto.name.split(".").pop();
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error } = await supabase.storage.from("trip-photos").upload(path, coverPhoto, { contentType: coverPhoto.type, upsert: false });
-    if (error) { console.error("Photo upload error:", error); return null; }
-    const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
-    return data.publicUrl;
+    try {
+      const res = await fetch(
+        `/api/upload-image?folder=photos&type=${encodeURIComponent(coverPhoto.type)}&name=${encodeURIComponent(coverPhoto.name)}`,
+        { method: "POST", headers: { "content-type": "application/octet-stream" }, body: coverPhoto }
+      );
+      if (!res.ok) { console.error("Photo upload failed:", await res.text()); return null; }
+      const { url } = await res.json();
+      return url;
+    } catch (err) {
+      console.error("Photo upload error:", err);
+      return null;
+    }
   };
 
   const compressForUpload = (file) => new Promise(resolve => {
@@ -1535,11 +1541,17 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
       if (onProgress) onProgress(`Uploading photo ${i + 1} of ${galleryFiles.length}…`);
       const compressed = await compressForUpload(gf.file);
       if (!compressed) continue;
-      const path = `gallery-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-      const { error } = await supabase.storage.from("trip-photos").upload(path, compressed, { contentType: "image/jpeg", upsert: false });
-      if (error) { console.error("Gallery upload error:", error); continue; }
-      const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
-      urls.push({ url: data.publicUrl, caption: gf.caption || "" });
+      try {
+        const res = await fetch(
+          `/api/upload-image?folder=gallery&type=image%2Fjpeg&name=gallery.jpg`,
+          { method: "POST", headers: { "content-type": "application/octet-stream" }, body: compressed }
+        );
+        if (!res.ok) { console.error("Gallery upload failed:", await res.text()); continue; }
+        const { url } = await res.json();
+        urls.push({ url, caption: gf.caption || "" });
+      } catch (err) {
+        console.error("Gallery upload error:", err);
+      }
     }
     return urls;
   };

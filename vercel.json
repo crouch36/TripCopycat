@@ -11,6 +11,9 @@
     },
     "api/trip/[id].js": {
       "maxDuration": 10
+    },
+    "api/upload-image.js": {
+      "maxDuration": 30
     }
   }
 }
