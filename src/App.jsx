@@ -954,6 +954,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
   const [shareCopied, setShareCopied] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState(null);
   const [showRelated, setShowRelated] = useState(false);
+  const [showBlueprintPreview, setShowBlueprintPreview] = useState(false);
 
   const gallery = trip.gallery || [];
 
@@ -1025,6 +1026,9 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                     );
                   })()}
                   {/* Admin-only Instagram post button */}
+                  {isAdmin && (
+                    <button onClick={() => setShowBlueprintPreview(true)} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>🗺 Blueprint</button>
+                  )}
                   {isAdmin && (() => {
                     const handleGenPost = () => {
                       const rests = (trip.restaurants || []).slice(0,3).map(r => r.item).filter(Boolean);
@@ -1208,6 +1212,14 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
               </div>
             </div>
           )}
+        </div>
+      )}
+      {showBlueprintPreview && (
+        <div style={{ position:"fixed", inset:0, zIndex:3000 }}>
+          <BlueprintPage tripId={trip.id} onClose={() => setShowBlueprintPreview(false)} />
+          <div style={{ position:"fixed", top:"16px", right:"16px", zIndex:4000 }}>
+            <button onClick={() => setShowBlueprintPreview(false)} style={{ background:"rgba(28,43,58,0.9)", border:"1px solid rgba(255,255,255,0.2)", color:"#fff", borderRadius:"8px", padding:"8px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>✕ Close Preview</button>
+          </div>
         </div>
       )}
       {showExport && <ExportModal trip={trip} onClose={() => setShowExport(false)} />}
@@ -1504,18 +1516,12 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
 
   const uploadPhoto = async () => {
     if (!coverPhoto) return null;
-    try {
-      const res = await fetch(
-        `/api/upload-image?folder=photos&type=${encodeURIComponent(coverPhoto.type)}&name=${encodeURIComponent(coverPhoto.name)}`,
-        { method: "POST", headers: { "content-type": "application/octet-stream" }, body: coverPhoto }
-      );
-      if (!res.ok) { console.error("Photo upload failed:", await res.text()); return null; }
-      const { url } = await res.json();
-      return url;
-    } catch (err) {
-      console.error("Photo upload error:", err);
-      return null;
-    }
+    const ext = coverPhoto.name.split(".").pop();
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error } = await supabase.storage.from("trip-photos").upload(path, coverPhoto, { contentType: coverPhoto.type, upsert: false });
+    if (error) { console.error("Photo upload error:", error); return null; }
+    const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
+    return data.publicUrl;
   };
 
   const compressForUpload = (file) => new Promise(resolve => {
@@ -1541,17 +1547,11 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
       if (onProgress) onProgress(`Uploading photo ${i + 1} of ${galleryFiles.length}…`);
       const compressed = await compressForUpload(gf.file);
       if (!compressed) continue;
-      try {
-        const res = await fetch(
-          `/api/upload-image?folder=gallery&type=image%2Fjpeg&name=gallery.jpg`,
-          { method: "POST", headers: { "content-type": "application/octet-stream" }, body: compressed }
-        );
-        if (!res.ok) { console.error("Gallery upload failed:", await res.text()); continue; }
-        const { url } = await res.json();
-        urls.push({ url, caption: gf.caption || "" });
-      } catch (err) {
-        console.error("Gallery upload error:", err);
-      }
+      const path = `gallery-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+      const { error } = await supabase.storage.from("trip-photos").upload(path, compressed, { contentType: "image/jpeg", upsert: false });
+      if (error) { console.error("Gallery upload error:", error); continue; }
+      const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
+      urls.push({ url: data.publicUrl, caption: gf.caption || "" });
     }
     return urls;
   };
@@ -2150,6 +2150,7 @@ function AdminQueueModal({ onClose, onApprove }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
+  const [previewTripId, setPreviewTripId] = useState(null);
 
   useEffect(() => {
     supabase.from("submissions").select("*").order("submitted_at", { ascending: false })
@@ -2176,7 +2177,7 @@ function AdminQueueModal({ onClose, onApprove }) {
         body: JSON.stringify({ tripId: newTripId }),
       }).catch(() => {});
     }
-    await supabase.from("submissions").update({ status:"approved", reviewed_at:new Date().toISOString() }).eq("id",sub.id);
+    await supabase.from("submissions").update({ status:"approved", reviewed_at:new Date().toISOString(), approved_trip_id:newTripId||null }).eq("id",sub.id);
     setSubmissions(p => p.map(s => s.id===sub.id ? {...s,status:"approved"} : s));
     if (onApprove) onApprove();
     setDetail(null);
@@ -2230,6 +2231,11 @@ function AdminQueueModal({ onClose, onApprove }) {
                   <button onClick={() => reject(sub)} style={{ padding:"6px 12px", borderRadius:"7px", border:"none", background:C.red, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>Reject</button>
                 </div>
               )}
+              {sub.status==="approved" && sub.approved_trip_id && (
+                <div style={{ display:"flex", gap:"7px", marginTop:"6px" }}>
+                  <button onClick={() => setPreviewTripId(sub.approved_trip_id)} style={{ padding:"6px 12px", borderRadius:"7px", border:`1px solid ${C.amber}`, background:C.amberBg, color:C.amber, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>🗺 Preview Blueprint</button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -2265,6 +2271,14 @@ function AdminQueueModal({ onClose, onApprove }) {
           </div>
         );
       })()}
+      {previewTripId && (
+        <div style={{ position:"fixed", inset:0, zIndex:6000 }}>
+          <BlueprintPage tripId={previewTripId} onClose={() => setPreviewTripId(null)} />
+          <div style={{ position:"fixed", top:"16px", right:"16px", zIndex:7000 }}>
+            <button onClick={() => setPreviewTripId(null)} style={{ background:"rgba(28,43,58,0.9)", border:"1px solid rgba(255,255,255,0.2)", color:"#fff", borderRadius:"8px", padding:"8px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>✕ Close Preview</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
