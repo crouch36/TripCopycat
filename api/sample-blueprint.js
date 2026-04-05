@@ -415,9 +415,9 @@ export default function handler(req, res) {
   }
 
   // KML Download
-  async function generateKML() {
+  function generateKML() {
     const btns = document.querySelectorAll("#kml-btn-header, #kml-btn-body");
-    btns.forEach(b => { b.disabled = true; b.textContent = "Geocoding…"; });
+    btns.forEach(b => { b.disabled = true; b.textContent = "Downloading…"; });
 
     const cats = [
       { key:"hotels",      color:"ff0000ff", label:"Hotels" },
@@ -429,11 +429,12 @@ export default function handler(req, res) {
     const parts = [];
     for (const cat of cats) {
       for (const p of (TRIP[cat.key] || [])) {
-        const coords = await geocode(p.item, p.detail);
-        const pt = coords ? "<Point><coordinates>" + coords.lng + "," + coords.lat + ",0</coordinates></Point>" : "";
+        const pt = (p.lat && p.lng)
+          ? "<Point><coordinates>" + p.lng + "," + p.lat + ",0</coordinates></Point>"
+          : "";
         parts.push(
           "<Placemark><name>" + p.item + "</name>" +
-          "<description>" + cat.label + (p.detail ? " — " + p.detail : "") + "</description>" +
+          "<description>" + cat.label + (p.detail ? " - " + p.detail : "") + "</description>" +
           "<Style><IconStyle><color>" + cat.color + "</color></IconStyle></Style>" +
           pt + "</Placemark>"
         );
