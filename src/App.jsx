@@ -1030,7 +1030,8 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                     <button onClick={e => { e.stopPropagation(); setShowBlueprintPreview(true); }} onTouchEnd={e=>{e.stopPropagation();e.preventDefault();setShowBlueprintPreview(true);}} style={{ background:"rgba(70,130,90,0.3)", border:"1px solid rgba(70,180,100,0.5)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>🗺 Preview</button>
                   )}
                   {isAdmin && (() => {
-                    const handleGenPost = () => {
+                    const handleGenPost = (e) => {
+                      e.stopPropagation();
                       const rests = (trip.restaurants || []).slice(0,3).map(r => r.item).filter(Boolean);
                       const quote = (trip.loves || "").slice(0, 160);
                       const params = new URLSearchParams({
@@ -1042,10 +1043,12 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                         r2: rests[1] || "",
                         r3: rests[2] || "",
                       });
-                      window.open(`/instagram-template.html?${params.toString()}`, "_blank");
+                      const url = `/instagram-template.html?${params.toString()}`;
+                      const w = window.open("", "_blank", "noopener,noreferrer");
+                      if (w) { w.location.href = url; } else { window.location.href = url; }
                     };
                     return (
-                      <button onClick={handleGenPost} onTouchEnd={e=>{e.preventDefault();handleGenPost();}} style={{ background:"rgba(193,105,42,0.3)", border:"1px solid rgba(193,105,42,0.6)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>📸 Post</button>
+                      <button onClick={handleGenPost} onTouchEnd={e=>{e.stopPropagation();e.preventDefault();handleGenPost(e);}} style={{ background:"rgba(193,105,42,0.3)", border:"1px solid rgba(193,105,42,0.6)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>📸 Post</button>
                     );
                   })()}
                 </div>
