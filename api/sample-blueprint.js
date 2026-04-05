@@ -287,10 +287,30 @@ export default function handler(req, res) {
   const TRIP = {
     title: "Amalfi Coast Itinerary: Positano & Beyond",
     destination: "Positano, Amalfi Coast, Italy",
-    hotels:      [{ item:"Hotel Miramare", detail:"Positano" }, { item:"Hotel Santa Lucia", detail:"Naples Italy" }],
-    restaurants: [{ item:"Posides Café", detail:"Positano" }, { item:"Il Tridente", detail:"Positano" }, { item:"Saraceno D'Oro", detail:"Positano" }, { item:"Villa Verde", detail:"Capri Italy" }, { item:"Casa Mele", detail:"Capri Italy" }, { item:"Al Ruotolo", detail:"Naples Italy" }],
-    bars:        [{ item:"Don't Worry Bar", detail:"Positano" }, { item:"Hotel Palazzo Murat", detail:"Positano" }, { item:"Il Capitano", detail:"Positano" }],
-    activities:  [{ item:"Amalfi Heaven Gardens Cooking Class", detail:"Amalfi Italy" }, { item:"Cathedral of Sant Andrea Amalfi", detail:"Amalfi Italy" }, { item:"Capri island", detail:"Capri Italy" }, { item:"Amalfi town", detail:"Amalfi Italy" }],
+    // lat/lng verified from street addresses — never use Photon for sample page
+    hotels:      [
+      { item:"Hotel Miramare",                      detail:"Positano",    lat:40.6272, lng:14.4854 },
+      { item:"Hotel Santa Lucia",                   detail:"Naples",      lat:40.8349, lng:14.2470 },
+    ],
+    restaurants: [
+      { item:"Posides Cafe",                        detail:"Positano",    lat:40.6284, lng:14.4850 },
+      { item:"Il Tridente",                         detail:"Positano",    lat:40.6286, lng:14.4836 },
+      { item:"Saraceno D Oro",                      detail:"Positano",    lat:40.6278, lng:14.4843 },
+      { item:"Villa Verde",                         detail:"Capri",       lat:40.5508, lng:14.2270 },
+      { item:"Casa Mele",                           detail:"Capri",       lat:40.5503, lng:14.2261 },
+      { item:"Al Ruotolo",                          detail:"Naples",      lat:40.8526, lng:14.2686 },
+    ],
+    bars:        [
+      { item:"Don't Worry Bar",                     detail:"Positano",    lat:40.6281, lng:14.4856 },
+      { item:"Hotel Palazzo Murat",                 detail:"Positano",    lat:40.6280, lng:14.4848 },
+      { item:"Il Capitano",                         detail:"Positano",    lat:40.6268, lng:14.4862 },
+    ],
+    activities:  [
+      { item:"Amalfi Heaven Gardens Cooking Class", detail:"Amalfi",      lat:40.6350, lng:14.6022 },
+      { item:"Cathedral of Sant Andrea",            detail:"Amalfi",      lat:40.6342, lng:14.6027 },
+      { item:"Ferry to Capri",                      detail:"Positano",    lat:40.6264, lng:14.4871 },
+      { item:"Ferry to Amalfi",                     detail:"Positano",    lat:40.6264, lng:14.4871 },
+    ],
   };
 
   const CAT_CONFIG = {
@@ -325,7 +345,7 @@ export default function handler(req, res) {
     };
   }
 
-  // Build Google Map with coloured pins
+  // Build Google Map with coloured pins — coords are hardcoded, no geocoding needed
   async function initMap() {
     if (!MAPSKEY) {
       document.getElementById("map-loading").querySelector(".map-spinner").style.display = "none";
@@ -336,8 +356,7 @@ export default function handler(req, res) {
     const pins = [];
     for (const [cat, cfg] of Object.entries(CAT_CONFIG)) {
       for (const v of (TRIP[cat] || [])) {
-        const coords = await geocode(v.item, v.detail);
-        if (coords) pins.push({ ...coords, name: v.item, detail: v.detail || "", label: cfg.label, color: cfg.color });
+        if (v.lat && v.lng) pins.push({ lat: v.lat, lng: v.lng, name: v.item, detail: v.detail || "", label: cfg.label, color: cfg.color });
       }
     }
 
