@@ -415,6 +415,15 @@ export default function handler(req, res) {
   }
 
   // KML Download
+  function xmlEsc(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  }
+
   function generateKML() {
     const btns = document.querySelectorAll("#kml-btn-header, #kml-btn-body");
     btns.forEach(b => { b.disabled = true; b.textContent = "Downloading…"; });
@@ -433,15 +442,15 @@ export default function handler(req, res) {
           ? "<Point><coordinates>" + p.lng + "," + p.lat + ",0</coordinates></Point>"
           : "";
         parts.push(
-          "<Placemark><name>" + p.item + "</name>" +
-          "<description>" + cat.label + (p.detail ? " - " + p.detail : "") + "</description>" +
+          "<Placemark><n>" + xmlEsc(p.item) + "</n>" +
+          "<description>" + xmlEsc(cat.label + (p.detail ? " - " + p.detail : "")) + "</description>" +
           "<Style><IconStyle><color>" + cat.color + "</color></IconStyle></Style>" +
           pt + "</Placemark>"
         );
       }
     }
 
-    const kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>' + TRIP.title + '</name>' + parts.join("") + '</Document></kml>';
+    const kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><n>' + xmlEsc(TRIP.title) + '</n>' + parts.join("") + '</Document></kml>';
     const blob = new Blob([kml], { type: "application/vnd.google-earth.kml+xml" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
