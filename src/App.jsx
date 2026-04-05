@@ -956,7 +956,10 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
   const [showRelated, setShowRelated] = useState(false);
   const [showBlueprintPreview, setShowBlueprintPreview] = useState(false);
 
-  const gallery = trip.gallery || [];
+  // Always include cover photo as first lightbox image (Option C)
+  const coverEntry = trip.image ? [{ url: trip.image, caption: "Cover photo" }] : [];
+  const galleryEntries = (trip.gallery || []).filter(g => g.url !== trip.image);
+  const gallery = [...coverEntry, ...galleryEntries];
 
   // Related trips algorithm: prioritise same author, then matching tags, then same region
   const related = (allTrips || []).filter(t => t.id !== trip.id).map(t => {
