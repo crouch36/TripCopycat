@@ -3930,10 +3930,112 @@ function BlueprintPage({ tripId, onClose }) {
 }
 
 
+// ── How It Works Modal ───────────────────────────────────────────────────────
+function HowItWorksModal({ onClose, onSubmit }) {
+  return (
+    <div className="tc-modal-overlay" style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:2000, display:"flex", alignItems:"center", justifyContent:"center", padding:"20px 16px", overflowY:"auto", backdropFilter:"blur(8px)" }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"560px", overflow:"hidden", boxShadow:"0 32px 64px rgba(44,62,80,0.22)", border:`1px solid ${C.tide}` }}>
+
+        {/* Header */}
+        <div style={{ background:C.slate, padding:"28px 32px 24px", position:"relative", overflow:"hidden" }}>
+          <div style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(rgba(196,168,130,0.08) 1px,transparent 1px)", backgroundSize:"18px 18px" }} />
+          <div style={{ position:"relative" }}>
+            <div style={{ fontSize:"11px", fontWeight:700, color:C.amber, textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:"8px" }}>TripCopycat</div>
+            <h2 style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:"26px", fontWeight:900, color:"#fff", margin:"0 0 8px", lineHeight:1.1 }}>How Does This Work?</h2>
+            <p style={{ fontSize:"13px", color:"rgba(255,255,255,0.72)", margin:0, lineHeight:1.65 }}>TripCopycat is built by travelers, for travelers. Share a trip you've taken — and copy the ones others have shared.</p>
+          </div>
+          <button onClick={onClose} style={{ position:"absolute", top:"16px", right:"16px", background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", color:"rgba(255,255,255,0.8)", borderRadius:"50%", width:"32px", height:"32px", cursor:"pointer", fontSize:"16px", display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
+        </div>
+
+        {/* Steps */}
+        <div style={{ padding:"24px 32px" }}>
+
+          {/* Step 1 */}
+          <div style={{ display:"flex", gap:"16px" }}>
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0 }}>
+              <div style={{ width:"38px", height:"38px", borderRadius:"50%", background:C.seafoam, border:`1px solid ${C.tide}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"16px" }}>📝</div>
+              <div style={{ width:"2px", flex:1, background:C.tide, marginTop:"6px", minHeight:"24px" }} />
+            </div>
+            <div style={{ paddingTop:"6px", paddingBottom:"20px" }}>
+              <div style={{ fontSize:"13px", fontWeight:700, color:C.slate, marginBottom:"3px" }}>Step 1 — Share a trip you've taken</div>
+              <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.65 }}>Been somewhere great? Brain dump what you remember — hotels, restaurants, highlights, honest takes — and our AI fills in the structure. Add photos and submit. This is what makes the community work.</div>
+            </div>
+          </div>
+
+          {/* Step 2 */}
+          <div style={{ display:"flex", gap:"16px" }}>
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0 }}>
+              <div style={{ width:"38px", height:"38px", borderRadius:"50%", background:C.seafoam, border:`1px solid ${C.tide}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"16px" }}>🗺</div>
+              <div style={{ width:"2px", flex:1, background:C.tide, marginTop:"6px", minHeight:"24px" }} />
+            </div>
+            <div style={{ paddingTop:"6px", paddingBottom:"20px" }}>
+              <div style={{ fontSize:"13px", fontWeight:700, color:C.slate, marginBottom:"3px" }}>Step 2 — Your trip becomes a Blueprint</div>
+              <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.65 }}>Once approved, your trip gets AI-generated venue alternatives and a pinned Google Maps export — becoming a Blueprint that other travelers can leverage to plan their own version of your trip.</div>
+            </div>
+          </div>
+
+          {/* Step 3 */}
+          <div style={{ display:"flex", gap:"16px" }}>
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0 }}>
+              <div style={{ width:"38px", height:"38px", borderRadius:"50%", background:C.seafoam, border:`1px solid ${C.tide}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"16px" }}>✈️</div>
+              <div style={{ width:"2px", flex:1, background:C.tide, marginTop:"6px", minHeight:"24px" }} />
+            </div>
+            <div style={{ paddingTop:"6px", paddingBottom:"14px" }}>
+              <div style={{ fontSize:"13px", fontWeight:700, color:C.slate, marginBottom:"3px" }}>Step 3 — Browse what others have shared</div>
+              <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.65 }}>Every trip on TripCopycat was submitted by a real traveler — hotels they actually stayed at, restaurants they genuinely loved, and honest takes on what they'd skip next time.</div>
+            </div>
+          </div>
+
+          {/* Substep — Unlock a Blueprint */}
+          <div style={{ display:"flex", gap:"14px", marginLeft:"18px" }}>
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0, width:"20px" }}>
+              <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:C.cta, marginTop:"5px", flexShrink:0 }} />
+            </div>
+            <div style={{ paddingTop:"2px" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px" }}>
+                <div style={{ fontSize:"12px", fontWeight:700, color:C.slate }}>Unlock a Blueprint</div>
+                <div style={{ fontSize:"10px", fontWeight:700, background:C.seafoam, color:C.amber, border:`1px solid ${C.cta}`, padding:"1px 7px", borderRadius:"20px" }}>$1.99</div>
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                <div style={{ display:"flex", alignItems:"flex-start", gap:"8px" }}>
+                  <span style={{ fontSize:"13px", flexShrink:0, marginTop:"1px" }}>📍</span>
+                  <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.55 }}><span style={{ fontWeight:700, color:C.slate }}>Custom Google Maps pin map</span> — every hotel, restaurant, bar, and activity dropped as a color-coded pin. Open directly in Google Maps on your phone.</div>
+                </div>
+                <div style={{ display:"flex", alignItems:"flex-start", gap:"8px" }}>
+                  <span style={{ fontSize:"13px", flexShrink:0, marginTop:"1px" }}>📄</span>
+                  <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.55 }}><span style={{ fontWeight:700, color:C.slate }}>Printable PDF</span> — the full itinerary, venue details, and tips in one clean document. Print it, save it, or pull it up offline.</div>
+                </div>
+                <div style={{ display:"flex", alignItems:"flex-start", gap:"8px" }}>
+                  <span style={{ fontSize:"13px", flexShrink:0, marginTop:"1px" }}>🔗</span>
+                  <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.55 }}><span style={{ fontWeight:700, color:C.slate }}>Shareable link</span> — send your Blueprint to a travel partner so everyone has everything in one place.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* CTAs */}
+        <div style={{ padding:"16px 32px 28px", display:"flex", gap:"10px", flexWrap:"wrap" }}>
+          <button onClick={() => { onClose(); onSubmit(); }} style={{ flex:1, minWidth:"140px", padding:"12px 20px", borderRadius:"10px", border:"none", background:C.slate, color:"#fff", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+            Share a Trip You've Taken →
+          </button>
+          <button onClick={() => { window.location.href = "/blueprint/sample"; }} style={{ flex:1, minWidth:"140px", padding:"12px 20px", borderRadius:"10px", border:`2px solid ${C.amber}`, background:"transparent", color:C.amber, fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+            ▲ See a Sample Blueprint
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [showGear, setShowGear] = useState(window.location.pathname === "/gear");
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [trips, setTrips] = useState(SAMPLE_TRIPS);
   const [dbTrips, setDbTrips] = useState(() => {
     try {
@@ -4233,6 +4335,15 @@ export default function App() {
       {/* Hero — Warm Nomad */}
       <div style={{ background:C.seafoam, padding:"16px 0 14px", margin:"0", textAlign:"center", position:"relative", overflow:"hidden", borderBottom:`1px solid ${C.tide}` }}>
         <div style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(circle at 20% 50%, rgba(196,168,130,0.08) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(193,105,42,0.06) 0%, transparent 50%)", pointerEvents:"none" }} />
+        {/* How Does This Work — square card in hero dead space (desktop) / banner below search (mobile) */}
+        {!isMobile && (
+          <button onClick={() => setShowHowItWorks(true)} style={{ position:"absolute", right:"28px", top:"50%", transform:"translateY(-50%)", width:"110px", height:"110px", background:C.white, border:`2px solid ${C.tide}`, borderRadius:"14px", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"8px", boxShadow:"0 2px 16px rgba(28,43,58,0.08)", transition:"border-color .15s, box-shadow .15s", zIndex:10, fontFamily:"'Nunito',sans-serif" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.cta; e.currentTarget.style.boxShadow = "0 4px 20px rgba(28,43,58,0.14)"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.tide; e.currentTarget.style.boxShadow = "0 2px 16px rgba(28,43,58,0.08)"; }}>
+            <div style={{ width:"36px", height:"36px", borderRadius:"50%", background:C.slate, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"18px" }}>?</div>
+            <div style={{ fontSize:"11px", fontWeight:700, color:C.slate, lineHeight:1.3, textAlign:"center" }}>How Does<br/>This Work?</div>
+          </button>
+        )}
         <div style={{ position:"relative", maxWidth:"680px", margin:"0 auto", padding:"0 16px" }}>
           <h1 style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:"clamp(22px,4.5vw,46px)", fontWeight:700, color:C.slate, margin:"0 0 10px", lineHeight:1.15, letterSpacing:"-0.01em" }}>
             Planned by others. Perfected by you.
@@ -4249,11 +4360,24 @@ export default function App() {
               Sample Blueprint
               <span style={{ background:"#C4A882", color:"#1C2B3A", fontSize:"9px", fontWeight:700, padding:"1px 6px", borderRadius:"20px" }}>FREE</span>
             </button>
+
           </div>
           <div style={{ maxWidth:"500px", margin:"0 auto", position:"relative" }}>
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search destinations, trips, activities…" style={{ width:"100%", padding:"10px 18px 10px 42px", borderRadius:"50px", border:`1.5px solid ${C.tide}`, fontSize:"13px", outline:"none", boxSizing:"border-box", background:C.white, color:C.slate, boxShadow:`0 2px 12px rgba(28,43,58,0.07)`, fontFamily:"'Nunito',sans-serif" }} />
             <span style={{ position:"absolute", left:"14px", top:"50%", transform:"translateY(-50%)", fontSize:"14px" }}>🔍</span>
           </div>
+          {isMobile && (
+            <button onClick={() => setShowHowItWorks(true)} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%", maxWidth:"500px", margin:"10px auto 0", padding:"11px 18px", background:C.slate, borderRadius:"10px", border:"none", cursor:"pointer", fontFamily:"'Nunito',sans-serif", textAlign:"left" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                <div style={{ width:"28px", height:"28px", borderRadius:"50%", background:"rgba(255,255,255,0.12)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"14px", flexShrink:0 }}>?</div>
+                <div>
+                  <div style={{ fontSize:"12px", fontWeight:700, color:"#fff", lineHeight:1.2 }}>How Does This Work?</div>
+                  <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.6)", marginTop:"2px" }}>Browse trips · Submit yours · Unlock a Blueprint</div>
+                </div>
+              </div>
+              <span style={{ color:C.cta, fontSize:"16px", fontWeight:700, flexShrink:0 }}>→</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -4478,6 +4602,7 @@ export default function App() {
         </div>
       )}
 
+      {showHowItWorks && <HowItWorksModal onClose={() => setShowHowItWorks(false)} onSubmit={openSubmit} />}
       {showGear     && <GearPage onClose={() => { setShowGear(false); window.history.pushState(null, "", "/"); }} />}
       {selected      && <TripModal trip={selected} onClose={closeTrip} allTrips={allTrips} isBookmarked={bookmarks.includes(selected.id)} onBookmark={toggleBookmark} isAdmin={isAdmin} />}
       {showAdd       && <AddTripModal onClose={() => setShowAdd(false)} onAdd={t => setTrips(p=>[t,...p])} />}
