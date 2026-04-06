@@ -1,19 +1,14 @@
 {
   "rewrites": [
     { "source": "/trip/:id", "destination": "/api/trip/:id" },
+    { "source": "/trips/:id", "destination": "/api/trip/:id" },
     { "source": "/sitemap.xml", "destination": "/api/sitemap.xml" },
     { "source": "/blueprint/sample", "destination": "/api/sample-blueprint" },
     { "source": "/((?!api/)(?!sitemap\\.xml$).*)", "destination": "/index.html" }
   ],
   "functions": {
-    "api/gemini.js": {
-      "maxDuration": 60
-    },
-    "api/trip/[id].js": {
-      "maxDuration": 10
-    },
-    "api/upload-image.js": {
-      "maxDuration": 30
-    }
+    "api/gemini.js": { "maxDuration": 60 },
+    "api/trip/[id].js": { "maxDuration": 10 },
+    "api/upload-image.js": { "maxDuration": 30 }
   }
 }
