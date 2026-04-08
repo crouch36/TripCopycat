@@ -131,7 +131,7 @@ export default async function handler(req, res) {
   let description = DEFAULT_DESC;
   let ogImage     = DEFAULT_IMAGE;
   let tripData    = null;
-  const canonicalUrl = `${SITE_URL}/trip/${id}`;
+  const canonicalUrl = `${SITE_URL}/trips/${id}`;
 
   try {
     const r = await fetch(
