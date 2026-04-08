@@ -77,7 +77,7 @@ export default async function handler(req, res) {
 
       <!-- CTA -->
       <div style="margin-top:20px;text-align:center;">
-        <a href="https://www.tripcopycat.com" style="display:inline-block;background:#1C2B3A;color:#fff;text-decoration:none;padding:11px 28px;border-radius:8px;font-size:13px;font-weight:700;">
+        <a href="https://www.tripcopycat.com/#admin" style="display:inline-block;background:#1C2B3A;color:#fff;text-decoration:none;padding:11px 28px;border-radius:8px;font-size:13px;font-weight:700;">
           Review in Admin Queue →
         </a>
       </div>
