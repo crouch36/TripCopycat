@@ -2162,6 +2162,7 @@ function AdminQueueModal({ onClose, onApprove }) {
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
   const [previewTripId, setPreviewTripId] = useState(null);
+  const [queueTab, setQueueTab] = useState("pending");
 
   useEffect(() => {
     supabase.from("submissions").select("*").order("submitted_at", { ascending: false })
@@ -2237,15 +2238,28 @@ function AdminQueueModal({ onClose, onApprove }) {
             <button onClick={onClose} style={{ background:C.seafoamDeep, border:"none", color:C.slateLight, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>x</button>
           </div>
         </div>
-        <div style={{ padding:"16px 22px", maxHeight:"70vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
+        <div style={{ display:"flex", borderBottom:`1px solid ${C.tide}`, background:C.white, padding:"0 22px" }}>
+          {[["pending","Needs Review"],["completed","Completed"]].map(([tab, label]) => {
+            const count = tab === "pending"
+              ? submissions.filter(s => s.status === "pending" || s.status === "flagged").length
+              : submissions.filter(s => s.status === "approved" || s.status === "rejected").length;
+            return (
+              <button key={tab} onClick={() => setQueueTab(tab)} style={{ padding:"12px 18px", fontSize:"12px", fontWeight:queueTab===tab?700:400, border:"none", background:"transparent", cursor:"pointer", color:queueTab===tab?C.slate:C.muted, borderBottom:queueTab===tab?`2px solid ${C.amber}`:"2px solid transparent", fontFamily:"inherit", display:"flex", alignItems:"center", gap:"6px" }}>
+                {label}
+                <span style={{ background:queueTab===tab?C.amber:C.tide, color:queueTab===tab?"#fff":C.muted, fontSize:"10px", fontWeight:700, padding:"1px 7px", borderRadius:"20px" }}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ padding:"16px 22px", maxHeight:"60vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
           {loading && <div style={{ textAlign:"center", padding:"40px", color:C.muted }}>Loading…</div>}
-          {!loading && submissions.length === 0 && (
+          {!loading && submissions.filter(s => queueTab === "pending" ? (s.status === "pending" || s.status === "flagged") : (s.status === "approved" || s.status === "rejected")).length === 0 && (
             <div style={{ textAlign:"center", padding:"40px", color:C.muted }}>
-              <div style={{ fontSize:"32px", marginBottom:"10px" }}>📭</div>
-              <div>No submissions yet</div>
+              <div style={{ fontSize:"32px", marginBottom:"10px" }}>{queueTab === "pending" ? "✅" : "💭"}</div>
+              <div>{queueTab === "pending" ? "All caught up — nothing pending review" : "No completed submissions yet"}</div>
             </div>
           )}
-          {submissions.map(sub => (
+          {submissions.filter(s => queueTab === "pending" ? (s.status === "pending" || s.status === "flagged") : (s.status === "approved" || s.status === "rejected")).map(sub => (
             <div key={sub.id} style={{ background:C.white, border:`1px solid ${sub.status==="flagged"?C.red:C.tide}`, borderRadius:"12px", padding:"14px 16px", marginBottom:"10px" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"6px" }}>
                 <div>
