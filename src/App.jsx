@@ -417,7 +417,7 @@ async function extractExif(file) {
 }
 
 // Compress image via Canvas to ~200KB max
-async function compressImage(file, maxW = 600, quality = 0.4) {
+async function compressImage(file, maxW = 640, quality = 0.5) {
   return new Promise(resolve => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -443,9 +443,12 @@ async function compressImage(file, maxW = 600, quality = 0.4) {
 // Reverse geocode lat/lon to place name using OpenStreetMap (free, no key needed)
 async function reverseGeocode(lat, lon) {
   try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 3000);
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`, {
-      headers: { "Accept-Language": "en" }
+      headers: { "Accept-Language": "en" }, signal: controller.signal
     });
+    clearTimeout(t);
     const data = await res.json();
     const a = data.address || {};
     return [a.tourism || a.amenity || a.leisure || a.building, a.city || a.town || a.village, a.country]
@@ -486,7 +489,7 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
     setProgressLabel("Compressing photos…");
     const compressed = [];
     for (let i = 0; i < fileArr.length; i++) {
-      const b64 = await compressImage(fileArr[i], 600, 0.4);
+      const b64 = await compressImage(fileArr[i], 640, 0.5);
       if (b64) compressed.push({ b64, meta: metaArr[i], idx: i });
       setProgress(30 + Math.round((i + 1) / fileArr.length * 40));
     }
@@ -539,9 +542,14 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
       setProgress(100);
     } catch(e) {
       console.error("Gemini API error:", e);
-      const msg = e.name === "AbortError"
-        ? "Request timed out after 45 seconds. Try with fewer photos or on a stronger connection."
-        : `Analysis failed: ${e.message}. Please try again.`;
+      let msg;
+      if (e.name === "AbortError") {
+        msg = "Request timed out after 45 seconds. Try with fewer photos or on a stronger connection.";
+      } else if (e.message?.includes("413") || e.message?.includes("too large") || e.message?.includes("payload")) {
+        msg = "Photos are too large to process. Try selecting fewer photos (10-15) and try again.";
+      } else {
+        msg = `Analysis failed: ${e.message}. Please try again.`;
+      }
       setError(msg);
       setPhase("error");
     }
