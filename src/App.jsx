@@ -1628,13 +1628,15 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
     days: prefillData?.days || []
   } : EMPTY_FORM);
 
-  // Auto-save draft 3 seconds after last form change
+  // Auto-save draft 15 seconds after last form change — debounced to avoid mobile freezes
+  const formRef = useRef(form);
+  useEffect(() => { formRef.current = form; }, [form]);
   useEffect(() => {
     if (step !== "form" || !currentUser) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(() => saveDraft(form), 10000);
+    autoSaveTimer.current = setTimeout(() => saveDraft(formRef.current), 15000);
     return () => clearTimeout(autoSaveTimer.current);
-  }, [form, step]);
+  }, [JSON.stringify(form).slice(0, 100), step]);
 
   const inp = { width:"100%", padding:"8px 11px", borderRadius:"7px", border:`1px solid ${C.tide}`, fontSize:"12px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate };
   const lbl = { fontSize:"11px", fontWeight:600, color:C.slateMid, marginBottom:"3px", display:"block" };
