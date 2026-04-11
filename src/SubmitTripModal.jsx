@@ -5,7 +5,7 @@ import HybridProcessor from "./HybridProcessor.jsx";
 import PhotoImportModal from "./PhotoImportModal.jsx";
 import SubmitFormStep from "./SubmitFormStep.jsx";
 
-// ── Inline helpers (self-contained, no external deps beyond supabase) ─────────
+// ── Inline helpers ────────────────────────────────────────────────────────────
 
 const PROFANITY = ["spam","scam","xxx","porn","casino","viagra"];
 function runContentFilter(trip) {
@@ -25,21 +25,11 @@ function runContentFilter(trip) {
 
 const getSessionId = () => {
   let sid = sessionStorage.getItem("tc_sid");
-  if (!sid) {
-    sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
-    sessionStorage.setItem("tc_sid", sid);
-  }
+  if (!sid) { sid = Math.random().toString(36).slice(2) + Date.now().toString(36); sessionStorage.setItem("tc_sid", sid); }
   return sid;
 };
-
 const trackEvent = (eventType, eventData = {}) => {
-  try {
-    supabase.from("analytics_events").insert([{
-      event_type: eventType,
-      event_data: eventData,
-      session_id: getSessionId(),
-    }]).then(() => {});
-  } catch (_) {}
+  try { supabase.from("analytics_events").insert([{ event_type: eventType, event_data: eventData, session_id: getSessionId() }]).then(() => {}); } catch (_) {}
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -98,8 +88,6 @@ Valid tag values: family-friendly, romantic, adventure, food & wine, culture, be
 Start by asking: Where did you go and when?`;
 
 // ── DocExtractor ──────────────────────────────────────────────────────────────
-// Loads PDF.js + mammoth from CDN, extracts text from user-uploaded PDF/DOCX.
-// Only used within SubmitTripModal so lives here rather than as its own file.
 
 function DocExtractor({ onExtracted }) {
   const [status, setStatus] = useState(null);
@@ -111,10 +99,7 @@ function DocExtractor({ onExtracted }) {
   useEffect(() => {
     const loadScript = (src) => new Promise((resolve, reject) => {
       if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
-      const s = document.createElement("script");
-      s.src = src;
-      s.onload = resolve;
-      s.onerror = reject;
+      const s = document.createElement("script"); s.src = src; s.onload = resolve; s.onerror = reject;
       document.head.appendChild(s);
     });
     Promise.all([
@@ -126,44 +111,35 @@ function DocExtractor({ onExtracted }) {
     }).catch(() => setLibsLoaded(true));
   }, []);
 
-  const extractPDF = async (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(e.target.result) }).promise;
-          let text = "";
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const content = await page.getTextContent();
-            text += content.items.map(item => item.str).join(" ") + "\n";
-          }
-          resolve(text.trim());
-        } catch(err) { reject(err); }
-      };
-      reader.readAsArrayBuffer(file);
-    });
-  };
+  const extractPDF = async (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(e.target.result) }).promise;
+        let text = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          text += content.items.map(item => item.str).join(" ") + "\n";
+        }
+        resolve(text.trim());
+      } catch(err) { reject(err); }
+    };
+    reader.readAsArrayBuffer(file);
+  });
 
-  const extractDOCX = async (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const result = await window.mammoth.extractRawText({ arrayBuffer: e.target.result });
-          resolve(result.value.trim());
-        } catch(err) { reject(err); }
-      };
-      reader.readAsArrayBuffer(file);
-    });
-  };
+  const extractDOCX = async (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try { const result = await window.mammoth.extractRawText({ arrayBuffer: e.target.result }); resolve(result.value.trim()); }
+      catch(err) { reject(err); }
+    };
+    reader.readAsArrayBuffer(file);
+  });
 
   const handleFile = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setFileName(file.name);
-    setStatus("loading");
-    setErrorMsg("");
+    const file = e.target.files[0]; if (!file) return;
+    setFileName(file.name); setStatus("loading"); setErrorMsg("");
     try {
       let text = "";
       if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
@@ -172,16 +148,10 @@ function DocExtractor({ onExtracted }) {
       } else if (file.name.toLowerCase().endsWith(".docx") || file.type.includes("wordprocessingml")) {
         if (!window.mammoth) throw new Error("DOCX library still loading — try again in a moment.");
         text = await extractDOCX(file);
-      } else {
-        throw new Error("Please use a PDF or DOCX file.");
-      }
+      } else { throw new Error("Please use a PDF or DOCX file."); }
       if (!text) throw new Error("Could not extract text from this file — it may be image-based.");
-      onExtracted(text);
-      setStatus("done");
-    } catch(err) {
-      setErrorMsg(err.message);
-      setStatus("error");
-    }
+      onExtracted(text); setStatus("done");
+    } catch(err) { setErrorMsg(err.message); setStatus("error"); }
     e.target.value = "";
   };
 
@@ -222,8 +192,6 @@ function DocExtractor({ onExtracted }) {
 }
 
 // ── HybridPhotoSelector ───────────────────────────────────────────────────────
-// Simple multi-photo picker used in the brain dump step (AI-analysis photos only).
-// Only used within SubmitTripModal so lives here.
 
 function HybridPhotoSelector({ onChange }) {
   const [files, setFiles] = useState([]);
@@ -232,15 +200,11 @@ function HybridPhotoSelector({ onChange }) {
   const add = (e) => {
     const added = Array.from(e.target.files).slice(0, 30 - files.length);
     const newFiles = [...files, ...added].slice(0, 30);
-    setFiles(newFiles);
-    onChange && onChange(newFiles);
-    e.target.value = "";
+    setFiles(newFiles); onChange && onChange(newFiles); e.target.value = "";
   };
-
   const remove = (idx) => {
     const updated = files.filter((_, i) => i !== idx);
-    setFiles(updated);
-    onChange && onChange(updated);
+    setFiles(updated); onChange && onChange(updated);
   };
 
   return (
@@ -256,15 +220,13 @@ function HybridPhotoSelector({ onChange }) {
               </div>
             ))}
             {files.length < 30 && (
-              <div onClick={() => ref.current.click()} style={{ width:"52px", height:"52px", borderRadius:"6px", border:`2px dashed ${C.tide}`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:"20px", color:C.muted, background:C.seafoam }}
-                className="tc-hover-border">+</div>
+              <div onClick={() => ref.current.click()} style={{ width:"52px", height:"52px", borderRadius:"6px", border:`2px dashed ${C.tide}`, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:"20px", color:C.muted, background:C.seafoam }} className="tc-hover-border">+</div>
             )}
           </div>
           <div style={{ fontSize:"10px", color:C.muted }}>{files.length} photo{files.length!==1?"s":""} selected · {30-files.length} remaining · Used for AI analysis only</div>
         </div>
       ) : (
-        <div onClick={() => ref.current.click()} style={{ border:`2px dashed ${C.tide}`, borderRadius:"8px", padding:"14px", textAlign:"center", cursor:"pointer", background:C.white, fontSize:"12px", color:C.slateMid }}
-          className="tc-hover-border">
+        <div onClick={() => ref.current.click()} style={{ border:`2px dashed ${C.tide}`, borderRadius:"8px", padding:"14px", textAlign:"center", cursor:"pointer", background:C.white, fontSize:"12px", color:C.slateMid }} className="tc-hover-border">
           Tap to add trip photos · up to 30 · Used for AI analysis only
         </div>
       )}
@@ -273,21 +235,21 @@ function HybridPhotoSelector({ onChange }) {
 }
 
 // ── SubmitTripModal ───────────────────────────────────────────────────────────
-// Multi-step modal: prompt → (hybrid-processing | ai-prompt | photo-import |
-//   photo-supplement) → form → submitting → done/flagged
+// Manages step navigation, draft I/O, photo uploads, and submission.
+// Does NOT hold form/submitter state — that lives in SubmitFormStep.
 //
-// Performance note: draftSaving/draftSaved state REMOVED — draft status updates
-// use document.getElementById("draft-status") DOM manipulation to avoid
-// re-rendering the form on every save tick. Do NOT add those state vars back.
+// PERFORMANCE NOTE: SubmitFormStep is always mounted (display:none when hidden)
+// so its internal form state survives step transitions. Keystrokes only
+// re-render SubmitFormStep — this component stays still, keeping the X button
+// and header responsive at all times.
+//
+// Draft status uses DOM manipulation (document.getElementById("draft-status"))
+// NOT React state — do NOT add draftSaving/draftSaved state variables back.
 
 export default function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, prefillData }) {
   const [step, setStep] = useState(prefillData ? "form" : "prompt");
   const [pastedText, setPastedText] = useState("");
-  const [filterResult, setFilterResult] = useState(null);
-  const [submitterName, setSubmitterName] = useState(displayName || "");
-  const [submitterEmail, setSubmitterEmail] = useState(currentUser?.email || "");
   const [copiedPrompt, setCopiedPrompt] = useState(false);
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [coverPhoto, setCoverPhoto] = useState(null);
   const [coverPhotoPreview, setCoverPhotoPreview] = useState(null);
   const [photoError, setPhotoError] = useState("");
@@ -296,9 +258,31 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
   const [galleryError, setGalleryError] = useState("");
   const [draftExists, setDraftExists] = useState(false);
   const [checkingDraft, setCheckingDraft] = useState(true);
-  const autoSaveTimer = useRef(null);
   const [submitError, setSubmitError] = useState("");
   const [uploadStatus, setUploadStatus] = useState("");
+
+  // Ref to SubmitFormStep — used to read form/submitter values at submit time
+  const formStepRef = useRef(null);
+  const autoSaveTimer = useRef(null);
+
+  // Compute initial form once — passed to SubmitFormStep as seed for its internal state
+  const initialForm = prefillData ? {
+    title: prefillData?.destination ? `${prefillData.destination} Trip` : "",
+    destination: prefillData?.destination || "",
+    region: prefillData?.region || "Europe",
+    duration: prefillData?.duration || "",
+    travelers: prefillData?.travelers || "",
+    date: "",
+    tags: prefillData?.tags || [],
+    loves: prefillData?.loves || "",
+    doNext: prefillData?.doNext || "",
+    airfare: [{item:"",detail:"",tip:""}],
+    hotels: prefillData?.hotels?.length ? prefillData.hotels : [{item:"",detail:"",tip:""}],
+    restaurants: prefillData?.restaurants?.length ? prefillData.restaurants : [{item:"",detail:"",tip:""}],
+    bars: prefillData?.bars?.length ? prefillData.bars : [{item:"",detail:"",tip:""}],
+    activities: prefillData?.activities?.length ? prefillData.activities : [{item:"",detail:"",tip:""}],
+    days: prefillData?.days || []
+  } : EMPTY_FORM;
 
   // ── Draft: check on mount ─────────────────────────────────────────────────
   useEffect(() => {
@@ -323,21 +307,20 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
       });
   }, []);
 
-  // ── Draft: DOM-manipulation status helper (zero re-renders) ──────────────
+  // ── Draft: DOM-manipulation status (zero re-renders) ─────────────────────
   const updateDraftStatus = (msg, color) => {
     const el = document.getElementById("draft-status");
     if (el) { el.textContent = msg; el.style.color = color; }
   };
 
   const saveDraft = async (formData, showIndicator = false) => {
+    if (!formData) return;
     if (!currentUser) { localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(formData)); return; }
     if (showIndicator) updateDraftStatus("Saving…", C.amber);
     try {
       await supabase.auth.getSession();
       const { error } = await supabase.from("drafts").upsert({
-        user_id: currentUser.id,
-        form_data: formData,
-        updated_at: new Date().toISOString()
+        user_id: currentUser.id, form_data: formData, updated_at: new Date().toISOString()
       }, { onConflict: "user_id" });
       if (error) {
         localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(formData));
@@ -356,30 +339,35 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
   const loadDraft = async () => {
     if (currentUser) {
       const { data } = await supabase.from("drafts").select("form_data").eq("user_id", currentUser.id).maybeSingle();
-      if (data?.form_data) { setForm(data.form_data); setDraftExists(false); setStep("form"); return; }
+      if (data?.form_data) { formStepRef.current?.setFormData(data.form_data); setDraftExists(false); setStep("form"); return; }
     }
     const fallback = localStorage.getItem("tripcopycat_draft_fallback");
     if (fallback) {
-      try { setForm(JSON.parse(fallback)); setDraftExists(false); setStep("form"); } catch(e) {}
+      try { formStepRef.current?.setFormData(JSON.parse(fallback)); setDraftExists(false); setStep("form"); } catch(e) {}
     }
   };
 
   const clearDraft = async () => {
-    await supabase.from("drafts").delete().eq("user_id", currentUser.id);
+    if (currentUser) await supabase.from("drafts").delete().eq("user_id", currentUser.id);
     localStorage.removeItem("tripcopycat_draft_fallback");
     setDraftExists(false);
   };
 
-  // ── Photo upload helpers ──────────────────────────────────────────────────
+  // Auto-save to Supabase every 20s when on form step — reads from SubmitFormStep ref
+  useEffect(() => {
+    if (step !== "form") return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => saveDraft(formStepRef.current?.getForm(), false), 20000);
+    return () => clearTimeout(autoSaveTimer.current);
+  }, [step]);
+
+  // ── Photo upload handlers ─────────────────────────────────────────────────
   const handlePhotoChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     const allowed = ["image/jpeg","image/png","image/webp","image/heic","image/heif","image/gif","image/avif","image/tiff"];
     if (!allowed.includes(file.type)) { setPhotoError("File type not supported. Please use JPG, PNG, WEBP, HEIC, or similar."); return; }
     if (file.size > 5 * 1024 * 1024) { setPhotoError("Photo must be under 5MB."); return; }
-    setPhotoError("");
-    setCoverPhoto(file);
-    setCoverPhotoPreview(URL.createObjectURL(file));
+    setPhotoError(""); setCoverPhoto(file); setCoverPhotoPreview(URL.createObjectURL(file));
   };
 
   const uploadPhoto = async () => {
@@ -398,8 +386,7 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
     img.onload = () => {
       const scale = Math.min(1, 1200 / img.width);
       const canvas = document.createElement("canvas");
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
+      canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
       canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
       canvas.toBlob(blob => { URL.revokeObjectURL(url); resolve(blob); }, "image/jpeg", 0.7);
     };
@@ -413,8 +400,7 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
     for (let i = 0; i < galleryFiles.length; i++) {
       const gf = galleryFiles[i];
       if (onProgress) onProgress(`Uploading photo ${i + 1} of ${galleryFiles.length}…`);
-      const compressed = await compressForUpload(gf.file);
-      if (!compressed) continue;
+      const compressed = await compressForUpload(gf.file); if (!compressed) continue;
       const path = `gallery-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
       const { error } = await supabase.storage.from("trip-photos").upload(path, compressed, { contentType: "image/jpeg", upsert: false });
       if (error) { console.error("Gallery upload error:", error); continue; }
@@ -428,77 +414,16 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
     const files = Array.from(e.target.files);
     const allowed = ["image/jpeg","image/png","image/webp","image/heic","image/heif"];
     const valid = files.filter(f => allowed.includes(f.type) && f.size <= 5*1024*1024);
-    if (valid.length < files.length) setGalleryError("Some files were skipped (unsupported type or over 5MB).");
-    else setGalleryError("");
+    if (valid.length < files.length) setGalleryError("Some files were skipped (unsupported type or over 5MB)."); else setGalleryError("");
     const remaining = 5 - galleryFiles.length;
     const toAdd = valid.slice(0, remaining).map(f => ({ file: f, preview: URL.createObjectURL(f), caption: "" }));
-    setGalleryFiles(p => [...p, ...toAdd]);
-    e.target.value = "";
+    setGalleryFiles(p => [...p, ...toAdd]); e.target.value = "";
   };
+  const removeGalleryPhoto = (idx) => { setGalleryFiles(p => { URL.revokeObjectURL(p[idx].preview); return p.filter((_,i) => i !== idx); }); };
+  const updateCaption = (idx, caption) => { setGalleryFiles(p => p.map((g,i) => i === idx ? {...g, caption} : g)); };
 
-  const removeGalleryPhoto = (idx) => {
-    setGalleryFiles(p => { URL.revokeObjectURL(p[idx].preview); return p.filter((_,i) => i !== idx); });
-  };
-
-  const updateCaption = (idx, caption) => {
-    setGalleryFiles(p => p.map((g,i) => i === idx ? {...g, caption} : g));
-  };
-
-  // ── Form state ────────────────────────────────────────────────────────────
-  const [form, setForm] = useState(() => prefillData ? {
-    title: prefillData?.destination ? `${prefillData.destination} Trip` : "",
-    destination: prefillData?.destination || "",
-    region: prefillData?.region || "Europe",
-    duration: prefillData?.duration || "",
-    travelers: prefillData?.travelers || "",
-    date: "",
-    tags: prefillData?.tags || [],
-    loves: prefillData?.loves || "",
-    doNext: prefillData?.doNext || "",
-    airfare: [{item:"",detail:"",tip:""}],
-    hotels: prefillData?.hotels?.length ? prefillData.hotels : [{item:"",detail:"",tip:""}],
-    restaurants: prefillData?.restaurants?.length ? prefillData.restaurants : [{item:"",detail:"",tip:""}],
-    bars: prefillData?.bars?.length ? prefillData.bars : [{item:"",detail:"",tip:""}],
-    activities: prefillData?.activities?.length ? prefillData.activities : [{item:"",detail:"",tip:""}],
-    days: prefillData?.days || []
-  } : EMPTY_FORM);
-
-  // Keep latest form in ref — zero re-renders, used by auto-save
-  const formRef = useRef(form);
-  useEffect(() => {
-    formRef.current = form;
-    // Always persist to localStorage immediately on every change — zero network cost, prevents data loss
-    try { localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(form)); } catch {}
-  }, [form]);
-
-  // Auto-save to Supabase every 20 seconds — runs silently, no state updates
-  useEffect(() => {
-    if (step !== "form") return;
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(() => saveDraft(formRef.current, false), 20000);
-    return () => clearTimeout(autoSaveTimer.current);
-  }, [step]);
-
-  // Also save on unmount to catch any unsaved changes
-  useEffect(() => {
-    return () => {
-      if (formRef.current) {
-        try { localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(formRef.current)); } catch {}
-      }
-    };
-  }, []);
-
-  // ── Form helpers ──────────────────────────────────────────────────────────
-  const updRow = (cat,i,f,v) => setForm(p => { const u=[...p[cat]]; u[i]={...u[i],[f]:v}; return {...p,[cat]:u}; });
-  const addRow = cat => setForm(p => ({...p,[cat]:[...p[cat],{item:"",detail:"",tip:""}]}));
-  const delRow = (cat,i) => setForm(p => ({...p,[cat]:p[cat].filter((_,idx)=>idx!==i)}));
-  const toggleTag = tag => setForm(p => { if (!p.tags.includes(tag) && p.tags.length >= 8) return p; return {...p, tags: p.tags.includes(tag) ? p.tags.filter(t=>t!==tag) : [...p.tags, tag]}; });
-
-  // ── AI prompt step ────────────────────────────────────────────────────────
-  const copyPrompt = () => {
-    navigator.clipboard.writeText(AI_SUBMISSION_PROMPT);
-    setCopiedPrompt(true); setTimeout(() => setCopiedPrompt(false), 2500);
-  };
+  // ── AI prompt step helpers ────────────────────────────────────────────────
+  const copyPrompt = () => { navigator.clipboard.writeText(AI_SUBMISSION_PROMPT); setCopiedPrompt(true); setTimeout(() => setCopiedPrompt(false), 2500); };
 
   const parseAIOutput = () => {
     const raw = pastedText.trim();
@@ -507,38 +432,35 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
     if (!jsonMatch) { alert("Could not find structured data in the output. Make sure you copied the full response including the JSON block."); return; }
     try {
       const d = JSON.parse(jsonMatch[0]);
-      const ensureRows = (arr) => (Array.isArray(arr) && arr.length)
-        ? arr.map(r => ({ item: r.item||"", detail: r.detail||"", tip: r.tip||"" }))
-        : [{item:"",detail:"",tip:""}];
-      setForm(p => ({
-        ...p,
-        title:        d.title        || p.title,
-        destination:  d.destination  || p.destination,
-        region:       REGIONS.find(r => r !== "All Regions" && r.toLowerCase() === (d.region||"").toLowerCase()) || p.region,
-        date:         d.date         || p.date,
-        duration:     d.duration     || p.duration,
-        travelers:    d.travelers    || p.travelers,
-        tags:         Array.isArray(d.tags) && d.tags.length ? d.tags : p.tags,
-        loves:        d.loves        || p.loves,
-        doNext:       d.doNext       || p.doNext,
+      const ensureRows = (arr) => (Array.isArray(arr) && arr.length) ? arr.map(r => ({ item: r.item||"", detail: r.detail||"", tip: r.tip||"" })) : [{item:"",detail:"",tip:""}];
+      formStepRef.current?.setFormData({
+        ...(formStepRef.current?.getForm() || EMPTY_FORM),
+        title:        d.title        || "",
+        destination:  d.destination  || "",
+        region:       REGIONS.find(r => r !== "All Regions" && r.toLowerCase() === (d.region||"").toLowerCase()) || "Europe",
+        date:         d.date         || "",
+        duration:     d.duration     || "",
+        travelers:    d.travelers    || "",
+        tags:         Array.isArray(d.tags) && d.tags.length ? d.tags : [],
+        loves:        d.loves        || "",
+        doNext:       d.doNext       || "",
         airfare:      ensureRows(d.airfare),
         hotels:       ensureRows(d.hotels),
         restaurants:  ensureRows(d.restaurants),
         bars:         ensureRows(d.bars),
         activities:   ensureRows(d.activities),
-        days:         Array.isArray(d.days) && d.days.length ? d.days : p.days,
-      }));
+        days:         Array.isArray(d.days) && d.days.length ? d.days : [],
+      });
       setStep("form");
-    } catch(e) {
-      alert("Could not parse the JSON output. Please make sure you copied the complete response.");
-    }
+    } catch(e) { alert("Could not parse the JSON output. Please make sure you copied the complete response."); }
   };
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
+    const { submitterName, submitterEmail } = formStepRef.current?.getSubmitterInfo() || {};
     if (!submitterName || !submitterEmail) { alert("Please add your name and email."); return; }
-    setSubmitError("");
-    setStep("submitting");
+    const form = formStepRef.current?.getForm() || EMPTY_FORM;
+    setSubmitError(""); setStep("submitting");
     trackEvent("submit_start", { has_photo: !!coverPhoto, gallery_count: galleryFiles.length });
     try {
       const photoUrl = await Promise.race([
@@ -551,19 +473,14 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
         new Promise((_, rej) => setTimeout(() => rej(new Error("Gallery upload timed out")), 30000))
       ]).catch(() => []);
       setUploadStatus("Saving your trip…");
-
       const tripWithPhoto = { ...form, image: photoUrl || "", focalPoint, gallery: galleryUrls };
       const result = runContentFilter(tripWithPhoto);
-      setFilterResult(result);
-
       const { error } = await supabase.from("submissions").insert([{
         trip_data: tripWithPhoto, submitter_name: submitterName, submitter_email: submitterEmail,
         status: result.passed ? "pending" : "flagged",
-        ai_flagged: !result.passed,
-        ai_flag_reason: result.flags.join("; "),
+        ai_flagged: !result.passed, ai_flag_reason: result.flags.join("; "),
         user_id: currentUser?.id || null
       }]);
-
       if (error) throw error;
       if (currentUser) await supabase.from("drafts").delete().eq("user_id", currentUser.id);
       trackEvent("submit_complete", { has_photo: !!photoUrl, gallery_count: galleryUrls.length });
@@ -575,50 +492,12 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
     }
   };
 
-  // ── HybridProcessor onComplete handler ───────────────────────────────────
-  const handleHybridComplete = (data) => {
-    const mergeRows = (existing, incoming) => {
-      if (!incoming?.length) return existing;
-      const incomingNames = incoming.map(r => r.item.toLowerCase());
-      const keptExisting = existing.filter(r =>
-        r.item && !incomingNames.some(n => {
-          const el = r.item.toLowerCase();
-          return n === el || n.includes(el) || el.includes(n);
-        })
-      );
-      return [...incoming, ...keptExisting];
-    };
-    const betterText = (a, b) => { if (!a) return b; if (!b) return a; return b.length > a.length ? b : a; };
-    setForm(p => ({
-      ...p,
-      title:        betterText(p.title, data.title),
-      destination:  betterText(p.destination, data.destination),
-      region:       data.region       || p.region,
-      date:         betterText(p.date, data.date),
-      duration:     betterText(p.duration, data.duration),
-      travelers:    betterText(p.travelers, data.travelers),
-      tags:         data.tags?.length ? [...new Set([...p.tags, ...data.tags])] : p.tags,
-      loves:        betterText(p.loves, data.loves),
-      doNext:       betterText(p.doNext, data.doNext),
-      airfare:      mergeRows(p.airfare, data.airfare),
-      hotels:       mergeRows(p.hotels, data.hotels),
-      restaurants:  mergeRows(p.restaurants, data.restaurants),
-      bars:         mergeRows(p.bars, data.bars),
-      activities:   mergeRows(p.activities, data.activities),
-      days:         data.days?.length && !p.days?.length ? data.days : p.days,
-    }));
-    window.__hybridPhotos = [];
-    window.__supplementPhotos = [];
-    window.__hybridText = "";
-    setStep("form");
-  };
-
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="tc-modal-overlay" style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:2000, display:"flex", alignItems:"center", justifyContent:"center", padding:"28px 16px", overflowY:"hidden", backdropFilter:"blur(8px)" }}>
       <div className="tc-modal-card" style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"720px", overflow:"hidden", boxShadow:`0 32px 64px rgba(44,62,80,0.22)`, border:`1px solid ${C.tide}` }}>
 
-        {/* ── Modal header ────────────────────────────────────────────────── */}
+        {/* ── Modal header — never re-renders on keystrokes ────────────────── */}
         <div style={{ padding:"20px 28px", borderBottom:`1px solid ${C.tide}`, background:C.seafoam, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <div>
             <div style={{ fontSize:"17px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif" }}>Submit a Trip</div>
@@ -628,7 +507,7 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
             {step === "form" && (
               <>
                 <span id="draft-status" style={{ fontSize:"10px", color:C.muted, fontWeight:600, transition:"color .3s" }}>Auto-saving</span>
-                <button onClick={() => saveDraft(form, true)} style={{ fontSize:"11px", padding:"5px 12px", borderRadius:"6px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateMid, cursor:"pointer", fontWeight:600 }}>Save Draft</button>
+                <button onClick={() => saveDraft(formStepRef.current?.getForm(), true)} style={{ fontSize:"11px", padding:"5px 12px", borderRadius:"6px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateMid, cursor:"pointer", fontWeight:600 }}>Save Draft</button>
               </>
             )}
             <button onClick={onClose} style={{ background:C.seafoamDeep, border:"none", color:C.slateLight, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>×</button>
@@ -638,7 +517,6 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
         {/* ── Step: prompt ────────────────────────────────────────────────── */}
         {step === "prompt" && (
           <div style={{ padding:"28px", maxHeight:"70vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
-            {/* Draft resume banner */}
             {draftExists && !checkingDraft && (
               <div style={{ background:C.amberBg, border:`1px solid ${C.amber}`, borderRadius:"12px", padding:"14px 18px", marginBottom:"20px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:"12px", flexWrap:"wrap" }}>
                 <div>
@@ -656,36 +534,21 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
               <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"4px" }}>Tell us about your trip</div>
               <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.6 }}>Brain dump what you remember — then add photos and let AI fill in the gaps. You can always come back later to add more detail.</div>
             </div>
-
-            {/* Hybrid: text + photos */}
             <div style={{ background:C.seafoam, borderRadius:"14px", border:`1.5px solid ${C.amber}`, padding:"18px", marginBottom:"14px" }}>
               <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"12px" }}>
                 <span style={{ fontSize:"18px" }}>🧠</span>
                 <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Step 1 — Brain dump</div>
                 <span style={{ fontSize:"9px", fontWeight:700, background:C.amber, color:C.white, padding:"2px 8px", borderRadius:"20px" }}>Start here</span>
               </div>
-              <div style={{ fontSize:"11px", color:C.slateMid, marginBottom:"8px", lineHeight:1.6 }}>
-                Write anything you remember — as little or as much as you like. Destination, dates, who you went with, hotels, restaurants, highlights, costs. Don't worry about format.
-              </div>
-              <textarea
-                id="hybrid-brain-dump"
-                placeholder={`e.g. "Ireland trip, 4 guys, 4 days in October. Flew into Dublin, stayed at The Meyrick in Galway for 3 nights. Highlights: Cliffs of Moher, Sean's Bar was incredible, Bowe's in Dublin. Rented a car ~€80/day. Recommend going in shoulder season."`}
-                style={{ width:"100%", minHeight:"90px", padding:"10px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"12px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate, resize:"vertical", lineHeight:1.6 }}
-              />
-
-              {/* Document upload */}
+              <div style={{ fontSize:"11px", color:C.slateMid, marginBottom:"8px", lineHeight:1.6 }}>Write anything you remember — as little or as much as you like. Destination, dates, who you went with, hotels, restaurants, highlights, costs. Don't worry about format.</div>
+              <textarea id="hybrid-brain-dump" placeholder={`e.g. "Ireland trip, 4 guys, 4 days in October. Flew into Dublin, stayed at The Meyrick in Galway for 3 nights. Highlights: Cliffs of Moher, Sean's Bar was incredible, Bowe's in Dublin. Rented a car ~€80/day. Recommend going in shoulder season."`}
+                style={{ width:"100%", minHeight:"90px", padding:"10px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"12px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate, resize:"vertical", lineHeight:1.6 }} />
               <div style={{ display:"flex", alignItems:"center", gap:"8px", marginTop:"14px", marginBottom:"8px" }}>
                 <span style={{ fontSize:"18px" }}>📄</span>
                 <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Got a PDF or Word doc? <span style={{ fontSize:"11px", fontWeight:400, color:C.muted }}>(optional)</span></div>
               </div>
-              <div style={{ fontSize:"11px", color:C.slateMid, marginBottom:"8px", lineHeight:1.6 }}>
-                Have an itinerary, booking confirmation, or travel doc? Upload it and we'll extract the text automatically — no copy-pasting needed.
-              </div>
-              <DocExtractor onExtracted={(text) => {
-                const ta = document.getElementById("hybrid-brain-dump");
-                if (ta) { ta.value = (ta.value ? ta.value + "\n\n" : "") + text; }
-              }} />
-
+              <div style={{ fontSize:"11px", color:C.slateMid, marginBottom:"8px", lineHeight:1.6 }}>Have an itinerary, booking confirmation, or travel doc? Upload it and we'll extract the text automatically — no copy-pasting needed.</div>
+              <DocExtractor onExtracted={(text) => { const ta = document.getElementById("hybrid-brain-dump"); if (ta) { ta.value = (ta.value ? ta.value + "\n\n" : "") + text; } }} />
               <div style={{ display:"flex", alignItems:"center", gap:"8px", marginTop:"14px", marginBottom:"10px" }}>
                 <span style={{ fontSize:"18px" }}>📸</span>
                 <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Step 2 — Add photos <span style={{ fontSize:"11px", fontWeight:400, color:C.muted }}>(optional but powerful)</span></div>
@@ -694,21 +557,11 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
                 <strong style={{ color:C.slate }}>These photos are for AI analysis only</strong> — AI reads GPS location data and identifies venues from signage to fill in details your brain dump might have missed. You'll add your actual cover photo and gallery on the next step.
               </div>
               <HybridPhotoSelector onChange={(files) => { window.__hybridPhotos = files; }} />
-
-              <button
-                onClick={() => {
-                  const text = document.getElementById("hybrid-brain-dump")?.value || "";
-                  const photos = window.__hybridPhotos || [];
-                  if (!text.trim() && !photos.length) { alert("Please add some text, a document, or photos to get started."); return; }
-                  setStep("hybrid-processing");
-                  window.__hybridText = text;
-                }}
+              <button onClick={() => { const text = document.getElementById("hybrid-brain-dump")?.value || ""; const photos = window.__hybridPhotos || []; if (!text.trim() && !photos.length) { alert("Please add some text, a document, or photos to get started."); return; } setStep("hybrid-processing"); window.__hybridText = text; }}
                 style={{ width:"100%", marginTop:"14px", padding:"12px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
                 Build My Itinerary →
               </button>
             </div>
-
-            {/* Secondary options */}
             <div style={{ display:"flex", gap:"8px", alignItems:"stretch" }}>
               <button onClick={() => setStep("ai-prompt")} style={{ flex:1, padding:"12px", borderRadius:"10px", border:`1px solid ${C.tide}`, background:C.white, cursor:"pointer", textAlign:"left" }}>
                 <div style={{ fontSize:"16px", marginBottom:"4px" }}>🤖</div>
@@ -734,7 +587,7 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
           <HybridProcessor
             text={typeof window !== "undefined" ? window.__hybridText || "" : ""}
             photos={typeof window !== "undefined" ? window.__hybridPhotos || [] : []}
-            onComplete={handleHybridComplete}
+            onComplete={(data) => { formStepRef.current?.mergeForm(data); window.__hybridPhotos = []; window.__supplementPhotos = []; window.__hybridText = ""; setStep("form"); }}
             onBack={() => setStep(window.__supplementPhotos?.length ? "photo-supplement" : "prompt")}
           />
         )}
@@ -750,15 +603,16 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
               </div>
             </div>
             <div style={{ background:C.amberBg, border:`1px solid ${C.amber}44`, borderRadius:"10px", padding:"10px 14px", marginBottom:"16px", fontSize:"11px", color:C.slateMid, lineHeight:1.6 }}>
-              <strong style={{ color:C.slate }}>These photos are for AI analysis only</strong> — AI will enhance vague entries with specific names from signage (e.g. "a hotel" → "The Meyrick Hotel"), add new venues it spots, and fill any gaps — without removing data you've already entered.
+              <strong style={{ color:C.slate }}>These photos are for AI analysis only</strong> — AI will enhance vague entries with specific names from signage, add new venues it spots, and fill any gaps — without removing data you've already entered.
             </div>
             <HybridPhotoSelector onChange={(files) => { window.__supplementPhotos = files; }} />
             <button
               onClick={() => {
                 const photos = window.__supplementPhotos || [];
                 if (!photos.length) { alert("Please select at least one photo."); return; }
+                const f = formStepRef.current?.getForm() || {};
                 window.__hybridPhotos = photos;
-                window.__hybridText = `Here is what I already have filled in about this trip. For each field, use the photos to ENHANCE or make more specific — if a photo shows a venue name that matches a vague description, use the specific name. Add new items the photos reveal that aren't already listed. Keep existing specific data as-is.\n\nTitle: ${form.title}\nDestination: ${form.destination}\nRegion: ${form.region}\nDuration: ${form.duration}\nDate: ${form.date}\nTravelers: ${form.travelers}\nLoves: ${form.loves}\nDo Next: ${form.doNext}\nHotels already listed: ${form.hotels?.filter(h=>h.item).map(h=>h.item).join(", ")||"none"}\nRestaurants already listed: ${form.restaurants?.filter(r=>r.item).map(r=>r.item).join(", ")||"none"}\nBars already listed: ${form.bars?.filter(b=>b.item).map(b=>b.item).join(", ")||"none"}\nActivities already listed: ${form.activities?.filter(a=>a.item).map(a=>a.item).join(", ")||"none"}\n\nFor the JSON output: include ALL items (existing + new from photos). If a photo reveals the specific name of something listed vaguely (e.g. "a hotel" → "The Meyrick Hotel"), return the improved version.`;
+                window.__hybridText = `Here is what I already have filled in about this trip. For each field, use the photos to ENHANCE or make more specific — if a photo shows a venue name that matches a vague description, use the specific name. Add new items the photos reveal that aren't already listed. Keep existing specific data as-is.\n\nTitle: ${f.title}\nDestination: ${f.destination}\nRegion: ${f.region}\nDuration: ${f.duration}\nDate: ${f.date}\nTravelers: ${f.travelers}\nLoves: ${f.loves}\nDo Next: ${f.doNext}\nHotels already listed: ${f.hotels?.filter(h=>h.item).map(h=>h.item).join(", ")||"none"}\nRestaurants already listed: ${f.restaurants?.filter(r=>r.item).map(r=>r.item).join(", ")||"none"}\nBars already listed: ${f.bars?.filter(b=>b.item).map(b=>b.item).join(", ")||"none"}\nActivities already listed: ${f.activities?.filter(a=>a.item).map(a=>a.item).join(", ")||"none"}\n\nFor the JSON output: include ALL items (existing + new from photos). If a photo reveals the specific name of something listed vaguely (e.g. "a hotel" → "The Meyrick Hotel"), return the improved version.`;
                 setStep("hybrid-processing");
               }}
               style={{ width:"100%", marginTop:"14px", padding:"12px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"13px", fontWeight:700, cursor:"pointer" }}>
@@ -771,25 +625,7 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
         {step === "photo-import" && (
           <PhotoImportModal
             onClose={() => setStep("prompt")}
-            onComplete={(data) => {
-              setForm(p => ({
-                ...p,
-                title: data.destination ? `${data.destination} Trip` : p.title,
-                destination: data.destination || p.destination,
-                region: data.region || p.region,
-                duration: data.duration || p.duration,
-                travelers: data.travelers || p.travelers,
-                tags: data.tags?.length ? data.tags : p.tags,
-                loves: data.loves || p.loves,
-                doNext: data.doNext || p.doNext,
-                hotels: data.hotels?.length ? data.hotels : p.hotels,
-                restaurants: data.restaurants?.length ? data.restaurants : p.restaurants,
-                bars: data.bars?.length ? data.bars : p.bars,
-                activities: data.activities?.length ? data.activities : p.activities,
-                days: data.days?.length ? data.days : p.days,
-              }));
-              setStep("form");
-            }}
+            onComplete={(data) => { formStepRef.current?.mergeForm(data); setStep("form"); }}
             skipCloseOnComplete
           />
         )}
@@ -798,9 +634,7 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
         {step === "ai-prompt" && (
           <div style={{ padding:"24px 28px", maxHeight:"70vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
             <div style={{ fontSize:"13px", color:C.slateLight, marginBottom:"14px", lineHeight:1.6 }}>Copy this prompt and paste it into Claude, ChatGPT, or any AI. Answer its questions about your trip. When done, copy the full output and paste it below.</div>
-            <pre style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"10px", padding:"14px", fontSize:"10.5px", lineHeight:1.7, color:C.slateMid, whiteSpace:"pre-wrap", wordBreak:"break-word", maxHeight:"200px", overflowY:"auto", WebkitOverflowScrolling:"touch", fontFamily:"monospace", marginBottom:"14px" }}>
-              {AI_SUBMISSION_PROMPT}
-            </pre>
+            <pre style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"10px", padding:"14px", fontSize:"10.5px", lineHeight:1.7, color:C.slateMid, whiteSpace:"pre-wrap", wordBreak:"break-word", maxHeight:"200px", overflowY:"auto", WebkitOverflowScrolling:"touch", fontFamily:"monospace", marginBottom:"14px" }}>{AI_SUBMISSION_PROMPT}</pre>
             <button onClick={copyPrompt} style={{ width:"100%", padding:"10px", borderRadius:"8px", border:"none", background:copiedPrompt?C.green:`linear-gradient(135deg,${C.azureDark},${C.azure})`, color:C.white, fontWeight:700, fontSize:"13px", cursor:"pointer", marginBottom:"16px", transition:"background .2s" }}>
               {copiedPrompt ? "Copied!" : "Copy Prompt"}
             </button>
@@ -815,11 +649,15 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
           </div>
         )}
 
-        {/* ── Step: form ──────────────────────────────────────────────────── */}
-        {step === "form" && (
+        {/* ── SubmitFormStep — ALWAYS MOUNTED, hidden when not on form step ── */}
+        {/* Keeping it mounted preserves form state across step transitions.   */}
+        {/* Keystrokes only re-render SubmitFormStep, never this component.    */}
+        <div style={{ display: step === "form" ? "block" : "none" }}>
           <SubmitFormStep
-            form={form} setForm={setForm}
-            updRow={updRow} addRow={addRow} delRow={delRow} toggleTag={toggleTag}
+            ref={formStepRef}
+            initialForm={initialForm}
+            initialSubmitterName={displayName || ""}
+            initialSubmitterEmail={currentUser?.email || ""}
             onPhotoSupplement={() => setStep("photo-supplement")}
             coverPhoto={coverPhoto} setCoverPhoto={setCoverPhoto}
             coverPhotoPreview={coverPhotoPreview} setCoverPhotoPreview={setCoverPhotoPreview}
@@ -828,23 +666,18 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
             galleryFiles={galleryFiles} galleryError={galleryError}
             handleGalleryAdd={handleGalleryAdd}
             removeGalleryPhoto={removeGalleryPhoto} updateCaption={updateCaption}
-            submitterName={submitterName} setSubmitterName={setSubmitterName}
-            submitterEmail={submitterEmail} setSubmitterEmail={setSubmitterEmail}
-            agreedToTerms={agreedToTerms} setAgreedToTerms={setAgreedToTerms}
             onBack={() => setStep("prompt")}
             onSubmit={handleSubmit}
             submitError={submitError}
           />
-        )}
+        </div>
 
         {/* ── Step: submitting ─────────────────────────────────────────────── */}
         {step === "submitting" && (
           <div style={{ padding:"60px 28px", textAlign:"center" }}>
             <div style={{ fontSize:"36px", marginBottom:"14px", animation:"spin 1.5s linear infinite", display:"inline-block" }}>⏳</div>
             <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>Submitting your trip…</div>
-            <div style={{ fontSize:"12px", color:C.slateLight, marginBottom:"8px" }}>
-              {uploadStatus || "Uploading photos and saving…"}
-            </div>
+            <div style={{ fontSize:"12px", color:C.slateLight, marginBottom:"8px" }}>{uploadStatus || "Uploading photos and saving…"}</div>
             <div style={{ width:"200px", height:"4px", background:C.seafoam, borderRadius:"2px", margin:"0 auto 24px", overflow:"hidden" }}>
               <div style={{ height:"100%", background:C.amber, borderRadius:"2px", animation:"progress-pulse 1.5s ease-in-out infinite", width:"60%" }} />
             </div>
@@ -867,7 +700,7 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
           <div style={{ padding:"50px 28px", textAlign:"center" }}>
             <div style={{ fontSize:"40px", marginBottom:"14px" }}>🎉</div>
             <div style={{ fontSize:"18px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"8px" }}>Trip Submitted!</div>
-            <div style={{ fontSize:"13px", color:C.slateLight, maxWidth:"380px", margin:"0 auto 16px", lineHeight:1.6 }}>Thanks for contributing to TripCopycat! Your trip is under review and will be published shortly. We'll be in touch at <strong>{submitterEmail}</strong>.</div>
+            <div style={{ fontSize:"13px", color:C.slateLight, maxWidth:"380px", margin:"0 auto 16px", lineHeight:1.6 }}>Thanks for contributing to TripCopycat! Your trip is under review and will be published shortly. We'll be in touch at <strong>{formStepRef.current?.getSubmitterInfo()?.submitterEmail}</strong>.</div>
             <button className="tc-btn" onClick={onClose} style={{ padding:"11px 28px", borderRadius:"10px", border:"none", background:C.cta, color:C.ctaText, fontWeight:700, fontSize:"13px", cursor:"pointer" }}>Done</button>
           </div>
         )}
