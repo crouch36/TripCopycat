@@ -1,15 +1,6 @@
 const MODEL = "gemini-2.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
-// Increase Vercel body size limit from default 4.5MB to 20MB for photo uploads
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: "20mb",
-    },
-  },
-};
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method not allowed" });
@@ -28,6 +19,22 @@ export default async function handler(req, res) {
   } catch (e) {
     res.status(400).json({ error: "Failed to parse request body: " + e.message });
     return;
+  }
+
+  // New format: imageUrls + prompt (server fetches images to avoid client 4.5MB payload limit)
+  if (body.imageUrls && body.prompt) {
+    const imageParts = [];
+    for (const url of body.imageUrls) {
+      try {
+        const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (r.ok) {
+          const buf = await r.arrayBuffer();
+          const b64 = Buffer.from(buf).toString("base64");
+          imageParts.push({ inline_data: { mime_type: "image/jpeg", data: b64 } });
+        }
+      } catch {}
+    }
+    body = { contents: [{ parts: [{ text: body.prompt }, ...imageParts] }] };
   }
 
   if (!body || !body.contents) {

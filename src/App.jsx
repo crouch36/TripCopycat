@@ -485,20 +485,43 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
       setProgress(Math.round((i + 1) / fileArr.length * 30));
     }
 
-    // Step 2: Compress all photos
-    setProgressLabel("Compressing photos…");
-    const compressed = [];
+    // Step 2: Compress photos to blob and upload to R2 (avoids Vercel 4.5MB client payload limit)
+    setProgressLabel("Uploading photos for analysis…");
+    const photoUrls = [];
     for (let i = 0; i < fileArr.length; i++) {
-      const b64 = await compressImage(fileArr[i], 640, 0.5);
-      if (b64) compressed.push({ b64, meta: metaArr[i], idx: i });
+      const blob = await new Promise(resolve => {
+        const objUrl = URL.createObjectURL(fileArr[i]);
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, 1200 / img.width);
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob(b => { URL.revokeObjectURL(objUrl); resolve(b); }, "image/jpeg", 0.7);
+        };
+        img.onerror = () => { URL.revokeObjectURL(objUrl); resolve(null); };
+        img.src = objUrl;
+      });
+      if (blob) {
+        try {
+          const ext = (fileArr[i].name.split(".").pop() || "jpg").toLowerCase();
+          const resp = await fetch(`/api/upload-image?folder=temp&type=image%2Fjpeg&name=photo.${ext}`, {
+            method: "POST",
+            body: blob
+          });
+          const upData = await resp.json();
+          if (upData.url) photoUrls.push({ url: upData.url, meta: metaArr[i] });
+        } catch {}
+      }
       setProgress(30 + Math.round((i + 1) / fileArr.length * 40));
     }
 
-    // Step 3: Send to Claude API
+    // Step 3: Send R2 URLs to Gemini server function (server fetches images — no client payload limit)
     setProgressLabel("Analysing with AI…");
     setProgress(70);
 
-    const metaSummary = compressed.map((p, i) => {
+    const metaSummary = photoUrls.map((p, i) => {
       const m = p.meta;
       const parts = [`Photo ${i + 1}: ${m.filename || "photo"}`];
       if (m.placeName) parts.push(`GPS location: ${m.placeName}`);
@@ -507,23 +530,16 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
       return parts.join(" | ");
     }).join("\n");
 
-    try {
-      const parts = [
-        {
-          text: `You are analysing travel photos to reconstruct a trip itinerary. Here is the GPS and timestamp metadata extracted from each photo:\n\n${metaSummary}\n\nIMPORTANT: Use the GPS location data to identify SPECIFIC venue names. If GPS shows a photo was taken at a specific street address or named place, use that exact place name. Do not use generic descriptions like "local restaurant" or "hotel balcony" — always try to name the specific venue based on GPS coordinates, visible signage, or recognisable landmarks.\n\nReturn ONLY a JSON object with this exact structure, no other text:\n{\n  "destination": "City, Country",\n  "region": "Europe|Asia|North America|Central America|South America|Africa|Oceania",\n  "duration": "N days",\n  "travelers": "description e.g. Couple, Family, Guys trip",\n  "tags": ["tag1", "tag2"],\n  "loves": "2-4 sentences about specific highlights visible in the photos — name actual places",\n  "doNext": "1-2 sentences of honest advice",\n  "hotels": [{"item": "hotel name from GPS or signage", "detail": "location", "tip": ""}],\n  "restaurants": [{"item": "restaurant name from GPS or signage", "detail": "cuisine type", "tip": ""}],\n  "bars": [{"item": "bar name from GPS or signage", "detail": "type", "tip": ""}],\n  "activities": [{"item": "specific activity or landmark name", "detail": "description", "tip": ""}],\n  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"time": "", "type": "activity|restaurant|bar|hotel|transport", "label": "specific venue or activity name", "note": ""}]}]\n}`
-        },
-        ...compressed.map(p => ({
-          inline_data: { mime_type: "image/jpeg", data: p.b64 }
-        }))
-      ];
+    const geminiPrompt = `You are analysing a travel photo album to reconstruct a trip itinerary. Here is the GPS location and timestamp metadata extracted from each photo:\n\n${metaSummary}\n\nIMPORTANT: Use the GPS location data to identify SPECIFIC venue names. If GPS shows a photo was taken at a specific street address or named place, use that exact place name. Do not use generic descriptions like "local restaurant" or "hotel balcony" — always try to name the specific venue based on GPS coordinates, visible signage, or recognisable landmarks.\n\nReturn ONLY a JSON object with this exact structure, no other text:\n{\n  "destination": "City, Country",\n  "region": "Europe|Asia|North America|Central America|South America|Africa|Oceania",\n  "duration": "N days",\n  "travelers": "description e.g. Couple, Family, Guys trip",\n  "tags": ["tag1", "tag2"],\n  "loves": "2-4 sentences about specific highlights visible in the photos — name actual places",\n  "doNext": "1-2 sentences of honest advice",\n  "hotels": [{"item": "hotel name from GPS or signage", "detail": "location", "tip": ""}],\n  "restaurants": [{"item": "restaurant name from GPS or signage", "detail": "cuisine type", "tip": ""}],\n  "bars": [{"item": "bar name from GPS or signage", "detail": "type", "tip": ""}],\n  "activities": [{"item": "specific activity or landmark name", "detail": "description", "tip": ""}],\n  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"time": "", "type": "activity|restaurant|bar|hotel|transport", "label": "specific venue or activity name", "note": ""}]}]\n}`;
 
+    try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      const timeoutId = setTimeout(() => controller.abort(), 55000);
 
       const res = await fetch("/api/gemini", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts }] }),
+          body: JSON.stringify({ imageUrls: photoUrls.map(p => p.url), prompt: geminiPrompt }),
           signal: controller.signal
         });
       clearTimeout(timeoutId);
