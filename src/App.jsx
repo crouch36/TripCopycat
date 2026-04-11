@@ -2376,12 +2376,7 @@ function HybridProcessor({ text, photos, onComplete, onBack }) {
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
       canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(blob => {
-        URL.revokeObjectURL(url);
-        const reader = new FileReader();
-        reader.onload = e => resolve(e.target.result.split(",")[1]);
-        reader.readAsDataURL(blob);
-      }, "image/jpeg", 0.65);
+      canvas.toBlob(blob => { URL.revokeObjectURL(url); resolve(blob); }, "image/jpeg", 0.7);
     };
     img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
     img.src = url;
@@ -2390,14 +2385,23 @@ function HybridProcessor({ text, photos, onComplete, onBack }) {
   useEffect(() => {
     const run = async () => {
 
-
-      // Step 1: compress photos
-      const compressed = [];
+      // Step 1: compress and upload photos to R2
+      const photoUrls = [];
       if (photos.length > 0) {
-        setLabel(`Compressing ${photos.length} photo${photos.length!==1?"s":""}...`);
+        setLabel(`Uploading ${photos.length} photo${photos.length!==1?"s":""}...`);
         for (let i = 0; i < photos.length; i++) {
-          const b64 = await compressOne(photos[i]);
-          if (b64) compressed.push(b64);
+          const blob = await compressOne(photos[i]);
+          if (blob) {
+            try {
+              const ext = (photos[i].name.split(".").pop() || "jpg").toLowerCase();
+              const resp = await fetch(`/api/upload-image?folder=temp&type=image%2Fjpeg&name=photo.${ext}`, {
+                method: "POST",
+                body: blob
+              });
+              const upData = await resp.json();
+              if (upData.url) photoUrls.push(upData.url);
+            } catch {}
+          }
           setProgress(Math.round((i + 1) / photos.length * 40));
         }
       } else {
@@ -2408,11 +2412,11 @@ function HybridProcessor({ text, photos, onComplete, onBack }) {
       setProgress(50);
 
       const hasText = text.trim().length > 0;
-      const hasPhotos = compressed.length > 0;
+      const hasPhotos = photoUrls.length > 0;
 
       const prompt = `You are helping a traveller document a trip for a crowd-sourced travel platform called TripCopycat.
 
-${hasText ? `The traveller wrote this brain dump about their trip:\n\n"${text}"\n\n` : ""}${hasPhotos ? `They have also provided ${compressed.length} photos from the trip. Use GPS data, visible signage, and landmarks in the photos to identify specific venues and locations.\n\n` : ""}Your job is to extract and structure everything into a trip itinerary. Be as specific as possible — use real venue names from the text or photos. For anything not mentioned, leave it as an empty string or empty array rather than guessing.
+${hasText ? `The traveller wrote this brain dump about their trip:\n\n"${text}"\n\n` : ""}${hasPhotos ? `They have also provided ${photoUrls.length} photos from the trip. Use GPS data, visible signage, and landmarks in the photos to identify specific venues and locations.\n\n` : ""}Your job is to extract and structure everything into a trip itinerary. Be as specific as possible — use real venue names from the text or photos. For anything not mentioned, leave it as an empty string or empty array rather than guessing.
 
 IMPORTANT: Never reference photos by number (e.g. "photo 1", "image 3", "in photo 17") anywhere in the output. Never mention photos at all in any field values. All output must read as if written by the traveller from memory, not derived from images.
 
@@ -2436,16 +2440,13 @@ Return ONLY a valid JSON object with no other text:
 }
 Valid tags: family-friendly, romantic, adventure, food & wine, culture, beach, wildlife, scenic drives`;
 
-      const parts = [{ text: prompt }];
-      compressed.forEach(b64 => parts.push({ inline_data: { mime_type: "image/jpeg", data: b64 } }));
-
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 60000);
         const res = await fetch("/api/gemini", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts }] }),
+          body: JSON.stringify({ imageUrls: photoUrls, prompt }),
           signal: controller.signal,
         });
         clearTimeout(timeout);
