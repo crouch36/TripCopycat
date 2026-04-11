@@ -129,6 +129,7 @@ VITE_GEOCODE_SECRET
 |---|---|---|
 | `gemini.js` | Proxies Gemini AI requests | Handles `{ contents }` (legacy) and `{ imageUrls, prompt }` (current R2 flow) |
 | `upload-image.js` | Uploads raw binary to R2 | Reads raw request body — NOT JSON |
+| `approve-submission.js` | Approves a submission → inserts into `trips` | Uses `SUPABASE_SERVICE_KEY` to bypass RLS. Protected by `x-admin-secret` header (reuses `GEOCODE_SECRET`). Also updates `submissions.status` to approved. Geocoding is fired client-side after success. |
 | `geocode-venues.js` | Geocodes venues on trip approval | Uses `GOOGLE_GEOCODING_KEY`, protected by `GEOCODE_SECRET` header |
 | `notify-submission.js` | Sends email on new submission | From `notifications@tripcopycat.com`, links to `/#admin` |
 | `trip/[id].js` | Server-renders trip pages for SEO | Canonical URL uses `/trips/:id` (plural — must match sitemap) |
@@ -223,7 +224,7 @@ If ANY fail → do not push. Fix first.
 
 ### RLS (all secured Apr 10 2026)
 - All tables have RLS enabled
-- `trips`: public read, service role insert/delete, users update own
+- `trips`: public read, service role insert/delete, users update own — **client anon key cannot insert into trips**. All trip inserts must go through `api/approve-submission.js` or `api/` functions using `SUPABASE_SERVICE_KEY`
 - `submissions`: public read, anon/authenticated insert, service role update
 - `blueprint_purchases`: public read, service role insert
 - `analytics_events`: anon/authenticated insert
@@ -332,4 +333,4 @@ Full `C` object now lives in `src/constants.js` and is imported by all split com
 
 ---
 
-*Last updated: April 11, 2026 — Component split complete (constants.js, PhotoImportModal, HybridProcessor, SubmitFormStep, SubmitTripModal). Form freeze fixed via forwardRef/useImperativeHandle pattern — form state now owned by SubmitFormStep, SubmitTripModal header never re-renders on keystrokes. Full submit flow tested and confirmed working end-to-end including photos.*
+*Last updated: April 11, 2026 — Component split complete (constants.js, PhotoImportModal, HybridProcessor, SubmitFormStep, SubmitTripModal). Form freeze fixed via forwardRef/useImperativeHandle pattern — form state now owned by SubmitFormStep, SubmitTripModal header never re-renders on keystrokes. Full submit flow tested end-to-end. Approval 403 fixed — trips insert now routed through api/approve-submission.js using service role key; client anon key blocked by RLS on trips table.*
