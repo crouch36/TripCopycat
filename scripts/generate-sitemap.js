@@ -15,7 +15,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_8usxe69F1Loh3l3-dYHp4g_dnXxwWY7";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const SITE_URL = "https://tripcopycat.com";
+const SITE_URL = "https://www.tripcopycat.com";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 

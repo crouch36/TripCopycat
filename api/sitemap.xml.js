@@ -25,7 +25,7 @@ export default async function handler(req, res) {
   ];
 
   const tripUrls = trips.map(trip => ({
-    loc: `${SITE_URL}/trip/${trip.id}`,
+    loc: `${SITE_URL}/trips/${trip.id}`,
     lastmod: trip.created_at ? trip.created_at.split("T")[0] : today,
     changefreq: "weekly",
     priority: "0.8"
