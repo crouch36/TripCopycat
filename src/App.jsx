@@ -1435,8 +1435,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
   const [galleryError, setGalleryError] = useState("");
   const galleryRef = useRef();
   const [draftExists, setDraftExists] = useState(false);
-  const [draftSaving, setDraftSaving] = useState(false);
-  const [draftSaved, setDraftSaved] = useState(false);
+
   const [checkingDraft, setCheckingDraft] = useState(true);
   const photoRef = useRef(null);
   const autoSaveTimer = useRef(null);
@@ -1474,11 +1473,15 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
       });
   }, []);
 
-  const saveDraft = async (formData) => {
-    if (!currentUser) return;
-    setDraftSaving(true);
+  const updateDraftStatus = (msg, color) => {
+    const el = document.getElementById("draft-status");
+    if (el) { el.textContent = msg; el.style.color = color; }
+  };
+
+  const saveDraft = async (formData, showIndicator = false) => {
+    if (!currentUser) { localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(formData)); return; }
+    if (showIndicator) updateDraftStatus("Saving…", C.amber);
     try {
-      // Refresh session before saving to prevent auth expiry issues
       await supabase.auth.getSession();
       const { error } = await supabase.from("drafts").upsert({
         user_id: currentUser.id,
@@ -1486,29 +1489,17 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
         updated_at: new Date().toISOString()
       }, { onConflict: "user_id" });
       if (error) {
-        // Session expired — save to localStorage as fallback
-        if (error.code === "PGRST301" || error.message?.includes("JWT")) {
-          localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(formData));
-          setDraftSaved(true);
-          setTimeout(() => setDraftSaved(false), 2000);
-        } else {
-          console.error("Draft save error:", error);
-        }
+        localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(formData));
+        updateDraftStatus("✓ Saved locally", C.amber);
       } else {
-        // Also clear any localStorage fallback
         localStorage.removeItem("tripcopycat_draft_fallback");
-        setDraftSaved(true);
-        setTimeout(() => setDraftSaved(false), 2000);
+        updateDraftStatus("✓ Draft saved", C.green);
       }
     } catch(e) {
-      // Network error — save to localStorage as fallback
       localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(formData));
-      setDraftSaved(true);
-      setTimeout(() => setDraftSaved(false), 2000);
-      console.warn("Draft saved to local fallback:", e.message);
-    } finally {
-      setDraftSaving(false);
+      updateDraftStatus("✓ Saved locally", C.amber);
     }
+    if (showIndicator) setTimeout(() => updateDraftStatus("Auto-saving", C.muted), 2500);
   };
 
   const loadDraft = async () => {
@@ -1628,15 +1619,30 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
     days: prefillData?.days || []
   } : EMPTY_FORM);
 
-  // Auto-save draft 15 seconds after last form change — debounced to avoid mobile freezes
+  // Keep latest form in ref — zero re-renders, used by auto-save
   const formRef = useRef(form);
-  useEffect(() => { formRef.current = form; }, [form]);
   useEffect(() => {
-    if (step !== "form" || !currentUser) return;
+    formRef.current = form;
+    // Always persist to localStorage immediately on every change — zero network cost, prevents data loss
+    try { localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(form)); } catch {}
+  }, [form]);
+
+  // Auto-save to Supabase every 20 seconds — runs silently, no state updates
+  useEffect(() => {
+    if (step !== "form") return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(() => saveDraft(formRef.current), 15000);
+    autoSaveTimer.current = setTimeout(() => saveDraft(formRef.current, false), 20000);
     return () => clearTimeout(autoSaveTimer.current);
-  }, [JSON.stringify(form).slice(0, 100), step]);
+  }, [step]);
+
+  // Also save on unmount to catch any unsaved changes
+  useEffect(() => {
+    return () => {
+      if (formRef.current) {
+        try { localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(formRef.current)); } catch {}
+      }
+    };
+  }, []);
 
   const inp = { width:"100%", padding:"8px 11px", borderRadius:"7px", border:`1px solid ${C.tide}`, fontSize:"12px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate };
   const lbl = { fontSize:"11px", fontWeight:600, color:C.slateMid, marginBottom:"3px", display:"block" };
@@ -1743,12 +1749,10 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
             {step === "form" && (
-              <span style={{ fontSize:"10px", color: draftSaving ? C.amber : draftSaved ? C.green : C.muted, fontWeight:600, transition:"color .3s" }}>
-                {draftSaving ? "Saving…" : draftSaved ? "✓ Draft saved" : "Auto-saving"}
-              </span>
-            )}
-            {step === "form" && (
-              <button onClick={() => saveDraft(form)} style={{ fontSize:"11px", padding:"5px 12px", borderRadius:"6px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateMid, cursor:"pointer", fontWeight:600 }}>Save Draft</button>
+              <>
+                <span id="draft-status" style={{ fontSize:"10px", color:C.muted, fontWeight:600, transition:"color .3s" }}>Auto-saving</span>
+                <button onClick={() => saveDraft(form, true)} style={{ fontSize:"11px", padding:"5px 12px", borderRadius:"6px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateMid, cursor:"pointer", fontWeight:600 }}>Save Draft</button>
+              </>
             )}
             <button onClick={onClose} style={{ background:C.seafoamDeep, border:"none", color:C.slateLight, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>×</button>
           </div>
