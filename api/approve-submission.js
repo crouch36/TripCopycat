@@ -57,7 +57,7 @@ export default async function handler(req, res) {
       bars:         t.bars || [],
       activities:   t.activities || [],
       days:         t.days || [],
-      image:        t.image ?? null,
+      image:        t.image || null,  // || guards against empty string stored at submission time
       status:       "published",
       user_id:      userId || null,
       focal_point:  t.focalPoint || { x: 50, y: 50 },

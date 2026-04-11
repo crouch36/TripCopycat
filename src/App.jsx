@@ -1714,7 +1714,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
       ]).catch(() => []);
       setUploadStatus("Saving your trip…");
 
-      const tripWithPhoto = { ...form, image: photoUrl || "", focalPoint, gallery: galleryUrls };
+      const tripWithPhoto = { ...form, image: photoUrl || null, focalPoint, gallery: galleryUrls };
       const result = runContentFilter(tripWithPhoto);
       setFilterResult(result);
 
