@@ -34,10 +34,11 @@
 ## Local Environment
 
 - **Repo:** `C:\Users\crouc\tripcopycat`
-- **Main file:** `src/App.jsx` (~4,700 lines — monolith, component split planned)
+- **Main file:** `src/App.jsx` (~3,150 lines after component split)
 - **Deploy:** `git push origin main` ONLY — **never** `vercel`, `npx vercel`, `vercel deploy`, or any Vercel CLI commands
 - **GitHub:** github.com/crouch36/TripCopycat
 - **OS:** Windows (CRLF line endings — see critical section below)
+- **Build command:** `cmd /c "npm run build"` — PowerShell blocks npm by default on this machine
 
 ---
 
@@ -46,7 +47,7 @@
 - NEVER run `vercel`, `npx vercel`, `vercel --prod`, or `vercel deploy`
 - All deployments happen automatically via `git push origin main`
 - Vercel watches the repo and auto-deploys — no manual deploy ever needed
-- Always run `npm run build` locally before git push — must show ✓ built with no errors
+- Always run `cmd /c "npm run build"` locally before git push — must show ✓ built with no errors
 
 ---
 
@@ -66,9 +67,23 @@
 
 - Deliver complete replacement files — never partial edits or diffs
 - Git commands in isolated code blocks — never mixed with file content or prose
-- Always work from `/mnt/user-data/outputs/App.jsx` first — only ask for upload if absent or clearly stale
+- Always work from the most recently uploaded file — stale uploads have caused cascading issues
 - Never run `vercel deploy` — deploy is `git push origin main` only
 - Copy changes for review and approval before applying to code
+
+---
+
+## Source File Map
+
+| File | Lines | Purpose |
+|---|---|---|
+| `src/App.jsx` | ~3,150 | Main app shell, routing, all non-submit components |
+| `src/constants.js` | ~82 | `C`, `REGIONS`, `TAGS`, `PRIMARY_TAGS`, `EXTENDED_TAGS`, `DURATION_FILTERS`, `catConfig`, `typeStyles`, `REGION_GRADIENTS`, `REGION_EMOJI` — imported by all split components |
+| `src/SubmitTripModal.jsx` | ~711 | Step navigation, draft I/O, photo uploads, submission logic. Owns: `step`, `coverPhoto`, `focalPoint`, `galleryFiles`. Does NOT hold form text state. |
+| `src/SubmitFormStep.jsx` | ~280 | Form fields, gallery, submitter details, footer. Owns all text state via `forwardRef`/`useImperativeHandle`. Always mounted in SubmitTripModal (display:none when hidden). |
+| `src/HybridProcessor.jsx` | ~143 | AI brain dump + photo processing. Uses R2 upload flow. |
+| `src/PhotoImportModal.jsx` | ~263 | Photo album import, EXIF extraction. Uses R2 upload flow. |
+| `src/supabaseClient.js` | — | Single Supabase instance — never create a second |
 
 ---
 
@@ -139,52 +154,30 @@ Vercel has a hard 4.5MB payload limit on serverless functions. Sending mobile ph
 4. Client sends `{ imageUrls: [...], prompt: "..." }` to `/api/gemini` — tiny JSON payload, no 413
 5. `gemini.js` detects `imageUrls` format, fetches each image from R2 server-side, converts to base64, builds `inline_data` parts, calls Gemini
 
-### Two places this pattern is used
-- `PhotoImportModal` (~line 466 in App.jsx) — photo album import
-- `HybridProcessor` (~line 2365 in App.jsx) — submit trip brain dump + photos
+### Two files that use this pattern
+- `src/PhotoImportModal.jsx` — photo album import
+- `src/HybridProcessor.jsx` — submit trip brain dump + photos
 
 ---
 
 ## CRITICAL: SubmitTripModal Form Performance
 
-### Root cause of mobile freeze
-- Entire modal is ~762 lines as a monolith
-- Every keystroke calls `setForm()` → re-renders entire modal
-- Previously: auto-save called `setDraftSaving(true)` mid-edit → additional re-renders
+### Root cause of mobile freeze (resolved Apr 11 2026)
+Every keystroke previously called `setForm()` in `SubmitTripModal` → re-rendered the entire modal tree including the header and X button → rapid typing across multiple fields queued enough re-renders to block click events.
 
-### Current workaround (implemented Apr 10 2026)
-- Auto-save indicator uses **DOM manipulation** (`document.getElementById("draft-status")`) — zero re-renders
-- `draftSaving` and `draftSaved` state variables **removed** — do NOT add back
-- Every keystroke writes to `localStorage` immediately via `formRef` + `useEffect`
-- Supabase save runs every 20 seconds on fixed timer — NOT triggered by form changes
-- Unmount effect does final localStorage save
+### Current architecture (fully implemented)
+- **Form state lives in `SubmitFormStep`** — keystrokes only re-render that component
+- `SubmitTripModal` reads values at submit time via `formStepRef.current.getForm()` and `formStepRef.current.getSubmitterInfo()`
+- `SubmitFormStep` uses `forwardRef` + `useImperativeHandle` to expose: `getForm()`, `getSubmitterInfo()`, `mergeForm(data)`, `setFormData(data)`
+- `SubmitFormStep` is **always mounted** inside `SubmitTripModal` (wrapped in `display:none` when hidden) — form state survives step transitions
+- Draft status indicator uses **DOM manipulation** (`document.getElementById("draft-status")`) — zero re-renders
+- `draftSaving` and `draftSaved` state variables **do not exist** — do NOT add them back
+- Every keystroke writes to `localStorage` immediately via `useEffect` on `form` in `SubmitFormStep`
+- Supabase auto-save runs every 20 seconds via timer in `SubmitTripModal` — calls `formStepRef.current?.getForm()`
+- Unmount effect in `SubmitFormStep` does final localStorage save
 
-### Proper long-term fix (scheduled — see Component Split Plan below)
-
----
-
-## Component Split Plan (Next Dedicated Session)
-
-### Files to create
-| File | Est. lines | Contents |
-|---|---|---|
-| `src/constants.js` | ~80 | `C`, `REGIONS`, `TAGS`, `PRIMARY_TAGS`, `EXTENDED_TAGS`, `DURATION_FILTERS` |
-| `src/SubmitTripModal.jsx` | ~350 | State, all logic, modal chrome, non-form steps |
-| `src/SubmitFormStep.jsx` | ~430 | All form JSX, photo UI, gallery, submitter row, footer |
-| `src/HybridProcessor.jsx` | ~120 | AI brain dump + photo processing, R2 upload flow |
-| `src/PhotoImportModal.jsx` | ~220 | Photo album import, EXIF extraction, R2 upload flow |
-
-### Critical notes for that session
-- `EMPTY_FORM` and `AI_SUBMISSION_PROMPT` move into `SubmitTripModal.jsx`
-- `C`, `REGIONS`, `TAGS` go into `constants.js` — both App.jsx and new files import from there
-- `draftSaving` / `draftSaved` state no longer exists — do NOT add back
-- Draft status uses `document.getElementById("draft-status")` DOM manipulation
-- HybridProcessor and PhotoImportModal both use R2 upload flow (not inline base64)
-- All new files must use LF line endings
-- This split is the pilot for full App.jsx component architecture
-
-### Kickoff prompt for that session
-> "Begin App.jsx component split. Read CLAUDE.md first. Start with src/constants.js, then SubmitTripModal.jsx, SubmitFormStep.jsx, HybridProcessor.jsx, PhotoImportModal.jsx. All files LF line endings. Do not revert R2 photo upload flow. Do not add back draftSaving/draftSaved state."
+### What SubmitTripModal owns (do not move to SubmitFormStep)
+`coverPhoto`, `coverPhotoPreview`, `focalPoint`, `galleryFiles`, `galleryError`, `photoError` — needed by `handleSubmit` for upload logic
 
 ---
 
@@ -214,6 +207,7 @@ If ANY fail → do not push. Fix first.
 - **allTrips useEffect:** changes to `allTrips` trigger re-renders — effects depending on `[allTrips]` must not re-open modals as side effect
 - **iOS touch events:** header buttons in TripModal need both `onClick` AND `onTouchEnd` to fire reliably after scrolling
 - **Instagram template:** `public/instagram-template.html` must be excluded from SPA catch-all in `vercel.json`
+- **SubmitFormStep always mounted:** do not convert to conditional render — form state would be lost on step transitions
 
 ---
 
@@ -312,10 +306,10 @@ Scotland, Prague, Amalfi, Ireland gallery photos were lost pre-R2 migration. Re-
 
 - [ ] Gallery re-upload: Scotland, Prague, Amalfi, Ireland — via admin edit modal
 - [ ] Leaked password protection — enable once Supabase custom SMTP configured
-- [ ] Component split (SubmitTripModal) — dedicated session, see plan above
 - [ ] SVG favicon not square — `copycat.svg` viewBox is 953×1166, needs squaring then re-index in Search Console
 - [ ] Auto-approve low-risk submissions (AI filter passed → publish immediately)
 - [ ] Supabase egress resets May 6 2026
+- [ ] Continue App.jsx component split — remaining large components: `TripModal`, `AdminQueueModal`, `BlueprintPage`
 
 ---
 
@@ -324,18 +318,18 @@ Scotland, Prague, Amalfi, Ireland gallery photos were lost pre-R2 migration. Re-
 ```js
 C.slate      = "#1C2B3A"   // Primary dark navy
 C.amber      = "#C1692A"   // Primary orange / CTA
-C.cta        = "#C1692A"   // Same as amber
-C.ctaText    = "#FAF7F2"   // Cream text on CTA buttons
-C.white      = "#FAF7F2"   // Off-white background
-C.seafoam    = "#F0EAE0"   // Light warm background
+C.cta        = "#C4A882"   // Warm sand CTA button color
+C.ctaText    = "#1C2B3A"   // Dark text on CTA buttons
+C.white      = "#FFFFFF"   // Card backgrounds
+C.seafoam    = "#FAF7F2"   // Page/modal background
 C.tide       = "#E8DDD0"   // Borders
 C.muted      = "#A89080"   // Muted text
-C.green      = "#3B6D11"   // Success
-C.red        = "#A32D2D"   // Error/danger
+C.green      = "#7A9E5A"   // Success
+C.red        = "#B03A2E"   // Error/danger
 ```
 
-Full `C` object defined at top of App.jsx — must be exported exactly to `constants.js` when split is done.
+Full `C` object now lives in `src/constants.js` and is imported by all split components.
 
 ---
 
-*Last updated: April 10, 2026 — R2 photo fix, form freeze fix, Supabase security, email notifications, admin queue tabs, SEO canonical fix, component split planning.*
+*Last updated: April 11, 2026 — Component split complete (constants.js, PhotoImportModal, HybridProcessor, SubmitFormStep, SubmitTripModal). Form freeze fixed via forwardRef/useImperativeHandle pattern — form state now owned by SubmitFormStep, SubmitTripModal header never re-renders on keystrokes. Full submit flow tested and confirmed working end-to-end including photos.*
