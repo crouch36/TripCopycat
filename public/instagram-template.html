@@ -421,10 +421,13 @@ const firstTwoSentences = (q) => {
 };
 document.getElementById("post-quote").textContent = quote ? `"${firstTwoSentences(quote)}"` : "";
 
+  const photoProxied = photo && photo.startsWith("http")
+    ? `/api/image?url=${encodeURIComponent(photo)}`
+    : photo;
+
   if (photo) {
-    // Proxy through /api/image so html2canvas can capture it (R2 CORS blocks direct canvas use)
-    const proxied = photo.startsWith("http") ? `/api/image?url=${encodeURIComponent(photo)}` : photo;
-    document.getElementById("post-bg").style.backgroundImage = `url(${JSON.stringify(proxied)})`;
+    // Use direct URL for display — proxied version used only during download capture
+    document.getElementById("post-bg").style.backgroundImage = `url(${JSON.stringify(photo)})`;
   }
 
   const restsEl = document.getElementById("post-rests");
@@ -562,23 +565,33 @@ Keep it under 300 words. No em-dashes. Sound like a smart traveler, not a bot.`;
     btn.disabled = true;
 
     const doCapture = () => {
-      html2canvas(document.getElementById("post-card"), {
-        useCORS: true,
-        allowTaint: true,
-        scale: 2,
-        logging: false,
-      }).then(canvas => {
-        const a = document.createElement("a");
-        a.download = `tripcopycat-${cityOnly.toLowerCase().replace(/\s+/g, "-")}.png`;
-        a.href = canvas.toDataURL("image/png");
-        a.click();
-        btn.textContent = "⬇ Download Image";
-        btn.disabled = false;
-      }).catch(() => {
-        btn.textContent = "⬇ Download Image";
-        btn.disabled = false;
-        alert("Could not generate image — try screenshotting instead.");
-      });
+      // Swap to proxied URL before capture so html2canvas can read the cross-origin image
+      const bgEl = document.getElementById("post-bg");
+      const originalBg = bgEl.style.backgroundImage;
+      if (photoProxied && photo) {
+        bgEl.style.backgroundImage = `url("${photoProxied}")`;
+      }
+      setTimeout(() => {
+        html2canvas(document.getElementById("post-card"), {
+          useCORS: true,
+          allowTaint: false,
+          scale: 2,
+          logging: false,
+        }).then(canvas => {
+          bgEl.style.backgroundImage = originalBg;
+          const a = document.createElement("a");
+          a.download = `tripcopycat-${cityOnly.toLowerCase().replace(/\s+/g, "-")}.png`;
+          a.href = canvas.toDataURL("image/png");
+          a.click();
+          btn.textContent = "⬇ Download Image";
+          btn.disabled = false;
+        }).catch(() => {
+          bgEl.style.backgroundImage = originalBg;
+          btn.textContent = "⬇ Download Image";
+          btn.disabled = false;
+          alert("Could not generate image — try screenshotting instead.");
+        });
+      }, 1000);
     };
 
     if (!window.html2canvas) {
