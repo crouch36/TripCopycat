@@ -111,19 +111,19 @@
     .post-logo {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 7px;
       font-family: 'Inter', sans-serif;
-      font-size: clamp(9px, 1.8vw, 12px);
-      font-weight: 700;
-      color: rgba(255,255,255,0.85);
-      letter-spacing: 0.04em;
-      text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+      font-size: clamp(12px, 2.4vw, 17px);
+      font-weight: 800;
+      color: rgba(255,255,255,0.95);
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.7);
     }
     .post-logo img {
-      width: clamp(16px, 3vw, 22px);
-      height: clamp(16px, 3vw, 22px);
+      width: clamp(24px, 4.5vw, 34px);
+      height: clamp(24px, 4.5vw, 34px);
       object-fit: contain;
-      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
+      filter: drop-shadow(0 1px 4px rgba(0,0,0,0.6));
     }
 
     /* ── Bottom content ── */
@@ -374,7 +374,14 @@
   document.getElementById("post-dest").textContent     = cityOnly;
   document.getElementById("post-duration").textContent = duration;
   document.getElementById("post-label").textContent    = "VERIFIED PATH: " + dest.toUpperCase();
-  document.getElementById("post-quote").textContent    = quote ? `"${quote.slice(0, 120)}"` : "";
+  // Cut at last sentence boundary within 180 chars
+const trimQuote = (q, max) => {
+  if (q.length <= max) return q;
+  const cut = q.slice(0, max);
+  const lastPeriod = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+  return lastPeriod > 60 ? q.slice(0, lastPeriod + 1) : cut.trimEnd() + "…";
+};
+document.getElementById("post-quote").textContent = quote ? `"${trimQuote(quote, 180)}"` : "";
 
   if (photo) {
     document.getElementById("post-bg").style.backgroundImage = `url(${JSON.stringify(photo)})`;
@@ -471,7 +478,7 @@ Keep it under 300 words. No em-dashes. Sound like a smart traveler, not a bot.`;
 
   function fallbackCaption() {
     const restsLine = rests.length ? `\n\n🍽️ ${rests.join(" · ")}` : "";
-    return `Stop guessing your route.\n\n${dest} — ${duration}. Verified by a real traveler, not an algorithm.${quote ? `\n\n"${quote.slice(0, 120)}"` : ""}${restsLine}\n\n✈️ Get the full Verified Path at tripcopycat.com 🔗 [Link in Bio]\n\n#TripCopycat #VerifiedPath #${cityOnly.replace(/\s+/g, "")}Travel #TravelItinerary #TravelGuide`;
+    return `Stop guessing your route.\n\n${dest} — ${duration}. Verified by a real traveler, not an algorithm.${quote ? `\n\n"${trimQuote(quote, 180)}"` : ""}${restsLine}\n\n✈️ Get the full Verified Path at tripcopycat.com 🔗 [Link in Bio]\n\n#TripCopycat #VerifiedPath #${cityOnly.replace(/\s+/g, "")}Travel #TravelItinerary #TravelGuide`;
   }
 
   function copyCaption() {
