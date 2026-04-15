@@ -329,7 +329,7 @@
     <!-- Top bar -->
     <div class="post-top">
       <span class="post-logo" style="background:rgba(0,0,0,0.38);padding:5px 10px;border-radius:10px">
-        <img id="logo-img" src="/copycat.svg" alt="TripCopycat" />
+        <img id="logo-img" src="/apple-touch-icon.png" alt="TripCopycat" crossorigin="anonymous" />
         TripCopycat.com
       </span>
       <span class="post-actually">✓ Actually Traveled</span>
@@ -634,15 +634,9 @@ Do NOT use: #Travel #Wanderlust #Instagood #InstaTravel`;
   // ── Download via html2canvas ──────────────────────────────────────────────
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-  // Convert logo SVG to data URI — stored in promise so capture waits for it
-  let logoDataUri = null;
-  const logoReady = fetch("/copycat.svg")
-    .then(r => r.text())
-    .then(svg => {
-      logoDataUri = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
-      const logoImg = document.getElementById("logo-img");
-      if (logoImg) logoImg.src = logoDataUri;
-    }).catch(() => { logoDataUri = null; });
+  // Logo uses PNG (apple-touch-icon) — html2canvas captures raster reliably on iOS
+  // No fetch needed — direct src, pre-loaded by browser
+  const logoReady = Promise.resolve();
 
   function downloadCard() {
     const btn = document.querySelector(".btn-download");
@@ -650,8 +644,11 @@ Do NOT use: #Travel #Wanderlust #Instagood #InstaTravel`;
     btn.disabled = true;
 
     const doCapture = async () => {
-      // Wait for logo data URI to be ready before capturing
       await logoReady;
+      // Swap logo to proxied URL for html2canvas capture
+      const logoEl = document.getElementById("logo-img");
+      const originalLogoSrc = logoEl ? logoEl.src : null;
+      if (logoEl) logoEl.src = `/api/image?url=${encodeURIComponent("https://www.tripcopycat.com/apple-touch-icon.png")}`;
       const bgEl = document.getElementById("post-bg");
       const originalBg = bgEl.style.backgroundImage;
       if (photoProxied && photo) {
@@ -665,6 +662,7 @@ Do NOT use: #Travel #Wanderlust #Instagood #InstaTravel`;
           logging: false,
         }).then(canvas => {
           bgEl.style.backgroundImage = originalBg;
+          if (logoEl && originalLogoSrc) logoEl.src = originalLogoSrc;
           const dataUrl = canvas.toDataURL("image/png");
 
           if (isIOS) {
@@ -696,6 +694,7 @@ Do NOT use: #Travel #Wanderlust #Instagood #InstaTravel`;
           btn.disabled = false;
         }).catch(() => {
           bgEl.style.backgroundImage = originalBg;
+          if (logoEl && originalLogoSrc) logoEl.src = originalLogoSrc;
           btn.textContent = "⬇ Download Image";
           btn.disabled = false;
           alert("Could not generate image — try screenshotting instead.");
