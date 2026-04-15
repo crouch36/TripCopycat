@@ -634,21 +634,24 @@ Do NOT use: #Travel #Wanderlust #Instagood #InstaTravel`;
   // ── Download via html2canvas ──────────────────────────────────────────────
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-  // Convert logo SVG to data URI at load so html2canvas can capture it on iOS
-  fetch("/copycat.svg")
+  // Convert logo SVG to data URI — stored in promise so capture waits for it
+  let logoDataUri = null;
+  const logoReady = fetch("/copycat.svg")
     .then(r => r.text())
     .then(svg => {
-      const dataUri = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+      logoDataUri = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
       const logoImg = document.getElementById("logo-img");
-      if (logoImg) logoImg.src = dataUri;
-    }).catch(() => {});
+      if (logoImg) logoImg.src = logoDataUri;
+    }).catch(() => { logoDataUri = null; });
 
   function downloadCard() {
     const btn = document.querySelector(".btn-download");
     btn.textContent = "Generating…";
     btn.disabled = true;
 
-    const doCapture = () => {
+    const doCapture = async () => {
+      // Wait for logo data URI to be ready before capturing
+      await logoReady;
       const bgEl = document.getElementById("post-bg");
       const originalBg = bgEl.style.backgroundImage;
       if (photoProxied && photo) {
