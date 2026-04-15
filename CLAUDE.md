@@ -137,7 +137,7 @@ VITE_GEOCODE_SECRET
 | `stripe-webhook.js` | Handles Stripe checkout events | Live keys only |
 | `create-checkout.js` | Creates Stripe checkout session | |
 | `sitemap.xml.js` | Dynamic sitemap | Uses `/trips/:id` URLs |
-| `image.js` | Image proxy for OG images | |
+| `image.js` | Image proxy for OG images and Instagram template | Allows proxying from Supabase bucket AND Cloudflare R2 (`pub-f680025b41de449893423994b6e1c42b.r2.dev`). Updated Apr 11 2026 to allow R2 — do not remove R2 from allowedHosts. |
 
 ---
 
@@ -313,14 +313,48 @@ Scotland, Prague, Amalfi, Ireland gallery photos were lost pre-R2 migration. Re-
 
 ---
 
-## Known Pending Items
+## Instagram Post Template
 
-- [ ] Gallery re-upload: Scotland, Prague, Amalfi, Ireland — via admin edit modal
+### File
+`public/instagram-template.html` — standalone static page, excluded from SPA catch-all in `vercel.json`
+
+### How it works
+Opened by the 📸 Post button in TripModal (admin mode only). Receives trip data as URL params:
+`dest`, `duration`, `quote`, `doNext`, `photo`, `rests`, `bars`, `acts`, `tripId`, `mapsKey`, `geminiKey`
+
+### Features
+- **Neo-Brutalist layout** — frosted pill text protection (rgba 0,0,0,0.38 + border-radius 10px) on all text elements
+- **"Actually Traveled" badge** top-right, "TripCopycat.com" + cat logo top-left
+- **Smart venue selection** — prefers venues mentioned in `loves` text, excludes venues in `doNext`
+- **Static map snippet** via Google Maps Static API — uses stored `venue_coords`, zero extra geocoding calls
+- **AI caption** via direct Gemini 2.0 Flash browser call (bypasses `/api/gemini` — was returning 503)
+- **Split output** — Caption block (3 clean tags) + First Comment block (full 12-15 tag stack)
+- **iOS save panel** — detects iOS, shows full-screen image with "Press and hold → Save to Photos"
+- **Desktop download** — triggers file download via `<a>` click
+
+### Logo
+Uses `apple-touch-icon.png` (not `copycat.svg`). The SVG is a raster image wrapped in SVG — html2canvas cannot capture it. Do NOT switch back to SVG. Do NOT proxy the logo through `/api/image` during capture — it causes a question mark flash and blank logo in the saved image. `apple-touch-icon.png` is same-domain and captures directly.
+
+### Hashtag strategy
+- **Caption** (3 tags only): `#TripCopycat #ActuallyTraveled #[City]`
+- **First Comment** (12-15 tags, tiered):
+  - Brand: `#TripCopycat #ActuallyTraveled #VerifiedPath`
+  - High Intent: `#TravelBlueprint #TravelItinerary #TripPlanning #TravelCheatCode #ItineraryLogic`
+  - Niche: `#ProfessionalTraveler #CuratedTravel #SmartLuxury` + audience tag
+  - Destination: `#[City] #[City]Travel`
+  - Trend: `#DestinationDupe #AntiAlgorithm #HumanVetted #OffTheBeatenPath` (2 most relevant)
+- Do NOT use: `#Travel #Wanderlust #Instagood #InstaTravel` — too broad, low conversion
+
+### Known Pending Items
+
 - [ ] Leaked password protection — enable once Supabase custom SMTP configured
 - [ ] SVG favicon not square — `copycat.svg` viewBox is 953×1166, needs squaring then re-index in Search Console
 - [ ] Auto-approve low-risk submissions (AI filter passed → publish immediately)
 - [ ] Supabase egress resets May 6 2026
 - [ ] Continue App.jsx component split — remaining large components: `TripModal`, `AdminQueueModal`, `BlueprintPage`
+- [ ] Instagram logic post template (`public/instagram-logic.html`) — high-contrast text card for "Problem/Solution" posts
+- [ ] Admin queue pin review — `PinReviewMap` component added to Completed tab, confirm working after deploy
+- [ ] Google Search Console — monitor redirect errors clearing after sitemap fix, re-request indexing if still pending
 
 ---
 
@@ -343,4 +377,4 @@ Full `C` object now lives in `src/constants.js` and is imported by all split com
 
 ---
 
-*Last updated: April 11, 2026 — Component split complete. Form freeze fixed. Approval 403 fixed (service role via api/approve-submission.js). Cover photo empty string bug fixed. Sitemap www/plural bug fixed — all 8 trip pages resubmitted for indexing. Gallery photos restored on all pre-migration trips. All trips published and confirmed working.*
+*Last updated: April 12, 2026 — Instagram post template complete (public/instagram-template.html): frosted pills, AI caption, split caption/first comment, tiered hashtag stack, iOS save panel, smart venue selection, static map, logo fix. Admin queue pin review map added. Sitemap www fix deployed. image.js updated to allow R2 proxy. Admin session state persists via sessionStorage. TripModal button labels added.*
