@@ -1023,10 +1023,10 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                 <div style={{ marginTop:"4px", fontSize:"14px", color:"rgba(255,255,255,0.95)", fontWeight:500, textShadow:"0 1px 4px rgba(0,0,0,0.5)" }}>{trip.destination}</div>
               </div>
               <div style={{ display:"flex", gap:"5px", flexWrap:"wrap", justifyContent:"flex-end", alignSelf:"flex-start" }}>
-                  <button onClick={handleShare} onTouchEnd={e=>{e.preventDefault();handleShare();}} title="Copy link" style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>{shareCopied ? "✓ Copied" : "🔗 Share"}</button>
-                  <button onClick={handleTwitterShare} onTouchEnd={e=>{e.preventDefault();handleTwitterShare();}} title="Share on X" style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>𝕏</button>
-                  <button onClick={() => onBookmark && onBookmark(trip.id)} onTouchEnd={e=>{e.preventDefault(); onBookmark && onBookmark(trip.id);}} title={isBookmarked ? "Remove bookmark" : "Bookmark"} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>{isBookmarked ? "🔖 Saved" : "🏷️ Save"}</button>
-                  <button onClick={() => setShowExport(true)} onTouchEnd={e=>{e.preventDefault();setShowExport(true);}} title="Export trip" style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>📤 Export</button>
+                  <button onClick={handleShare} onTouchEnd={e=>{e.preventDefault();handleShare();}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>{shareCopied ? "✓" : "🔗"}</button>
+                  <button onClick={handleTwitterShare} onTouchEnd={e=>{e.preventDefault();handleTwitterShare();}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>𝕏</button>
+                  <button onClick={() => onBookmark && onBookmark(trip.id)} onTouchEnd={e=>{e.preventDefault(); onBookmark && onBookmark(trip.id);}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>{isBookmarked ? "🔖" : "🏷️"}</button>
+                  <button onClick={() => setShowExport(true)} onTouchEnd={e=>{e.preventDefault();setShowExport(true);}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>📤</button>
                   {/* Blueprint purchase button — admin only until launch */}
                   {isAdmin && (() => {
                     const handleBlueprint = async () => {
@@ -1059,24 +1059,16 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                   {isAdmin && (() => {
                     const handleGenPost = (e) => {
                       e.stopPropagation();
-                      const quote = (trip.loves || "");
-                      const doNext = (trip.doNext || "");
-                      // Pass all venues so template can pick the most-highlighted ones
-                      const allRests = (trip.restaurants || []).map(r => r.item).filter(Boolean);
-                      const allBars  = (trip.bars || []).map(b => b.item).filter(Boolean);
-                      const allActs  = (trip.activities || []).map(a => a.item).filter(Boolean);
+                      const rests = (trip.restaurants || []).slice(0,3).map(r => r.item).filter(Boolean);
+                      const quote = (trip.loves || "").slice(0, 160);
                       const params = new URLSearchParams({
-                        dest:     trip.destination || "",
+                        dest: trip.destination || "",
                         duration: `${trip.duration || ""}${trip.travelers ? " · " + trip.travelers : ""}`,
                         quote,
-                        doNext,
-                        photo:    trip.image || "",
-                        rests:    allRests.join("||"),
-                        bars:     allBars.join("||"),
-                        acts:     allActs.join("||"),
-                        tripId:   trip.id || "",
-                        mapsKey:  import.meta.env.VITE_GOOGLE_MAPS_KEY || "",
-                        geminiKey: import.meta.env.VITE_GEMINI_API_KEY || "",
+                        photo: trip.image || "",
+                        r1: rests[0] || "",
+                        r2: rests[1] || "",
+                        r3: rests[2] || "",
                       });
                       const url = `/instagram-template.html?${params.toString()}`;
                       const a = document.createElement("a");
@@ -1722,7 +1714,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
       ]).catch(() => []);
       setUploadStatus("Saving your trip…");
 
-      const tripWithPhoto = { ...form, image: photoUrl || null, focalPoint, gallery: galleryUrls };
+      const tripWithPhoto = { ...form, image: photoUrl || "", focalPoint, gallery: galleryUrls };
       const result = runContentFilter(tripWithPhoto);
       setFilterResult(result);
 
@@ -2194,103 +2186,6 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
   );
 }
 
-// ── Pin Review Map ────────────────────────────────────────────────────────────
-// Inline map shown in admin Completed tab. Reads already-stored venue_coords —
-// zero additional geocoding API calls.
-function PinReviewMap({ tripId, onClose }) {
-  const [coords, setCoords] = useState(null);
-  const [tripVenues, setTripVenues] = useState(null);
-  const [status, setStatus] = useState("loading");
-  const mapRef = useRef(null);
-
-  const load = () => {
-    setStatus("loading");
-    supabase.from("trips")
-      .select("hotels, restaurants, bars, activities, venue_coords")
-      .eq("id", tripId)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error || !data) { setStatus("error"); return; }
-        if (!data.venue_coords || !Object.keys(data.venue_coords).length) { setStatus("empty"); return; }
-        setTripVenues(data);
-        setCoords(data.venue_coords);
-        setStatus("ready");
-      });
-  };
-
-  useEffect(() => { load(); }, [tripId]);
-
-  useEffect(() => {
-    if (status !== "ready" || !coords || !mapRef.current) return;
-    const key = import.meta.env.VITE_GOOGLE_MAPS_KEY || "";
-    if (!key) return;
-    const CAT_COLORS = { hotels:"#C1392B", restaurants:"#2980B9", bars:"#8E44AD", activities:"#27AE60" };
-
-    const renderMap = () => {
-      if (!window.google || !mapRef.current) return;
-      const pins = [];
-      for (const [cat, coordArr] of Object.entries(coords)) {
-        const venues = tripVenues?.[cat] || [];
-        (coordArr || []).forEach((c, i) => {
-          if (c?.lat && c?.lng) pins.push({ lat: c.lat, lng: c.lng, name: venues[i]?.item || cat, color: CAT_COLORS[cat] || "#888" });
-        });
-      }
-      if (!pins.length) { setStatus("empty"); return; }
-      const map = new window.google.maps.Map(mapRef.current, {
-        zoom: 10, center: { lat: pins[0].lat, lng: pins[0].lng },
-        mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
-      });
-      const bounds = new window.google.maps.LatLngBounds();
-      const iw = new window.google.maps.InfoWindow();
-      pins.forEach(pin => {
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 28 36"><path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 22 14 22S28 23.333 28 14C28 6.268 21.732 0 14 0z" fill="${pin.color}"/><circle cx="14" cy="14" r="6" fill="white"/></svg>`;
-        const m = new window.google.maps.Marker({
-          position: { lat: pin.lat, lng: pin.lng }, map,
-          icon: { url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg), scaledSize: new window.google.maps.Size(24, 32), anchor: new window.google.maps.Point(12, 32) },
-          title: pin.name,
-        });
-        m.addListener("click", () => { iw.setContent(`<div style="font-size:12px;font-weight:600;padding:2px 4px">${pin.name}</div>`); iw.open(map, m); });
-        bounds.extend({ lat: pin.lat, lng: pin.lng });
-      });
-      if (pins.length > 1) map.fitBounds(bounds);
-    };
-
-    if (window.google) { renderMap(); }
-    else {
-      const existing = document.querySelector('script[src*="maps.googleapis.com"]');
-      if (!existing) {
-        const s = document.createElement("script");
-        s.src = `https://maps.googleapis.com/maps/api/js?key=${key}`;
-        s.async = true; s.onload = renderMap;
-        document.head.appendChild(s);
-      } else { existing.addEventListener("load", renderMap); }
-    }
-  }, [status, coords, tripVenues]);
-
-  return (
-    <div style={{ marginTop:"10px", borderRadius:"10px", border:`1px solid ${C.tide}`, overflow:"hidden" }}>
-      <div style={{ padding:"8px 12px", display:"flex", justifyContent:"space-between", alignItems:"center", background:C.seafoam, borderBottom:`1px solid ${C.tide}` }}>
-        <div style={{ display:"flex", gap:"10px", alignItems:"center" }}>
-          <span style={{ fontSize:"11px", fontWeight:700, color:C.slate }}>📍 Pin Review</span>
-          {[["hotels","#C1392B"],["restaurants","#2980B9"],["bars","#8E44AD"],["activities","#27AE60"]].map(([cat,col]) => (
-            <span key={cat} style={{ fontSize:"9px", color:col, fontWeight:700 }}>● {cat}</span>
-          ))}
-        </div>
-        <button onClick={onClose} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"16px", lineHeight:1 }}>×</button>
-      </div>
-      {status === "loading" && <div style={{ padding:"24px", textAlign:"center", fontSize:"11px", color:C.muted }}>Loading pins…</div>}
-      {status === "error"   && <div style={{ padding:"20px", textAlign:"center", fontSize:"11px", color:C.red }}>Could not load venue coords.</div>}
-      {status === "empty"   && (
-        <div style={{ padding:"16px", textAlign:"center" }}>
-          <div style={{ fontSize:"11px", color:C.muted, marginBottom:"8px" }}>No coords yet — geocoding may still be running.</div>
-          <button onClick={load} style={{ fontSize:"11px", padding:"5px 12px", borderRadius:"6px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateMid, cursor:"pointer" }}>↻ Retry</button>
-        </div>
-      )}
-      {status === "ready" && <div ref={mapRef} style={{ height:"220px", width:"100%" }} />}
-    </div>
-  );
-}
-
 // ── Admin Queue Modal ─────────────────────────────────────────────────────────
 function AdminQueueModal({ onClose, onApprove }) {
   const [submissions, setSubmissions] = useState([]);
@@ -2298,7 +2193,6 @@ function AdminQueueModal({ onClose, onApprove }) {
   const [detail, setDetail] = useState(null);
   const [previewTripId, setPreviewTripId] = useState(null);
   const [queueTab, setQueueTab] = useState("pending");
-  const [pinReviewId, setPinReviewId] = useState(null);
 
   useEffect(() => {
     supabase.from("submissions").select("*").order("submitted_at", { ascending: false })
@@ -2306,35 +2200,26 @@ function AdminQueueModal({ onClose, onApprove }) {
   }, []);
 
   const approve = async (sub) => {
-    // Uses server-side API with service role key — client anon key blocked by RLS on trips insert
-    const res = await fetch("/api/approve-submission", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-secret": import.meta.env.VITE_GEOCODE_SECRET || "",
-      },
-      body: JSON.stringify({
-        submissionId:  sub.id,
-        tripData:      sub.trip_data,
-        submitterName: sub.submitter_name,
-        submitterEmail: sub.submitter_email,
-        userId:        sub.user_id || null,
-      }),
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      console.error("Approval failed:", json.error);
-      alert("Approval failed: " + (json.error || "Unknown error"));
-      return;
-    }
+    const t = sub.trip_data;
+    const { data: inserted } = await supabase.from("trips").insert([{
+      title:t.title, destination:t.destination, region:t.region,
+      author_name:sub.submitter_name, author_email:sub.submitter_email,
+      date:t.date, duration:t.duration, travelers:t.travelers,
+      tags:t.tags||[], loves:t.loves, do_next:t.do_next||t.doNext||"",
+      airfare:t.airfare||[], hotels:t.hotels||[], restaurants:t.restaurants||[],
+      bars:t.bars||[], activities:t.activities||[], days:t.days||[],
+      image:t.image??null, status:"published", user_id:sub.user_id||null, focal_point:t.focalPoint||{x:50,y:50}, gallery:t.gallery||[]
+    }]).select("id");
     // Fire-and-forget geocoding — never blocks approval, errors are silent
-    if (json.tripId) {
+    const newTripId = inserted?.[0]?.id;
+    if (newTripId) {
       fetch("/api/geocode-venues", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-geocode-secret": import.meta.env.VITE_GEOCODE_SECRET || "" },
-        body: JSON.stringify({ tripId: json.tripId }),
+        body: JSON.stringify({ tripId: newTripId }),
       }).catch(() => {});
     }
+    await supabase.from("submissions").update({ status:"approved", reviewed_at:new Date().toISOString(), approved_trip_id:newTripId||null }).eq("id",sub.id);
     setSubmissions(p => p.map(s => s.id===sub.id ? {...s,status:"approved"} : s));
     if (onApprove) onApprove();
     setDetail(null);
@@ -2427,13 +2312,9 @@ function AdminQueueModal({ onClose, onApprove }) {
                 </div>
               )}
               {sub.status==="approved" && sub.approved_trip_id && (
-                <div style={{ display:"flex", gap:"7px", marginTop:"6px", flexWrap:"wrap" }}>
-                  <button onClick={() => setPinReviewId(pinReviewId === sub.approved_trip_id ? null : sub.approved_trip_id)} style={{ padding:"6px 12px", borderRadius:"7px", border:`1px solid ${pinReviewId===sub.approved_trip_id?C.green:C.tide}`, background:pinReviewId===sub.approved_trip_id?C.greenBg:C.seafoam, color:pinReviewId===sub.approved_trip_id?C.green:C.slateMid, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>📍 {pinReviewId===sub.approved_trip_id?"Hide Pins":"Check Pins"}</button>
+                <div style={{ display:"flex", gap:"7px", marginTop:"6px" }}>
                   <button onClick={() => setPreviewTripId(sub.approved_trip_id)} style={{ padding:"6px 12px", borderRadius:"7px", border:`1px solid ${C.amber}`, background:C.amberBg, color:C.amber, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>🗺 Preview Blueprint</button>
                 </div>
-              )}
-              {sub.status==="approved" && sub.approved_trip_id && pinReviewId===sub.approved_trip_id && (
-                <PinReviewMap tripId={sub.approved_trip_id} onClose={() => setPinReviewId(null)} />
               )}
             </div>
           ))}
@@ -3217,27 +3098,35 @@ function AdminEditModal({ trip, onSave, onClose }) {
                 <input style={{...inp, flex:1}} value={form.image||""} onChange={e=>updField("image",e.target.value)} placeholder="/your-photo.jpg or https://..." />
                 <label style={{ padding:"7px 12px", borderRadius:"7px", border:`1px solid ${C.amber}`, background:C.amberBg, color:C.slate, fontSize:"11px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0 }}>
                   📤 Upload Photo
-                  <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display:"none" }} onChange={async (e) => {
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" style={{ display:"none" }} onChange={async (e) => {
                     const file = e.target.files[0];
                     if (!file) return;
-                    const scale = Math.min(1, 1200 / 1200);
-                    const canvas = document.createElement("canvas");
+                    // Compress via canvas — bakes EXIF rotation into pixels
+                    const objUrl = URL.createObjectURL(file);
                     const img = new Image();
                     img.onload = async () => {
                       const s = Math.min(1, 1200 / img.width);
+                      const canvas = document.createElement("canvas");
                       canvas.width = Math.round(img.width * s);
                       canvas.height = Math.round(img.height * s);
                       canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+                      URL.revokeObjectURL(objUrl);
                       canvas.toBlob(async (blob) => {
-                        const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-                        const { error } = await supabase.storage.from("trip-photos").upload(path, blob, { contentType:"image/jpeg", upsert:false });
-                        if (!error) {
-                          const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
-                          updField("image", data.publicUrl);
+                        // Upload to R2 via server function (consistent with all new uploads)
+                        try {
+                          const resp = await fetch(`/api/upload-image?folder=photos&type=image%2Fjpeg&name=cover.jpg`, {
+                            method: "POST",
+                            body: blob,
+                          });
+                          const upData = await resp.json();
+                          if (upData.url) updField("image", upData.url);
+                        } catch(err) {
+                          console.error("Cover photo upload error:", err);
                         }
                       }, "image/jpeg", 0.82);
                     };
-                    img.src = URL.createObjectURL(file);
+                    img.onerror = () => URL.revokeObjectURL(objUrl);
+                    img.src = objUrl;
                     e.target.value = "";
                   }} />
                 </label>
@@ -4373,7 +4262,7 @@ export default function App() {
   // Admin state
   const isAdminUrl = window.location.pathname === "/admin" || window.location.hash === "#admin";
   const [showAdminLogin, setShowAdminLogin] = useState(isAdminUrl);
-  const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem("tc_admin") === "1");
+  const [isAdmin, setIsAdmin] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Trigger admin login if navigated to #admin after mount
@@ -4385,7 +4274,7 @@ export default function App() {
     window.addEventListener("hashchange", checkAdmin);
     return () => window.removeEventListener("hashchange", checkAdmin);
   }, [isAdmin]);
-  const handleAdminLogin = () => { setIsAdmin(true); setShowAdminLogin(false); sessionStorage.setItem("tc_admin", "1"); };
+  const handleAdminLogin = () => { setIsAdmin(true); setShowAdminLogin(false); };
   const [showLegal, setShowLegal] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showMoreTags, setShowMoreTags] = useState(false);
@@ -4459,7 +4348,7 @@ export default function App() {
           <div style={{ fontSize:"12px", fontWeight:700, color:C.white, display:"flex", alignItems:"center", gap:"8px" }}>
             <span>🔐</span> Admin Mode Active — you can edit, delete and add trips
           </div>
-          <button onClick={() => { setIsAdmin(false); sessionStorage.removeItem("tc_admin"); }} style={{ fontSize:"11px", fontWeight:700, color:C.white, background:"rgba(255,255,255,0.2)", border:"none", borderRadius:"6px", padding:"4px 12px", cursor:"pointer" }}>Exit Admin</button>
+          <button onClick={() => setIsAdmin(false)} style={{ fontSize:"11px", fontWeight:700, color:C.white, background:"rgba(255,255,255,0.2)", border:"none", borderRadius:"6px", padding:"4px 12px", cursor:"pointer" }}>Exit Admin</button>
         </div>
       )}
 
