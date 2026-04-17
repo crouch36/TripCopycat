@@ -51,6 +51,72 @@
 
 ---
 
+## CRITICAL: Read Before Write Protocol
+
+**Every session must follow this process before modifying any file:**
+
+1. **Read the file first** — use the view tool to read the specific section being changed. Never modify from memory or assumption.
+2. **State the current working state** — explicitly describe what the code currently does before changing it. If it's working, say so.
+3. **State the scope** — list exactly which lines/functions will change and confirm no other functionality is affected.
+4. **State dependencies** — identify any other files that depend on what's being changed.
+5. **One fix at a time** — complete and verify one fix before starting the next.
+
+**If any of these can't be answered confidently — stop and ask Andrew before writing code.**
+
+This protocol exists because repeated "fixes" in this project have broken previously working functionality by acting on assumption rather than verification.
+
+---
+
+## CRITICAL: Do Not Touch — Known Working State
+
+These items are confirmed working. Do NOT modify them without explicit instruction from Andrew and full re-verification:
+
+### `index.html` OG Tags
+- Homepage uses **real hardcoded values** — `og:title`, `og:description`, `og:url`, `og:image` all contain actual content
+- `api/trip/[id].js` overrides these by **string-replacing the actual values** at serve time for trip pages
+- Do NOT replace with `__OG_*` placeholders — the homepage is a static file and placeholders will show raw in social previews
+- Do NOT change the exact strings used for replacement without updating `api/trip/[id].js` to match
+
+### `api/image.js` — Allowed Hosts
+- Must allow BOTH domains: `wnjxtjeospeblvqdqsdj.supabase.co` AND `pub-f680025b41de449893423994b6e1c42b.r2.dev`
+- Removing R2 breaks: Instagram template download, OG image proxy for R2-hosted cover photos
+- Do NOT revert to Supabase-only
+
+### `vercel.json` Catch-All Exclusions
+- `instagram-template.html` must remain excluded from the SPA catch-all
+- `sitemap.xml` must remain routed to `api/sitemap.xml.js`
+- `blueprint/sample` must remain routed to `api/sample-blueprint`
+- Do NOT simplify the catch-all regex without preserving all exclusions
+
+### `api/trip/[id].js` — OG Replacement Strings
+- Replaces these exact strings: `TripCopycat | Real Itineraries from Real Travelers`, `User-submitted travel guides. Planned by others. Perfected by you.`, `https://www.tripcopycat.com`, `https://www.tripcopycat.com/og-default.png`
+- If `index.html` OG values are ever changed, `api/trip/[id].js` replacement strings MUST be updated to match
+- The `proxyImage()` function routes R2 URLs through `/api/image` — do not change this logic
+
+### Instagram Template — Logo
+- Uses `apple-touch-icon.png` — NOT `copycat.svg`
+- `copycat.svg` is a raster image wrapped in SVG — html2canvas cannot capture it
+- Do NOT switch back to SVG, do NOT proxy the logo through `/api/image` during capture
+- Logo proxy causes question mark flash → blank logo in saved iOS photo
+
+### Admin Session Persistence
+- Admin state stored in `sessionStorage` key `"tc_admin"` — set on login, removed on Exit Admin
+- `useState` initializes from sessionStorage: `useState(() => sessionStorage.getItem("tc_admin") === "1")`
+- Do NOT revert to plain `useState(false)`
+
+### Sitemaps — Both Must Use www and /trips/
+- `scripts/generate-sitemap.js`: `SITE_URL = "https://www.tripcopycat.com"` (www, not no-www)
+- `api/sitemap.xml.js`: uses `https://www.tripcopycat.com` and `/trips/:id` (plural)
+- Changing either without updating both will cause Google redirect errors
+
+### SubmitTripModal Form Architecture
+- Form text state lives in `SubmitFormStep` — NOT in `SubmitTripModal`
+- `draftSaving` and `draftSaved` state variables do NOT exist — do not add them back
+- Draft status uses DOM manipulation: `document.getElementById("draft-status")`
+- `SubmitFormStep` is always mounted (display:none when hidden) — do not conditionally render it
+
+---
+
 ## CRITICAL: File Handling — CRLF vs LF
 
 **This has caused file corruption twice. Follow exactly.**
@@ -377,4 +443,4 @@ Full `C` object now lives in `src/constants.js` and is imported by all split com
 
 ---
 
-*Last updated: April 12, 2026 — Instagram post template complete (public/instagram-template.html): frosted pills, AI caption, split caption/first comment, tiered hashtag stack, iOS save panel, smart venue selection, static map, logo fix. Admin queue pin review map added. Sitemap www fix deployed. image.js updated to allow R2 proxy. Admin session state persists via sessionStorage. TripModal button labels added.*
+*Last updated: April 16, 2026 — Read Before Write Protocol added. Do Not Touch section added for all known-working critical state. OG tag fix: index.html uses real homepage values, api/trip/[id].js replaces by string-matching. Admin edit cover upload fixed to use R2 + EXIF baking. Instagram template complete with iOS save panel, frosted pills, split caption/comment, smart venue selection. Pin review map in admin queue. image.js allows R2. Admin session persists via sessionStorage.*
