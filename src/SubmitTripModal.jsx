@@ -372,12 +372,20 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
 
   const uploadPhoto = async () => {
     if (!coverPhoto) return null;
-    const ext = coverPhoto.name.split(".").pop();
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error } = await supabase.storage.from("trip-photos").upload(path, coverPhoto, { contentType: coverPhoto.type, upsert: false });
-    if (error) { console.error("Photo upload error:", error); return null; }
-    const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
-    return data.publicUrl;
+    // Compress via canvas — bakes EXIF rotation, normalizes encoding
+    const blob = await compressForUpload(coverPhoto);
+    if (!blob) return null;
+    try {
+      const resp = await fetch(`/api/upload-image?folder=photos&type=image%2Fjpeg&name=cover.jpg`, {
+        method: "POST", body: blob,
+        signal: AbortSignal.timeout(30000),
+      });
+      const data = await resp.json();
+      return data.url || null;
+    } catch (err) {
+      console.error("Cover photo upload error:", err);
+      return null;
+    }
   };
 
   const compressForUpload = (file) => new Promise(resolve => {
@@ -396,18 +404,32 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
 
   const uploadGallery = async (onProgress) => {
     if (!galleryFiles.length) return [];
-    const urls = [];
-    for (let i = 0; i < galleryFiles.length; i++) {
-      const gf = galleryFiles[i];
-      if (onProgress) onProgress(`Uploading photo ${i + 1} of ${galleryFiles.length}…`);
-      const compressed = await compressForUpload(gf.file); if (!compressed) continue;
-      const path = `gallery-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-      const { error } = await supabase.storage.from("trip-photos").upload(path, compressed, { contentType: "image/jpeg", upsert: false });
-      if (error) { console.error("Gallery upload error:", error); continue; }
-      const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
-      urls.push({ url: data.publicUrl, caption: gf.caption || "" });
-    }
-    return urls;
+    const total = galleryFiles.length;
+    let completed = 0;
+    if (onProgress) onProgress(`Uploading ${total} photo${total > 1 ? "s" : ""}…`);
+    // Parallel uploads — all photos upload simultaneously
+    const results = await Promise.all(
+      galleryFiles.map(async (gf) => {
+        try {
+          const compressed = await compressForUpload(gf.file);
+          if (!compressed) return null;
+          const resp = await fetch(`/api/upload-image?folder=gallery&type=image%2Fjpeg&name=gallery.jpg`, {
+            method: "POST", body: compressed,
+            signal: AbortSignal.timeout(45000),
+          });
+          const data = await resp.json();
+          completed++;
+          if (onProgress) onProgress(`Uploaded ${completed} of ${total} photo${total > 1 ? "s" : ""}…`);
+          return data.url ? { url: data.url, caption: gf.caption || "" } : null;
+        } catch (err) {
+          console.error("Gallery photo upload error:", err);
+          completed++;
+          if (onProgress) onProgress(`Uploaded ${completed} of ${total} photo${total > 1 ? "s" : ""}…`);
+          return null;
+        }
+      })
+    );
+    return results.filter(Boolean);
   };
 
   const handleGalleryAdd = (e) => {
@@ -462,32 +484,50 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
     const form = formStepRef.current?.getForm() || EMPTY_FORM;
     setSubmitError(""); setStep("submitting");
     trackEvent("submit_start", { has_photo: !!coverPhoto, gallery_count: galleryFiles.length });
+
     try {
-      const photoUrl = await Promise.race([
-        uploadPhoto(),
-        new Promise((_, rej) => setTimeout(() => rej(new Error("Photo upload timed out")), 30000))
-      ]).catch(() => null);
-      if (galleryFiles.length > 0) setUploadStatus("Uploading cover photo…");
-      const galleryUrls = await Promise.race([
-        uploadGallery((msg) => setUploadStatus(msg)),
-        new Promise((_, rej) => setTimeout(() => rej(new Error("Gallery upload timed out")), 30000))
-      ]).catch(() => []);
+      // Step 1: Cover photo upload
+      setUploadStatus(coverPhoto ? "Uploading cover photo…" : "Preparing your trip…");
+      const photoUrl = await uploadPhoto().catch(() => null);
+
+      // Step 2: Gallery uploads (parallel)
+      let galleryUrls = [];
+      if (galleryFiles.length > 0) {
+        galleryUrls = await uploadGallery((msg) => setUploadStatus(msg)).catch(() => []);
+      }
+
+      // Step 3: Save submission to Supabase (with one retry)
       setUploadStatus("Saving your trip…");
-      const tripWithPhoto = { ...form, image: photoUrl || "", focalPoint, gallery: galleryUrls };
+      const tripWithPhoto = { ...form, image: photoUrl || null, focalPoint, gallery: galleryUrls };
       const result = runContentFilter(tripWithPhoto);
-      const { error } = await supabase.from("submissions").insert([{
+      const payload = [{
         trip_data: tripWithPhoto, submitter_name: submitterName, submitter_email: submitterEmail,
         status: result.passed ? "pending" : "flagged",
         ai_flagged: !result.passed, ai_flag_reason: result.flags.join("; "),
         user_id: currentUser?.id || null
-      }]);
-      if (error) throw error;
-      if (currentUser) await supabase.from("drafts").delete().eq("user_id", currentUser.id);
+      }];
+
+      let insertError;
+      // First attempt
+      const first = await supabase.from("submissions").insert(payload);
+      insertError = first.error;
+      // One retry after 2s if first attempt failed
+      if (insertError) {
+        setUploadStatus("Almost there — retrying…");
+        await new Promise(r => setTimeout(r, 2000));
+        const retry = await supabase.from("submissions").insert(payload);
+        insertError = retry.error;
+      }
+      if (insertError) throw new Error("Could not save your submission. Your draft is safe — please try again.");
+
+      // Step 4: Cleanup
+      if (currentUser) await supabase.from("drafts").delete().eq("user_id", currentUser.id).catch(() => {});
       trackEvent("submit_complete", { has_photo: !!photoUrl, gallery_count: galleryUrls.length });
       setStep("flagged");
+
     } catch (err) {
       console.error("Submit error:", err);
-      setSubmitError(err.message || "Submission failed. Your draft is saved — please try again.");
+      setSubmitError(err.message || "Something went wrong. Your draft is saved — tap 'Save Draft' then try again.");
       setStep("form");
     }
   };
@@ -679,7 +719,7 @@ export default function SubmitTripModal({ onClose, currentUser, displayName, onS
             <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>Submitting your trip…</div>
             <div style={{ fontSize:"12px", color:C.slateLight, marginBottom:"8px" }}>{uploadStatus || "Uploading photos and saving…"}</div>
             <div style={{ width:"200px", height:"4px", background:C.seafoam, borderRadius:"2px", margin:"0 auto 24px", overflow:"hidden" }}>
-              <div style={{ height:"100%", background:C.amber, borderRadius:"2px", animation:"progress-pulse 1.5s ease-in-out infinite", width:"60%" }} />
+              <div style={{ height:"100%", background:C.amber, borderRadius:"2px", transition:"width 0.4s ease", width: uploadStatus.includes("of") ? `${Math.round((parseInt(uploadStatus) / (galleryFiles.length || 1)) * 100)}%` : "40%" }} />
             </div>
             <button onClick={() => { setStep("form"); setSubmitError("Submission cancelled — your draft is still here."); setUploadStatus(""); }} style={{ fontSize:"11px", color:C.muted, background:"none", border:`1px solid ${C.tide}`, borderRadius:"6px", padding:"6px 16px", cursor:"pointer" }}>Cancel</button>
           </div>
