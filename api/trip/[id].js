@@ -163,11 +163,12 @@ export default async function handler(req, res) {
     res.status(500).send("Failed to load app"); return;
   }
 
+  // Replace homepage OG values with trip-specific values
   html = html
-    .replace(/__OG_TITLE__/g,       escapeHtml(title))
-    .replace(/__OG_DESCRIPTION__/g, escapeHtml(description))
-    .replace(/__OG_URL__/g,         canonicalUrl)
-    .replace(/__OG_IMAGE__/g,       escapeHtml(ogImage));
+    .replace(/content="TripCopycat \| Real Itineraries from Real Travelers"/g, `content="${escapeHtml(title)}"`)
+    .replace(/content="User-submitted travel guides\. Planned by others\. Perfected by you\."/g, `content="${escapeHtml(description)}"`)
+    .replace(/content="https:\/\/www\.tripcopycat\.com"/g,                     `content="${canonicalUrl}"`)
+    .replace(/content="https:\/\/www\.tripcopycat\.com\/og-default\.png"/g,    `content="${escapeHtml(ogImage)}"`);
 
   const canonicalTag = `<link rel="canonical" href="${canonicalUrl}" />`;
   const jsonLdTag    = tripData
