@@ -18,7 +18,8 @@ function proxyImage(imageUrl) {
   if (!imageUrl) return DEFAULT_IMAGE;
   if (imageUrl.startsWith(SITE_URL)) return imageUrl;
   if (imageUrl.startsWith("http")) return `${SITE_URL}/api/image?url=${encodeURIComponent(imageUrl)}`;
-  return `${SITE_URL}${imageUrl}`;
+  // Relative paths are pre-migration images that no longer exist on the domain — use default
+  return DEFAULT_IMAGE;
 }
 
 function buildDescription(trip) {
@@ -170,6 +171,8 @@ export default async function handler(req, res) {
     .replace(/content="https:\/\/www\.tripcopycat\.com"/g,                     `content="${canonicalUrl}"`)
     .replace(/content="https:\/\/www\.tripcopycat\.com\/og-default\.png"/g,    `content="${escapeHtml(ogImage)}"`);
 
+  // Remove the homepage canonical from index.html before injecting the trip-specific one
+  html = html.replace(/<link rel="canonical" href="https:\/\/www\.tripcopycat\.com"\s*\/?>/g, "");
   const canonicalTag = `<link rel="canonical" href="${canonicalUrl}" />`;
   const jsonLdTag    = tripData
     ? `<script type="application/ld+json">${buildJsonLd(tripData, canonicalUrl, ogImage)}</script>`
