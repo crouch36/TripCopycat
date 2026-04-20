@@ -1542,12 +1542,19 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
 
   const uploadPhoto = async () => {
     if (!coverPhoto) return null;
-    const ext = coverPhoto.name.split(".").pop();
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error } = await supabase.storage.from("trip-photos").upload(path, coverPhoto, { contentType: coverPhoto.type, upsert: false });
-    if (error) { console.error("Photo upload error:", error); return null; }
-    const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
-    return data.publicUrl;
+    const blob = await compressForUpload(coverPhoto);
+    if (!blob) return null;
+    try {
+      const resp = await fetch(`/api/upload-image?folder=photos&type=image%2Fjpeg&name=cover.jpg`, {
+        method: "POST", body: blob,
+        signal: AbortSignal.timeout(30000),
+      });
+      const data = await resp.json();
+      return data.url || null;
+    } catch (err) {
+      console.error("Cover photo upload error:", err);
+      return null;
+    }
   };
 
   const compressForUpload = (file) => new Promise(resolve => {
@@ -1556,8 +1563,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
     img.onload = () => {
       const scale = Math.min(1, 1200 / img.width);
       const canvas = document.createElement("canvas");
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
+      canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
       canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
       canvas.toBlob(blob => { URL.revokeObjectURL(url); resolve(blob); }, "image/jpeg", 0.7);
     };
@@ -1567,19 +1573,31 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
 
   const uploadGallery = async (onProgress) => {
     if (!galleryFiles.length) return [];
-    const urls = [];
-    for (let i = 0; i < galleryFiles.length; i++) {
-      const gf = galleryFiles[i];
-      if (onProgress) onProgress(`Uploading photo ${i + 1} of ${galleryFiles.length}…`);
-      const compressed = await compressForUpload(gf.file);
-      if (!compressed) continue;
-      const path = `gallery-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-      const { error } = await supabase.storage.from("trip-photos").upload(path, compressed, { contentType: "image/jpeg", upsert: false });
-      if (error) { console.error("Gallery upload error:", error); continue; }
-      const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
-      urls.push({ url: data.publicUrl, caption: gf.caption || "" });
-    }
-    return urls;
+    const total = galleryFiles.length;
+    let completed = 0;
+    if (onProgress) onProgress(`Uploading ${total} photo${total > 1 ? "s" : ""}…`);
+    const results = await Promise.all(
+      galleryFiles.map(async (gf) => {
+        try {
+          const compressed = await compressForUpload(gf.file);
+          if (!compressed) return null;
+          const resp = await fetch(`/api/upload-image?folder=gallery&type=image%2Fjpeg&name=gallery.jpg`, {
+            method: "POST", body: compressed,
+            signal: AbortSignal.timeout(45000),
+          });
+          const data = await resp.json();
+          completed++;
+          if (onProgress) onProgress(`Uploaded ${completed} of ${total} photo${total > 1 ? "s" : ""}…`);
+          return data.url ? { url: data.url, caption: gf.caption || "" } : null;
+        } catch (err) {
+          console.error("Gallery photo upload error:", err);
+          completed++;
+          if (onProgress) onProgress(`Uploaded ${completed} of ${total} photo${total > 1 ? "s" : ""}…`);
+          return null;
+        }
+      })
+    );
+    return results.filter(Boolean);
   };
 
   const handleGalleryAdd = (e) => {
