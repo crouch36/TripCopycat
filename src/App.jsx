@@ -4472,12 +4472,17 @@ export default function App() {
       {/* Main layout — sidebar + grid */}
       <div style={{ maxWidth:"100%", padding:"20px 16px", display:"flex", gap:"24px", alignItems:"flex-start", boxSizing:"border-box" }}>
 
-        {/* Left Sidebar */}
+        {/* Left Sidebar — desktop: sticky column, mobile: fixed overlay */}
         {sidebarOpen && (
-          <aside style={{ width:"220px", flexShrink:0, position:"sticky", top:"68px" }}>
+          <aside style={ isMobile ? {
+            position:"fixed", inset:0, zIndex:300, background:C.seafoam, overflowY:"auto",
+            WebkitOverflowScrolling:"touch", padding:"16px", boxSizing:"border-box"
+          } : {
+            width:"220px", flexShrink:0, position:"sticky", top:"68px"
+          }}>
             {/* Collapse button */}
-            <button onClick={() => setSidebarOpen(false)} style={{ width:"100%", padding:"7px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.muted, fontSize:"11px", fontWeight:600, cursor:"pointer", marginBottom:"14px", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span>Hide sidebar</span><span>←</span>
+            <button onClick={() => setSidebarOpen(false)} onTouchEnd={e => { e.preventDefault(); setSidebarOpen(false); }} style={{ width:"100%", padding:"10px 14px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.muted, fontSize:"12px", fontWeight:600, cursor:"pointer", marginBottom:"16px", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center", touchAction:"manipulation", WebkitTapHighlightColor:"transparent" }}>
+              <span>Hide filters</span><span style={{ fontSize:"16px", lineHeight:1 }}>×</span>
             </button>
 
             {/* Trip type filter */}
@@ -4546,7 +4551,7 @@ export default function App() {
 
         {/* Expand sidebar button when collapsed */}
         {!sidebarOpen && (
-          <button onClick={() => setSidebarOpen(true)} style={{ position:"fixed", left:"16px", top:"50%", transform:"translateY(-50%)", zIndex:50, background:C.white, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"8px 6px", cursor:"pointer", fontSize:"11px", color:C.muted, boxShadow:`0 2px 8px rgba(44,62,80,0.1)`, writingMode:"vertical-rl" }}>
+          <button onClick={() => setSidebarOpen(true)} onTouchEnd={e => { e.preventDefault(); setSidebarOpen(true); }} style={{ position:"fixed", left:"16px", top:"50%", transform:"translateY(-50%)", zIndex:150, background:C.white, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"10px 8px", cursor:"pointer", fontSize:"11px", color:C.muted, boxShadow:`0 2px 8px rgba(44,62,80,0.1)`, writingMode:"vertical-rl", WebkitTapHighlightColor:"transparent", touchAction:"manipulation" }}>
             Filters →
           </button>
         )}
