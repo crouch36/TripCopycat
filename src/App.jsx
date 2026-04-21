@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import supabase from "./supabaseClient.js";
 
 // ── Analytics ─────────────────────────────────────────────────────────────────
