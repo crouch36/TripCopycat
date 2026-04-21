@@ -157,6 +157,29 @@ function runContentFilter(trip) {
 // Accent:    Terracotta   #C1692A  (tags, highlights)
 // Font:      Playfair Display (display) + Nunito (body)
 
+// ── Error Boundary ───────────────────────────────────────────────────────────
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) { console.error("TripCopycat error:", error, info); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#FAF7F2", fontFamily:"'DM Sans',sans-serif", padding:"32px 16px", textAlign:"center" }}>
+          <div>
+            <div style={{ fontSize:"40px", marginBottom:"16px" }}>🐾</div>
+            <div style={{ fontSize:"20px", fontWeight:700, color:"#1C2B3A", marginBottom:"8px" }}>Something went wrong</div>
+            <div style={{ fontSize:"14px", color:"#7A8A96", marginBottom:"24px" }}>An unexpected error occurred. Your data is safe.</div>
+            <button onClick={() => window.location.reload()} style={{ background:"#C1692A", color:"#fff", border:"none", borderRadius:"8px", padding:"10px 24px", fontSize:"14px", fontWeight:700, cursor:"pointer" }}>Reload page</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+
 const C = {
   azure:       "#C4A882",
   azureDeep:   "#A8896A",
@@ -1105,7 +1128,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
               {gallery.map((g, idx) => (
                 <div key={idx} onClick={() => setLightboxIdx(idx)} style={{ flexShrink:0, width:"80px", height:"60px", borderRadius:"6px", overflow:"hidden", cursor:"pointer", border:`1.5px solid ${C.tide}`, position:"relative" }}
                   className="tc-hover-border">
-                  <img src={g.url} alt={g.caption||""} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
+                  <img src={g.url} alt={g.caption||""} loading="lazy" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
                 </div>
               ))}
               <div style={{ flexShrink:0, display:"flex", alignItems:"center", paddingLeft:"4px" }}>
@@ -1233,7 +1256,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                       style={{ background:C.white, borderRadius:"12px", border:`1px solid ${C.tide}`, overflow:"hidden", cursor:"pointer", transition:"background-color .15s ease, box-shadow .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease" }}
                       className="tc-hover-border">
                       <div style={{ height:"65px", background:t.image?"transparent":grad, position:"relative", overflow:"hidden" }}>
-                        {t.image && <img src={t.image} alt={t.title} style={{ width:"100%", height:"100%", objectFit:"cover" }} />}
+                        {t.image && <img src={t.image} alt={t.title} loading="lazy" style={{ width:"100%", height:"100%", objectFit:"cover" }} />}
                         {t.image && <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.2)" }} />}
                         {isSameAuthor && <div style={{ position:"absolute", top:"5px", left:"6px", background:"rgba(196,168,130,0.9)", borderRadius:"20px", padding:"2px 7px", fontSize:"9px", color:"#fff", fontWeight:700 }}>Same author</div>}
                       </div>
@@ -1281,7 +1304,7 @@ function TripCard({ trip, onClick, isBookmarked, onBookmark }) {
       {/* Image / placeholder */}
       <div style={{ height:"148px", background:trip.image ? "transparent" : grad, position:"relative", display:"flex", alignItems:"flex-end", padding:"14px", overflow:"hidden" }}>
         {trip.image
-          ? <img src={trip.image} alt={trip.title} style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:`${trip.focalPoint?.x||50}% ${trip.focalPoint?.y||50}%` }} />
+          ? <img src={trip.image} alt={trip.title} loading="lazy" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:`${trip.focalPoint?.x||50}% ${trip.focalPoint?.y||50}%` }} />
           : <span style={{ fontSize:"42px", position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-60%)", opacity:0.35 }}>{emoji}</span>
         }
         {trip.image && <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.1) 60%)" }} />}
@@ -1303,6 +1326,22 @@ function TripCard({ trip, onClick, isBookmarked, onBookmark }) {
         <div style={{ display:"flex", flexWrap:"wrap", gap:"4px", marginBottom:"10px" }}>
           {trip.tags.map(t => <span key={t} style={{ fontSize:"10px", fontWeight:600, padding:"2px 8px", borderRadius:"20px", background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}` }}>{t}</span>)}
         </div>
+        {(() => {
+          const venueCount = ["hotels","restaurants","bars","activities"].reduce((n,k) => n + (trip[k]?.filter(r=>r.item).length||0), 0);
+          const hasGallery = trip.gallery?.length > 0;
+          const hasPhoto = !!trip.image;
+          const hasItinerary = trip.days?.length > 0;
+          const parts = [];
+          if (venueCount > 0) parts.push(`${venueCount} venue${venueCount!==1?"s":""}`);
+          if (hasGallery) parts.push(`${trip.gallery.length} photo${trip.gallery.length!==1?"s":""}`);
+          if (hasItinerary) parts.push("day-by-day");
+          if (parts.length === 0 && hasPhoto) parts.push("cover photo");
+          return parts.length > 0 ? (
+            <div style={{ fontSize:"10px", color:C.azureDeep, fontWeight:600, marginBottom:"8px", display:"flex", alignItems:"center", gap:"4px" }}>
+              <span style={{ color:C.amber }}>✦</span>{parts.join(" · ")}
+            </div>
+          ) : null;
+        })()}
         <div style={{ fontSize:"12px", color:C.slateMid, lineHeight:1.65, marginBottom:"12px" }}>
           <span style={{ fontWeight:700, color:C.green }}>❤️ </span>{trip.loves.substring(0,100)}…
         </div>
@@ -4190,8 +4229,8 @@ export default function App() {
     trackEvent("page_view", { path: window.location.pathname });
   }, []);
 
-  const openTrip = (trip) => { setSelected(trip); window.history.pushState(null, "", `/trip/${trip.id}`); trackEvent("trip_view", { trip_id: String(trip.id), title: trip.title, region: trip.region }); };
-  const closeTrip = () => { setSelected(null); window.history.pushState(null, "", "/"); window.__closeTripModal = null; };
+  const openTrip = (trip) => { setSelected(trip); window.history.pushState(null, "", `/trip/${trip.id}`); document.title = `${trip.title} | TripCopycat`; trackEvent("trip_view", { trip_id: String(trip.id), title: trip.title, region: trip.region }); };
+  const closeTrip = () => { setSelected(null); window.history.pushState(null, "", "/"); document.title = "TripCopycat | Real Itineraries from Real Travelers"; window.__closeTripModal = null; };
   useEffect(() => { window.__closeTripModal = selected ? closeTrip : null; }, [selected]);
 
   const allTrips = [...dbTrips, ...trips];
@@ -4356,6 +4395,7 @@ export default function App() {
   }, [dbTrips, trips, search, region, tag, sortBy, duration, bookmarks]);
 
   return (
+    <ErrorBoundary>
     <div style={{ minHeight:"100vh", background:C.seafoam, fontFamily:"'Nunito',system-ui,sans-serif", overflowX:"hidden" }}>
       <GlobalStyles />
       <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,700&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -4434,9 +4474,12 @@ export default function App() {
             Planned by others. Perfected by you.
           </h1>
           <div style={{ display:"flex", gap:"10px", justifyContent:"center", alignItems:"center", flexWrap:"wrap", marginBottom:"12px" }}>
-            <button onClick={() => openSubmit()} style={{ background:C.amber, color:"#fff", border:`2px solid ${C.amber}`, borderRadius:"6px", padding:"9px 20px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
-              Submit a Trip →
-            </button>
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"4px" }}>
+              <button onClick={() => openSubmit()} style={{ background:C.amber, color:"#fff", border:`2px solid ${C.amber}`, borderRadius:"6px", padding:"9px 20px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
+                Submit a Trip →
+              </button>
+              {allTrips.length > 0 && <span style={{ fontSize:"10px", color:C.muted, fontWeight:500 }}>Join {[...new Set(allTrips.map(t=>t.author))].length} travelers who've shared their itinerary</span>}
+            </div>
             <button onClick={() => { window.location.href = "/blueprint/sample"; }} style={{ background:"transparent", color:C.amber, border:`2px solid ${C.amber}`, borderRadius:"6px", padding:"9px 18px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", display:"inline-flex", alignItems:"center", gap:"6px" }}>
               <span style={{ fontSize:"11px" }}>▲</span>
               Sample Blueprint
@@ -4724,5 +4767,6 @@ export default function App() {
         <button onClick={() => setShowLegal(true)} style={{ fontSize:"11px", color:C.muted, background:"none", border:"none", cursor:"pointer", textDecoration:"underline", fontFamily:"inherit" }}>Terms of Service</button>
       </footer>
     </div>
+    </ErrorBoundary>
   );
 }
