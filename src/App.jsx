@@ -102,6 +102,14 @@ const GLOBAL_STYLES = `
 
   /* Spinner animation */
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes skeleton-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  @keyframes toast-in {
+    from { opacity:0; transform:translateY(8px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
   @keyframes progress-pulse {
     0% { transform: translateX(-100%); }
     50% { transform: translateX(60%); }
@@ -3923,7 +3931,7 @@ function BlueprintPage({ tripId, onClose }) {
           <div style={{ display:"flex", gap:"10px", marginTop:"24px", flexWrap:"wrap", fontFamily:"'DM Sans',sans-serif" }}>
             <button onClick={() => window.print()} style={{ padding:"10px 20px", borderRadius:"8px", border:"none", background:C.amber, color:C.slate, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>⬇ Download PDF</button>
             <button onClick={generateKML} style={{ padding:"10px 20px", borderRadius:"8px", border:"1px solid rgba(196,168,130,0.5)", background:"transparent", color:C.amber, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>🗺 Open in Google Maps</button>
-            <button onClick={() => { navigator.clipboard.writeText(window.location.href); alert("Link copied!"); }} style={{ padding:"10px 20px", borderRadius:"8px", border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"rgba(255,255,255,0.8)", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>🔗 Share Blueprint</button>
+            <button onClick={() => { navigator.clipboard.writeText(window.location.href); window.__toast && window.__toast("Link copied!"); }} style={{ padding:"10px 20px", borderRadius:"8px", border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"rgba(255,255,255,0.8)", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>🔗 Share Blueprint</button>
           </div>
         </div>
       </div>
@@ -4150,6 +4158,30 @@ function HowItWorksModal({ onClose, onSubmit }) {
 }
 
 // ── App ───────────────────────────────────────────────────────────────────────
+
+
+// ── Toast Notification ────────────────────────────────────────────────────────
+function Toast() {
+  const [toasts, setToasts] = React.useState([]);
+  React.useEffect(() => {
+    window.__toast = (msg) => {
+      const id = Date.now();
+      setToasts(p => [...p, { id, msg }]);
+      setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 2500);
+    };
+    return () => { window.__toast = null; };
+  }, []);
+  if (!toasts.length) return null;
+  return (
+    <div style={{ position:"fixed", bottom:"80px", left:"50%", transform:"translateX(-50%)", zIndex:9000, display:"flex", flexDirection:"column", gap:"8px", alignItems:"center", pointerEvents:"none" }}>
+      {toasts.map(t => (
+        <div key={t.id} style={{ background:C.slate, color:C.white, padding:"10px 20px", borderRadius:"20px", fontSize:"13px", fontWeight:600, boxShadow:"0 4px 16px rgba(28,43,58,0.25)", whiteSpace:"nowrap", animation:"toast-in .2s ease" }}>
+          {t.msg}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function App() {
   const [showGear, setShowGear] = useState(window.location.pathname === "/gear");
@@ -4399,6 +4431,7 @@ export default function App() {
     <div style={{ minHeight:"100vh", background:C.seafoam, fontFamily:"'Nunito',system-ui,sans-serif", overflowX:"hidden" }}>
       <GlobalStyles />
       <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,700&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+      <Toast />
 
       {/* Admin banner */}
       {isAdmin && (
@@ -4704,12 +4737,16 @@ export default function App() {
                 )}
               </div>
             ))}
-            {tripsLoading && (
-              <div style={{ gridColumn:"1/-1", textAlign:"center", padding:"56px 20px", color:C.muted }}>
-                <div style={{ fontSize:"32px", marginBottom:"12px" }}>🐾</div>
-                <div style={{ fontSize:"14px", fontWeight:600, color:C.slateLight }}>Loading itineraries…</div>
+            {tripsLoading && Array.from({length:8}).map((_,i) => (
+              <div key={i} style={{ background:C.white, border:`1px solid ${C.tide}`, borderRadius:"16px", overflow:"hidden" }}>
+                <div style={{ height:"148px", background:`linear-gradient(90deg, ${C.seafoam} 25%, ${C.tide} 50%, ${C.seafoam} 75%)`, backgroundSize:"200% 100%", animation:"skeleton-shimmer 1.4s ease infinite" }} />
+                <div style={{ padding:"16px 18px" }}>
+                  <div style={{ height:"12px", borderRadius:"6px", background:`linear-gradient(90deg, ${C.seafoam} 25%, ${C.tide} 50%, ${C.seafoam} 75%)`, backgroundSize:"200% 100%", animation:"skeleton-shimmer 1.4s ease infinite", marginBottom:"10px", width:"60%" }} />
+                  <div style={{ height:"10px", borderRadius:"6px", background:`linear-gradient(90deg, ${C.seafoam} 25%, ${C.tide} 50%, ${C.seafoam} 75%)`, backgroundSize:"200% 100%", animation:"skeleton-shimmer 1.4s ease infinite", marginBottom:"8px", width:"80%" }} />
+                  <div style={{ height:"10px", borderRadius:"6px", background:`linear-gradient(90deg, ${C.seafoam} 25%, ${C.tide} 50%, ${C.seafoam} 75%)`, backgroundSize:"200% 100%", animation:"skeleton-shimmer 1.4s ease infinite", width:"40%" }} />
+                </div>
               </div>
-            )}
+            ))}
             {!tripsLoading && filtered.length===0 && (
               <div style={{ gridColumn:"1/-1", textAlign:"center", padding:"56px 20px", color:C.muted }}>
                 <div style={{ fontSize:"38px", marginBottom:"12px" }}>✈️</div>
