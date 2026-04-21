@@ -4474,12 +4474,9 @@ export default function App() {
             Planned by others. Perfected by you.
           </h1>
           <div style={{ display:"flex", gap:"10px", justifyContent:"center", alignItems:"center", flexWrap:"wrap", marginBottom:"12px" }}>
-            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"4px" }}>
-              <button onClick={() => openSubmit()} style={{ background:C.amber, color:"#fff", border:`2px solid ${C.amber}`, borderRadius:"6px", padding:"9px 20px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
-                Submit a Trip →
-              </button>
-              {allTrips.length > 0 && <span style={{ fontSize:"10px", color:C.muted, fontWeight:500 }}>Join {[...new Set(allTrips.map(t=>t.author))].length} travelers who've shared their itinerary</span>}
-            </div>
+            <button onClick={() => openSubmit()} style={{ background:C.amber, color:"#fff", border:`2px solid ${C.amber}`, borderRadius:"6px", padding:"9px 20px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
+              Submit a Trip →
+            </button>
             <button onClick={() => { window.location.href = "/blueprint/sample"; }} style={{ background:"transparent", color:C.amber, border:`2px solid ${C.amber}`, borderRadius:"6px", padding:"9px 18px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", display:"inline-flex", alignItems:"center", gap:"6px" }}>
               <span style={{ fontSize:"11px" }}>▲</span>
               Sample Blueprint
