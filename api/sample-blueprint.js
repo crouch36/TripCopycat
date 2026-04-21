@@ -465,8 +465,16 @@ export default function handler(req, res) {
 
   function copyLink() {
     navigator.clipboard.writeText(window.location.href)
-      .then(() => alert("Link copied!"))
+      .then(() => showToast("Link copied!"))
       .catch(() => prompt("Copy this link:", window.location.href));
+  }
+
+  function showToast(msg) {
+    var el = document.createElement("div");
+    el.textContent = msg;
+    el.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1C2B3A;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;pointer-events:none;box-shadow:0 4px 16px rgba(28,43,58,0.25);white-space:nowrap;transition:opacity .3s ease";
+    document.body.appendChild(el);
+    setTimeout(function() { el.style.opacity = "0"; setTimeout(function() { el.remove(); }, 300); }, 2200);
   }
 
   // Load Google Maps JS API then run initMap
