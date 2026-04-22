@@ -1068,10 +1068,10 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                           body: JSON.stringify({ tripId: trip.id, tripTitle: trip.title }),
                         });
                         const { url, error } = await res.json();
-                        if (error) { alert("Could not start checkout: " + error); return; }
+                        if (error) { window.__toast && window.__toast("Checkout error — please try again."); return; }
                         window.location.href = url;
                       } catch (e) {
-                        alert("Checkout failed. Please try again.");
+                        window.__toast && window.__toast("Checkout failed — please try again.");
                       }
                     };
                     return (
@@ -1304,7 +1304,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
 
 // ── Trip Card ─────────────────────────────────────────────────────────────────
 
-function TripCard({ trip, onClick, isBookmarked, onBookmark, isFounder }) {
+function TripCard({ trip, onClick, isBookmarked, onBookmark }) {
   const grad = REGION_GRADIENTS[trip.region] || "linear-gradient(135deg,#8B7355,#C4A882)";
   const emoji = REGION_EMOJI[trip.region] || "🌍";
   return (
@@ -1354,7 +1354,7 @@ function TripCard({ trip, onClick, isBookmarked, onBookmark, isFounder }) {
           <span style={{ fontWeight:700, color:C.green }}>❤️ </span>{trip.loves.substring(0,100)}…
         </div>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:`1px solid ${C.seafoamDeep}`, paddingTop:"10px" }}>
-          <div style={{ fontSize:"11px", color:C.muted, display:"flex", alignItems:"center", gap:"4px" }}>by <strong onClick={e => { e.stopPropagation(); if (window.__closeTripModal) window.__closeTripModal(); setTimeout(() => window.__setViewingProfile && window.__setViewingProfile(trip.author), window.__closeTripModal ? 200 : 0); }} style={{ color:C.amber, cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted" }}>{trip.author}</strong>{isFounder && <img src="/founding-badge.png" alt="Founding Copycat" title="Founding Copycat — Top 50" style={{ width:"18px", height:"18px", objectFit:"contain", flexShrink:0 }} />} · {trip.date}</div>
+          <div style={{ fontSize:"11px", color:C.muted }}>by <strong onClick={e => { e.stopPropagation(); if (window.__closeTripModal) window.__closeTripModal(); setTimeout(() => window.__setViewingProfile && window.__setViewingProfile(trip.author), window.__closeTripModal ? 200 : 0); }} style={{ color:C.amber, cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted" }}>{trip.author}</strong> · {trip.date}</div>
           <div style={{ fontSize:"11px", color:C.slateMid, fontWeight:600 }}>{trip.travelers}</div>
         </div>
       </div>
@@ -1724,7 +1724,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
     // Find JSON object
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      alert("Could not find structured data in the output. Make sure you copied the full response including the JSON block.");
+      window.__toast && window.__toast("No structured data found — make sure you copied the full response.");
       return;
     }
     try {
@@ -1752,7 +1752,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
       }));
       setStep("form");
     } catch(e) {
-      alert("Could not parse the JSON output. Please make sure you copied the complete response.");
+      window.__toast && window.__toast("Could not parse output — copy the complete response and try again.");
     }
   };
 
@@ -1762,7 +1762,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
   const toggleTag = tag => setForm(p => { if (!p.tags.includes(tag) && p.tags.length >= 8) return p; return {...p, tags: p.tags.includes(tag) ? p.tags.filter(t=>t!==tag) : [...p.tags, tag]}; });
 
   const handleSubmit = async () => {
-    if (!submitterName || !submitterEmail) { alert("Please add your name and email."); return; }
+    if (!submitterName || !submitterEmail) { setSubmitError("Please add your name and email before submitting."); setStep("form"); return; }
     setSubmitError("");
     setStep("submitting");
     trackEvent("submit_start", { has_photo: !!coverPhoto, gallery_count: galleryFiles.length });
@@ -1886,7 +1886,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                 onClick={() => {
                   const text = document.getElementById("hybrid-brain-dump")?.value || "";
                   const photos = window.__hybridPhotos || [];
-                  if (!text.trim() && !photos.length) { alert("Please add some text, a document, or photos to get started."); return; }
+                  if (!text.trim() && !photos.length) { window.__toast && window.__toast("Add some text or photos to get started."); return; }
                   setStep("hybrid-processing");
                   window.__hybridText = text;
                 }}
@@ -1985,7 +1985,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
             <button
               onClick={() => {
                 const photos = window.__supplementPhotos || [];
-                if (!photos.length) { alert("Please select at least one photo."); return; }
+                if (!photos.length) { window.__toast && window.__toast("Select at least one photo to continue."); return; }
                 window.__hybridPhotos = photos;
                 window.__hybridText = `Here is what I already have filled in about this trip. For each field, use the photos to ENHANCE or make more specific — if a photo shows a venue name that matches a vague description, use the specific name. Add new items the photos reveal that aren't already listed. Keep existing specific data as-is.\n\nTitle: ${form.title}\nDestination: ${form.destination}\nRegion: ${form.region}\nDuration: ${form.duration}\nDate: ${form.date}\nTravelers: ${form.travelers}\nLoves: ${form.loves}\nDo Next: ${form.doNext}\nHotels already listed: ${form.hotels?.filter(h=>h.item).map(h=>h.item).join(", ")||"none"}\nRestaurants already listed: ${form.restaurants?.filter(r=>r.item).map(r=>r.item).join(", ")||"none"}\nBars already listed: ${form.bars?.filter(b=>b.item).map(b=>b.item).join(", ")||"none"}\nActivities already listed: ${form.activities?.filter(a=>a.item).map(a=>a.item).join(", ")||"none"}\n\nFor the JSON output: include ALL items (existing + new from photos). If a photo reveals the specific name of something listed vaguely (e.g. "a hotel" → "The Meyrick Hotel"), return the improved version.`;
                 setStep("hybrid-processing");
@@ -2959,10 +2959,9 @@ function ProfilePage({ authorName, allTrips, onClose, onTripClick, currentUser, 
                 {authorName.charAt(0).toUpperCase()}
               </div>
               <div>
-                <div style={{ fontSize:"24px", fontWeight:700, color:"#FAF7F2", fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"4px", display:"flex", alignItems:"center", gap:"10px", flexWrap:"wrap" }}>
+                <div style={{ fontSize:"24px", fontWeight:700, color:"#FAF7F2", fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"4px" }}>
                   {authorName}
-                  {profile?.featured_contributor && <span style={{ fontSize:"13px", background:"linear-gradient(135deg,#C4A882,#A8896A)", borderRadius:"20px", padding:"2px 10px", fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>✦ Featured</span>}
-                  {profile?.founding_copycat && <img src="/founding-badge.png" alt="Founding Copycat" title="Founding Copycat — Top 50" style={{ width:"48px", height:"48px", objectFit:"contain", flexShrink:0 }} />}
+                  {profile?.featured_contributor && <span style={{ marginLeft:"8px", fontSize:"13px", background:"linear-gradient(135deg,#C4A882,#A8896A)", borderRadius:"20px", padding:"2px 10px", fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>✦ Featured</span>}
                 </div>
                 {profile?.bio && <div style={{ fontSize:"13px", color:"rgba(250,247,242,0.8)", marginBottom:"6px", lineHeight:1.5 }}>{profile.bio}</div>}
                 <div style={{ display:"flex", gap:"16px", flexWrap:"wrap" }}>
@@ -4201,7 +4200,6 @@ export default function App() {
     return <BlueprintPage tripId={blueprintId} onClose={() => { window.history.pushState(null, "", "/"); window.location.reload(); }} />;
   }
   const [tripsLoading, setTripsLoading] = useState(true);
-  const [foundingCopycats, setFoundingCopycats] = useState(new Set());
   const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -4255,13 +4253,6 @@ export default function App() {
           try { localStorage.setItem("tc_trips_cache", JSON.stringify(mapped)); } catch {}
         }
         setTripsLoading(false);
-        // Fetch founding copycat profiles in parallel
-        supabase.from("profiles").select("display_name").eq("founding_copycat", true)
-          .then(({ data: founders }) => {
-            if (founders?.length) {
-              setFoundingCopycats(new Set(founders.map(f => (f.display_name || "").toLowerCase())));
-            }
-          });
       });
   };
 
@@ -4384,7 +4375,7 @@ export default function App() {
     if (!isAdmin) {
       const result = runContentFilter(updated);
       if (!result.passed) {
-        alert("Your edit contains flagged content and could not be saved: " + result.flags.join(", "));
+        window.__toast && window.__toast("Edit blocked — flagged content: " + result.flags.join(", "));
         return;
       }
     }
@@ -4412,7 +4403,7 @@ export default function App() {
         if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
       }
     }
-    alert("Save failed after 3 attempts. Please check your connection and try again. Your changes are still in the form.");
+    window.__toast && window.__toast("Save failed after 3 attempts — your changes are still in the form.");
   };
   const handleDeleteTrip = async (id) => {
     await supabase.from("trips").delete().eq("id", id);
@@ -4690,7 +4681,7 @@ export default function App() {
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(min(300px,100%),1fr))", gap:"18px" }}>
                   {featuredTrips.map(trip => (
                     <div key={trip.id} style={{ position:"relative" }}>
-                      <TripCard trip={trip} onClick={openTrip} isBookmarked={bookmarks.includes(trip.id)} onBookmark={toggleBookmark} isFounder={foundingCopycats.has((trip.author||"").toLowerCase())} />
+                      <TripCard trip={trip} onClick={openTrip} isBookmarked={bookmarks.includes(trip.id)} onBookmark={toggleBookmark} />
                       {isAdmin && (
                         <div style={{ position:"absolute", top:"12px", right:"12px", display:"flex", gap:"6px", zIndex:10 }}>
                           <button onClick={e => { e.stopPropagation(); setEditingTrip(trip); }} style={{ padding:"5px 10px", borderRadius:"7px", border:"none", background:C.azure, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>✏️</button>
@@ -4736,7 +4727,7 @@ export default function App() {
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(min(280px,100%),1fr))", gap:"18px" }}>
             {filtered.map(trip => (
               <div key={trip.id} style={{ position:"relative" }}>
-                <TripCard trip={trip} onClick={openTrip} isBookmarked={bookmarks.includes(trip.id)} onBookmark={toggleBookmark} isFounder={foundingCopycats.has((trip.author||"").toLowerCase())} />
+                <TripCard trip={trip} onClick={openTrip} isBookmarked={bookmarks.includes(trip.id)} onBookmark={toggleBookmark} />
                 {isAdmin && (
                   <div style={{ position:"absolute", top:"12px", right:"12px", display:"flex", gap:"6px", zIndex:10 }}>
                     <button onClick={e => { e.stopPropagation(); setEditingTrip(trip); }} style={{ padding:"5px 10px", borderRadius:"7px", border:"none", background:C.azure, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>✏️</button>
