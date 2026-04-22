@@ -1058,8 +1058,8 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                   <button onClick={handleTwitterShare} onTouchEnd={e=>{e.preventDefault();handleTwitterShare();}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>𝕏</button>
                   <button onClick={() => onBookmark && onBookmark(trip.id)} onTouchEnd={e=>{e.preventDefault(); onBookmark && onBookmark(trip.id);}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>{isBookmarked ? "🔖" : "🏷️"}</button>
                   <button onClick={() => setShowExport(true)} onTouchEnd={e=>{e.preventDefault();setShowExport(true);}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>📤</button>
-                  {/* Blueprint purchase button — public */}
-                  {(() => {
+                  {/* Blueprint purchase button — admin only until launch */}
+                  {isAdmin && (() => {
                     const handleBlueprint = async () => {
                       try {
                         const res = await fetch("/api/create-checkout", {
@@ -1068,10 +1068,10 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                           body: JSON.stringify({ tripId: trip.id, tripTitle: trip.title }),
                         });
                         const { url, error } = await res.json();
-                        if (error) { window.__toast && window.__toast("Checkout error — please try again."); return; }
+                        if (error) { alert("Could not start checkout: " + error); return; }
                         window.location.href = url;
                       } catch (e) {
-                        window.__toast && window.__toast("Checkout failed — please try again.");
+                        alert("Checkout failed. Please try again.");
                       }
                     };
                     return (
@@ -1724,7 +1724,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
     // Find JSON object
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      window.__toast && window.__toast("No structured data found — make sure you copied the full response.");
+      alert("Could not find structured data in the output. Make sure you copied the full response including the JSON block.");
       return;
     }
     try {
@@ -1752,7 +1752,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
       }));
       setStep("form");
     } catch(e) {
-      window.__toast && window.__toast("Could not parse output — copy the complete response and try again.");
+      alert("Could not parse the JSON output. Please make sure you copied the complete response.");
     }
   };
 
@@ -1762,7 +1762,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
   const toggleTag = tag => setForm(p => { if (!p.tags.includes(tag) && p.tags.length >= 8) return p; return {...p, tags: p.tags.includes(tag) ? p.tags.filter(t=>t!==tag) : [...p.tags, tag]}; });
 
   const handleSubmit = async () => {
-    if (!submitterName || !submitterEmail) { setSubmitError("Please add your name and email before submitting."); setStep("form"); return; }
+    if (!submitterName || !submitterEmail) { alert("Please add your name and email."); return; }
     setSubmitError("");
     setStep("submitting");
     trackEvent("submit_start", { has_photo: !!coverPhoto, gallery_count: galleryFiles.length });
@@ -1886,7 +1886,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                 onClick={() => {
                   const text = document.getElementById("hybrid-brain-dump")?.value || "";
                   const photos = window.__hybridPhotos || [];
-                  if (!text.trim() && !photos.length) { window.__toast && window.__toast("Add some text or photos to get started."); return; }
+                  if (!text.trim() && !photos.length) { alert("Please add some text, a document, or photos to get started."); return; }
                   setStep("hybrid-processing");
                   window.__hybridText = text;
                 }}
@@ -1985,7 +1985,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
             <button
               onClick={() => {
                 const photos = window.__supplementPhotos || [];
-                if (!photos.length) { window.__toast && window.__toast("Select at least one photo to continue."); return; }
+                if (!photos.length) { alert("Please select at least one photo."); return; }
                 window.__hybridPhotos = photos;
                 window.__hybridText = `Here is what I already have filled in about this trip. For each field, use the photos to ENHANCE or make more specific — if a photo shows a venue name that matches a vague description, use the specific name. Add new items the photos reveal that aren't already listed. Keep existing specific data as-is.\n\nTitle: ${form.title}\nDestination: ${form.destination}\nRegion: ${form.region}\nDuration: ${form.duration}\nDate: ${form.date}\nTravelers: ${form.travelers}\nLoves: ${form.loves}\nDo Next: ${form.doNext}\nHotels already listed: ${form.hotels?.filter(h=>h.item).map(h=>h.item).join(", ")||"none"}\nRestaurants already listed: ${form.restaurants?.filter(r=>r.item).map(r=>r.item).join(", ")||"none"}\nBars already listed: ${form.bars?.filter(b=>b.item).map(b=>b.item).join(", ")||"none"}\nActivities already listed: ${form.activities?.filter(a=>a.item).map(a=>a.item).join(", ")||"none"}\n\nFor the JSON output: include ALL items (existing + new from photos). If a photo reveals the specific name of something listed vaguely (e.g. "a hotel" → "The Meyrick Hotel"), return the improved version.`;
                 setStep("hybrid-processing");
@@ -4200,6 +4200,12 @@ export default function App() {
     return <BlueprintPage tripId={blueprintId} onClose={() => { window.history.pushState(null, "", "/"); window.location.reload(); }} />;
   }
   const [tripsLoading, setTripsLoading] = useState(true);
+  const [foundingCopycats, setFoundingCopycats] = useState(new Set());
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [searchDebounced, setSearchDebounced] = useState("");
+  const sentinelRef = useRef(null);
   const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -4235,37 +4241,120 @@ export default function App() {
   useEffect(() => { window.__setViewingProfile = setViewingProfile; }, []);
 
 
+  const PAGE_SIZE = 20;
+
+  const mapTrip = t => ({
+    id:t.id, title:t.title, destination:t.destination, region:t.region,
+    author:t.author_name, date:t.date, duration:t.duration, travelers:t.travelers,
+    tags:t.tags||[], loves:t.loves, doNext:t.do_next,
+    airfare:t.airfare||[], hotels:t.hotels||[], restaurants:t.restaurants||[],
+    bars:t.bars||[], activities:t.activities||[], days:t.days||[],
+    image:t.image??null, userId:t.user_id||null, featured:t.featured||false,
+    focalPoint:t.focal_point||{x:50,y:50}, gallery:t.gallery||[]
+  });
+
   const fetchTrips = () => {
     setTripsLoading(true);
-    supabase.from("trips").select("*").eq("status","published").order("created_at", { ascending: false })
+    setPage(0);
+    setHasMore(true);
+    supabase.from("trips").select("*").eq("status","published")
+      .order("created_at", { ascending: false })
+      .range(0, PAGE_SIZE - 1)
       .then(({ data, error }) => {
         if (error) console.error("Supabase fetch error:", error);
-        if (data?.length > 0) {
-          const mapped = data.map(t => ({
-            id:t.id, title:t.title, destination:t.destination, region:t.region,
-            author:t.author_name, date:t.date, duration:t.duration, travelers:t.travelers,
-            tags:t.tags||[], loves:t.loves, doNext:t.do_next,
-            airfare:t.airfare||[], hotels:t.hotels||[], restaurants:t.restaurants||[],
-            bars:t.bars||[], activities:t.activities||[], days:t.days||[],
-            image:t.image??null, userId:t.user_id||null, featured:t.featured||false, focalPoint:t.focal_point||{x:50,y:50}, gallery:t.gallery||[]
-          }));
+        if (data) {
+          const mapped = data.map(mapTrip);
           setDbTrips(mapped);
+          setHasMore(data.length === PAGE_SIZE);
           try { localStorage.setItem("tc_trips_cache", JSON.stringify(mapped)); } catch {}
         }
         setTripsLoading(false);
+        supabase.from("profiles").select("display_name").eq("founding_copycat", true)
+          .then(({ data: founders }) => {
+            if (founders?.length) {
+              setFoundingCopycats(new Set(founders.map(f => (f.display_name || "").toLowerCase())));
+            }
+          });
       });
   };
 
+  const fetchMoreTrips = (currentPage) => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextPage = currentPage + 1;
+    supabase.from("trips").select("*").eq("status","published")
+      .order("created_at", { ascending: false })
+      .range(nextPage * PAGE_SIZE, nextPage * PAGE_SIZE + PAGE_SIZE - 1)
+      .then(({ data, error }) => {
+        if (error) console.error("Supabase fetch more error:", error);
+        if (data?.length) {
+          setDbTrips(p => {
+            const existingIds = new Set(p.map(t => t.id));
+            const newTrips = data.map(mapTrip).filter(t => !existingIds.has(t.id));
+            return [...p, ...newTrips];
+          });
+          setHasMore(data.length === PAGE_SIZE);
+          setPage(nextPage);
+        } else {
+          setHasMore(false);
+        }
+        setLoadingMore(false);
+      });
+  };
+
+  const searchTrips = (term) => {
+    if (!term.trim()) { fetchTrips(); return; }
+    setTripsLoading(true);
+    supabase.from("trips").select("*").eq("status","published")
+      .or(`title.ilike.%${term}%,destination.ilike.%${term}%,loves.ilike.%${term}%,travelers.ilike.%${term}%`)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) console.error("Supabase search error:", error);
+        setDbTrips(data ? data.map(mapTrip) : []);
+        setHasMore(false);
+        setTripsLoading(false);
+      });
+  };
   useEffect(() => {
     fetchTrips();
     trackEvent("page_view", { path: window.location.pathname });
   }, []);
 
+  // Debounce search — 300ms after user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchDebounced(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // When debounced search changes: server-side search or reset to paginated
+  useEffect(() => {
+    if (searchDebounced) {
+      searchTrips(searchDebounced);
+    } else if (searchDebounced === "" && !tripsLoading) {
+      fetchTrips();
+    }
+  }, [searchDebounced]);
+
+  // IntersectionObserver — load more when sentinel div enters viewport
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !searchDebounced) {
+          fetchMoreTrips(page);
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, page, searchDebounced]);
+
   const openTrip = (trip) => { setSelected(trip); window.history.pushState(null, "", `/trip/${trip.id}`); document.title = `${trip.title} | TripCopycat`; trackEvent("trip_view", { trip_id: String(trip.id), title: trip.title, region: trip.region }); };
   const closeTrip = () => { setSelected(null); window.history.pushState(null, "", "/"); document.title = "TripCopycat | Real Itineraries from Real Travelers"; window.__closeTripModal = null; };
   useEffect(() => { window.__closeTripModal = selected ? closeTrip : null; }, [selected]);
 
-  const allTrips = [...dbTrips, ...trips];
+  const allTrips = [...dbTrips, ...trips].filter((t, i, arr) => arr.findIndex(x => x.id === t.id) === i);
 
   // On first load, open trip modal if server injected __INITIAL_TRIP_ID__
   useEffect(() => {
@@ -4375,7 +4464,7 @@ export default function App() {
     if (!isAdmin) {
       const result = runContentFilter(updated);
       if (!result.passed) {
-        window.__toast && window.__toast("Edit blocked — flagged content: " + result.flags.join(", "));
+        alert("Your edit contains flagged content and could not be saved: " + result.flags.join(", "));
         return;
       }
     }
@@ -4403,7 +4492,7 @@ export default function App() {
         if (attempt < 2) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
       }
     }
-    window.__toast && window.__toast("Save failed after 3 attempts — your changes are still in the form.");
+    alert("Save failed after 3 attempts. Please check your connection and try again. Your changes are still in the form.");
   };
   const handleDeleteTrip = async (id) => {
     await supabase.from("trips").delete().eq("id", id);
@@ -4414,7 +4503,7 @@ export default function App() {
 
   const filtered = useMemo(() => {
     const f = allTrips.filter(t =>
-      (!search || [t.title,t.destination,t.travelers,t.loves].some(s=>s.toLowerCase().includes(search.toLowerCase()))) &&
+      (!searchDebounced || [t.title,t.destination,t.travelers,t.loves].some(s=>s?.toLowerCase().includes(searchDebounced.toLowerCase()))) &&
       (region==="All Regions"||t.region===region) &&
       (tag==="All"||tag==="__bookmarks__"?true:t.tags.includes(tag)) &&
       (tag!=="__bookmarks__"||bookmarks.includes(t.id)) &&
@@ -4424,7 +4513,7 @@ export default function App() {
     else if (sortBy === "destination") f.sort((a,b) => a.destination.localeCompare(b.destination));
     else if (sortBy === "duration") f.sort((a,b) => parseInt(a.duration)||0 - (parseInt(b.duration)||0));
     return f;
-  }, [dbTrips, trips, search, region, tag, sortBy, duration, bookmarks]);
+  }, [dbTrips, trips, searchDebounced, region, tag, sortBy, duration, bookmarks]);
 
   return (
     <ErrorBoundary>
@@ -4754,6 +4843,14 @@ export default function App() {
               </div>
             )}
           </div>
+
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} style={{ height:"1px" }} />
+          {loadingMore && (
+            <div style={{ textAlign:"center", padding:"24px", color:C.muted, fontSize:"13px" }}>
+              Loading more itineraries…
+            </div>
+          )}
         </main>
       </div>
 
