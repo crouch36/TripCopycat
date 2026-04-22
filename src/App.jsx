@@ -1058,8 +1058,8 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                   <button onClick={handleTwitterShare} onTouchEnd={e=>{e.preventDefault();handleTwitterShare();}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>𝕏</button>
                   <button onClick={() => onBookmark && onBookmark(trip.id)} onTouchEnd={e=>{e.preventDefault(); onBookmark && onBookmark(trip.id);}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>{isBookmarked ? "🔖" : "🏷️"}</button>
                   <button onClick={() => setShowExport(true)} onTouchEnd={e=>{e.preventDefault();setShowExport(true);}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>📤</button>
-                  {/* Blueprint purchase button — admin only until launch */}
-                  {isAdmin && (() => {
+                  {/* Blueprint purchase button — public */}
+                  {(() => {
                     const handleBlueprint = async () => {
                       try {
                         const res = await fetch("/api/create-checkout", {
