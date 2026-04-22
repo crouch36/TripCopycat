@@ -1304,7 +1304,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
 
 // ── Trip Card ─────────────────────────────────────────────────────────────────
 
-function TripCard({ trip, onClick, isBookmarked, onBookmark }) {
+function TripCard({ trip, onClick, isBookmarked, onBookmark, isFounder }) {
   const grad = REGION_GRADIENTS[trip.region] || "linear-gradient(135deg,#8B7355,#C4A882)";
   const emoji = REGION_EMOJI[trip.region] || "🌍";
   return (
@@ -1354,7 +1354,7 @@ function TripCard({ trip, onClick, isBookmarked, onBookmark }) {
           <span style={{ fontWeight:700, color:C.green }}>❤️ </span>{trip.loves.substring(0,100)}…
         </div>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:`1px solid ${C.seafoamDeep}`, paddingTop:"10px" }}>
-          <div style={{ fontSize:"11px", color:C.muted }}>by <strong onClick={e => { e.stopPropagation(); if (window.__closeTripModal) window.__closeTripModal(); setTimeout(() => window.__setViewingProfile && window.__setViewingProfile(trip.author), window.__closeTripModal ? 200 : 0); }} style={{ color:C.amber, cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted" }}>{trip.author}</strong> · {trip.date}</div>
+          <div style={{ fontSize:"11px", color:C.muted, display:"flex", alignItems:"center", gap:"4px" }}>by <strong onClick={e => { e.stopPropagation(); if (window.__closeTripModal) window.__closeTripModal(); setTimeout(() => window.__setViewingProfile && window.__setViewingProfile(trip.author), window.__closeTripModal ? 200 : 0); }} style={{ color:C.amber, cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted" }}>{trip.author}</strong>{isFounder && <img src="/founding-badge.png" alt="Founding Copycat" title="Founding Copycat — Top 50" style={{ width:"18px", height:"18px", objectFit:"contain", flexShrink:0 }} />} · {trip.date}</div>
           <div style={{ fontSize:"11px", color:C.slateMid, fontWeight:600 }}>{trip.travelers}</div>
         </div>
       </div>
@@ -2959,9 +2959,10 @@ function ProfilePage({ authorName, allTrips, onClose, onTripClick, currentUser, 
                 {authorName.charAt(0).toUpperCase()}
               </div>
               <div>
-                <div style={{ fontSize:"24px", fontWeight:700, color:"#FAF7F2", fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"4px" }}>
+                <div style={{ fontSize:"24px", fontWeight:700, color:"#FAF7F2", fontFamily:"'Playfair Display',Georgia,serif", marginBottom:"4px", display:"flex", alignItems:"center", gap:"10px", flexWrap:"wrap" }}>
                   {authorName}
-                  {profile?.featured_contributor && <span style={{ marginLeft:"8px", fontSize:"13px", background:"linear-gradient(135deg,#C4A882,#A8896A)", borderRadius:"20px", padding:"2px 10px", fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>✦ Featured</span>}
+                  {profile?.featured_contributor && <span style={{ fontSize:"13px", background:"linear-gradient(135deg,#C4A882,#A8896A)", borderRadius:"20px", padding:"2px 10px", fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>✦ Featured</span>}
+                  {profile?.founding_copycat && <img src="/founding-badge.png" alt="Founding Copycat" title="Founding Copycat — Top 50" style={{ width:"48px", height:"48px", objectFit:"contain", flexShrink:0 }} />}
                 </div>
                 {profile?.bio && <div style={{ fontSize:"13px", color:"rgba(250,247,242,0.8)", marginBottom:"6px", lineHeight:1.5 }}>{profile.bio}</div>}
                 <div style={{ display:"flex", gap:"16px", flexWrap:"wrap" }}>
@@ -4200,6 +4201,7 @@ export default function App() {
     return <BlueprintPage tripId={blueprintId} onClose={() => { window.history.pushState(null, "", "/"); window.location.reload(); }} />;
   }
   const [tripsLoading, setTripsLoading] = useState(true);
+  const [foundingCopycats, setFoundingCopycats] = useState(new Set());
   const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -4253,6 +4255,13 @@ export default function App() {
           try { localStorage.setItem("tc_trips_cache", JSON.stringify(mapped)); } catch {}
         }
         setTripsLoading(false);
+        // Fetch founding copycat profiles in parallel
+        supabase.from("profiles").select("display_name").eq("founding_copycat", true)
+          .then(({ data: founders }) => {
+            if (founders?.length) {
+              setFoundingCopycats(new Set(founders.map(f => (f.display_name || "").toLowerCase())));
+            }
+          });
       });
   };
 
@@ -4681,7 +4690,7 @@ export default function App() {
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(min(300px,100%),1fr))", gap:"18px" }}>
                   {featuredTrips.map(trip => (
                     <div key={trip.id} style={{ position:"relative" }}>
-                      <TripCard trip={trip} onClick={openTrip} isBookmarked={bookmarks.includes(trip.id)} onBookmark={toggleBookmark} />
+                      <TripCard trip={trip} onClick={openTrip} isBookmarked={bookmarks.includes(trip.id)} onBookmark={toggleBookmark} isFounder={foundingCopycats.has((trip.author||"").toLowerCase())} />
                       {isAdmin && (
                         <div style={{ position:"absolute", top:"12px", right:"12px", display:"flex", gap:"6px", zIndex:10 }}>
                           <button onClick={e => { e.stopPropagation(); setEditingTrip(trip); }} style={{ padding:"5px 10px", borderRadius:"7px", border:"none", background:C.azure, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>✏️</button>
@@ -4727,7 +4736,7 @@ export default function App() {
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(min(280px,100%),1fr))", gap:"18px" }}>
             {filtered.map(trip => (
               <div key={trip.id} style={{ position:"relative" }}>
-                <TripCard trip={trip} onClick={openTrip} isBookmarked={bookmarks.includes(trip.id)} onBookmark={toggleBookmark} />
+                <TripCard trip={trip} onClick={openTrip} isBookmarked={bookmarks.includes(trip.id)} onBookmark={toggleBookmark} isFounder={foundingCopycats.has((trip.author||"").toLowerCase())} />
                 {isAdmin && (
                   <div style={{ position:"absolute", top:"12px", right:"12px", display:"flex", gap:"6px", zIndex:10 }}>
                     <button onClick={e => { e.stopPropagation(); setEditingTrip(trip); }} style={{ padding:"5px 10px", borderRadius:"7px", border:"none", background:C.azure, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>✏️</button>

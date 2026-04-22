@@ -87,5 +87,29 @@ export default async function handler(req, res) {
     // Trip was inserted — don't fail the whole request, just log
   }
 
+  // ── Founding Copycat check ───────────────────────────────────────────────────
+  // After approval, count distinct approved authors. If ≤ 50, award founding badge.
+  if (submitterEmail) {
+    try {
+      const { data: authorRows } = await supabaseAdmin
+        .from("trips")
+        .select("author_email")
+        .eq("status", "published");
+
+      const distinctAuthors = new Set((authorRows || []).map(r => r.author_email).filter(Boolean));
+
+      if (distinctAuthors.size <= 50) {
+        // Upsert founding_copycat on profiles row matching this email
+        await supabaseAdmin
+          .from("profiles")
+          .update({ founding_copycat: true })
+          .eq("email", submitterEmail);
+      }
+    } catch (err) {
+      console.error("Founding Copycat check error:", err);
+      // Non-fatal — don't fail the approval
+    }
+  }
+
   return res.status(200).json({ success: true, tripId: newTripId });
 }
