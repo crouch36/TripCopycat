@@ -4059,9 +4059,9 @@ function BlueprintPage({ tripId, onClose }) {
 // ── How It Works Modal ───────────────────────────────────────────────────────
 function HowItWorksModal({ onClose, onSubmit }) {
   return (
-    <div className="tc-modal-overlay" style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:2000, display:"flex", alignItems:"center", justifyContent:"center", padding:"20px 16px", overflowY:"auto", backdropFilter:"blur(8px)" }}
+    <div className="tc-modal-overlay" style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:2000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"20px 16px", overflowY:"auto", WebkitOverflowScrolling:"touch", backdropFilter:"blur(8px)" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"560px", overflow:"hidden", boxShadow:"0 32px 64px rgba(44,62,80,0.22)", border:`1px solid ${C.tide}` }}>
+      <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"560px", overflow:"hidden", boxShadow:"0 32px 64px rgba(44,62,80,0.22)", border:`1px solid ${C.tide}`, marginTop:"auto", marginBottom:"auto" }}>
 
         {/* Header */}
         <div style={{ background:C.slate, padding:"28px 32px 24px", position:"relative", overflow:"hidden" }}>
