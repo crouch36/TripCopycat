@@ -1000,6 +1000,56 @@ function DailyItinerary({ days }) {
   );
 }
 
+// ── Editable Daily Itinerary (submit form) ────────────────────────────────────
+function EditableDailyItinerary({ days, onChange }) {
+  const [active, setActive] = useState(0);
+  const safeActive = Math.min(active, days.length - 1);
+  const d = days[safeActive];
+  if (!d) return null;
+  const inp = { width:"100%", padding:"5px 8px", borderRadius:"6px", border:`1px solid ${C.tide}`, fontSize:"11px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate };
+  const updItem = (ii, field, val) => onChange(days.map((day, di) =>
+    di !== safeActive ? day : { ...day, items: day.items.map((it, idx) => idx !== ii ? it : { ...it, [field]: val }) }
+  ));
+  const delItem = (ii) => onChange(days.map((day, di) =>
+    di !== safeActive ? day : { ...day, items: day.items.filter((_, idx) => idx !== ii) }
+  ));
+  const addItem = () => onChange(days.map((day, di) =>
+    di !== safeActive ? day : { ...day, items: [...day.items, { time:"", type:"activity", label:"", note:"" }] }
+  ));
+  return (
+    <div style={{ marginBottom:"14px" }}>
+      <div style={{ fontSize:"12px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>
+        📅 Daily Itinerary <span style={{ fontWeight:400, color:C.muted, fontSize:"10px" }}>— AI-generated, edit as needed</span>
+      </div>
+      <div style={{ border:`1px solid ${C.tide}`, borderRadius:"10px", overflow:"hidden" }}>
+        <div style={{ display:"flex", gap:"5px", padding:"8px 12px", overflowX:"auto", background:C.seafoam, borderBottom:`1px solid ${C.tide}` }}>
+          {days.map((day, i) => (
+            <button key={i} onClick={() => setActive(i)} style={{ padding:"5px 11px", borderRadius:"7px", border:`1px solid ${safeActive===i?C.slate:C.tide}`, cursor:"pointer", flexShrink:0, background:safeActive===i?C.slate:C.white, color:safeActive===i?C.white:C.slateLight, fontSize:"11px", fontWeight:700, whiteSpace:"nowrap" }}>
+              Day {day.day}{day.title ? ` · ${day.title}` : ""}
+            </button>
+          ))}
+        </div>
+        <div style={{ padding:"10px 12px" }}>
+          {d.items.map((item, ii) => (
+            <div key={ii} style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"8px", marginBottom:"7px" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"58px 1fr 96px auto", gap:"5px", marginBottom:"5px" }}>
+                <input style={inp} placeholder="Time" value={item.time||""} onChange={e=>updItem(ii,"time",e.target.value)} />
+                <input style={inp} placeholder="Venue / activity" value={item.label||""} onChange={e=>updItem(ii,"label",e.target.value)} />
+                <select style={inp} value={item.type||"activity"} onChange={e=>updItem(ii,"type",e.target.value)}>
+                  {["activity","restaurant","bar","hotel","transport"].map(t=><option key={t}>{t}</option>)}
+                </select>
+                <button onClick={()=>delItem(ii)} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px", flexShrink:0 }}>✕</button>
+              </div>
+              <input style={inp} placeholder="Note (optional)" value={item.note||""} onChange={e=>updItem(ii,"note",e.target.value)} />
+            </div>
+          ))}
+          <button onClick={addItem} style={{ fontSize:"11px", color:C.azure, background:"none", border:`1px dashed ${C.azure}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600 }}>+ Add stop</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Trip Modal ────────────────────────────────────────────────────────────────
 
 function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin }) {
@@ -1467,6 +1517,7 @@ const EMPTY_FORM = {
 
 function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, prefillData }) {
   const [step, setStep] = useState(prefillData ? "form" : "prompt");
+  const [isLocalMode, setIsLocalMode] = useState(false);
   const [pastedText, setPastedText] = useState("");
   const [filterResult, setFilterResult] = useState(null);
   const [submitterName, setSubmitterName] = useState(displayName || "");
@@ -1895,6 +1946,20 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
               </button>
             </div>
 
+            {/* Best of My City — local weekend guide */}
+            <div style={{ background:C.seafoam, borderRadius:"14px", border:`1.5px solid ${C.green}`, padding:"18px", marginBottom:"14px", cursor:"pointer" }}
+              onClick={() => { setIsLocalMode(true); setStep("local-weekend"); }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px" }}>
+                <span style={{ fontSize:"18px" }}>🏙️</span>
+                <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Best of My City</div>
+                <span style={{ fontSize:"9px", fontWeight:700, background:C.green, color:C.white, padding:"2px 8px", borderRadius:"20px" }}>New</span>
+              </div>
+              <div style={{ fontSize:"11px", color:C.slateMid, lineHeight:1.6 }}>
+                Know your city better than any guidebook? Drop your go-to spots — we'll build a shareable weekend itinerary that visitors can copy.
+              </div>
+              <div style={{ fontSize:"12px", fontWeight:700, color:C.green, marginTop:"10px" }}>Build My City Guide →</div>
+            </div>
+
             {/* Secondary options */}
             <div style={{ display:"flex", gap:"8px", alignItems:"stretch" }}>
               <button onClick={() => setStep("ai-prompt")} style={{ flex:1, padding:"12px", borderRadius:"10px", border:`1px solid ${C.tide}`, background:C.white, cursor:"pointer", textAlign:"left" }}>
@@ -1963,9 +2028,10 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
               window.__hybridPhotos = [];
               window.__supplementPhotos = [];
               window.__hybridText = "";
-              setStep("form");
+              setStep(data.days?.length > 0 ? "review-itinerary" : "form");
             }}
-            onBack={() => setStep(window.__supplementPhotos?.length ? "photo-supplement" : "prompt")}
+            onBack={() => setStep(window.__supplementPhotos?.length ? "photo-supplement" : isLocalMode ? "local-weekend" : "prompt")}
+            isLocalMode={isLocalMode}
           />
         )}
 
@@ -2038,6 +2104,54 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
               <button onClick={parseAIOutput} disabled={pastedText.length < 50} style={{ flex:1, padding:"9px", borderRadius:"8px", border:"none", background:pastedText.length<50?C.tide:`linear-gradient(135deg,${C.azureDark},${C.azure})`, color:C.white, fontWeight:700, fontSize:"13px", cursor:pastedText.length<50?"not-allowed":"pointer" }}>
                 Auto-populate form
               </button>
+            </div>
+          </div>
+        )}
+
+        {step === "local-weekend" && (
+          <div style={{ padding:"28px", maxHeight:"70vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
+            <div style={{ textAlign:"center", marginBottom:"20px" }}>
+              <div style={{ fontSize:"28px", marginBottom:"8px" }}>🏙️</div>
+              <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"4px" }}>Your city. Your picks.</div>
+              <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.6 }}>Dump your go-to spots — restaurants, bars, activities, neighborhoods. We'll turn it into a shareable weekend guide titled <em>Best of [City] — A Local's Weekend.</em></div>
+            </div>
+            <div style={{ background:C.seafoam, borderRadius:"14px", border:`1.5px solid ${C.green}`, padding:"18px", marginBottom:"14px" }}>
+              <div style={{ fontSize:"11px", color:C.slateMid, marginBottom:"8px", lineHeight:1.6 }}>
+                Just list your favorites — no format needed. Include the city, neighborhoods, restaurants, bars, things to do, and anything visitors shouldn't miss.
+              </div>
+              <textarea
+                id="local-brain-dump"
+                placeholder={`e.g. "Canton, Ohio weekend — Friday night at Bender's Tavern downtown, Saturday morning hike at Sippo Lake, lunch at Taggart's Ice Cream, afternoon at the Pro Football Hall of Fame, dinner at Gervasi Vineyard, Sunday brunch at Steel Magnolias. Stay near downtown. Avoid going in August — too hot."`}
+                style={{ width:"100%", minHeight:"120px", padding:"10px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"12px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate, resize:"vertical", lineHeight:1.6 }}
+              />
+              <button
+                onClick={() => {
+                  const text = document.getElementById("local-brain-dump")?.value || "";
+                  if (!text.trim()) { alert("Tell us about your city first."); return; }
+                  window.__hybridText = text;
+                  window.__hybridPhotos = [];
+                  setStep("hybrid-processing");
+                }}
+                style={{ width:"100%", marginTop:"14px", padding:"12px", borderRadius:"8px", border:"none", background:C.green, color:C.white, fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
+                Build My Weekend Guide →
+              </button>
+            </div>
+            <button onClick={() => { setIsLocalMode(false); setStep("prompt"); }} style={{ background:"none", border:"none", color:C.muted, fontSize:"12px", cursor:"pointer", width:"100%", textAlign:"center", paddingTop:"4px" }}>← Back</button>
+          </div>
+        )}
+
+        {step === "review-itinerary" && (
+          <div style={{ padding:"24px 28px", maxHeight:"70vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
+            <div style={{ marginBottom:"16px" }}>
+              <div style={{ fontSize:"15px", fontWeight:800, color:C.slate, marginBottom:"4px" }}>Here's your itinerary — edit as needed</div>
+              <div style={{ fontSize:"11px", color:C.slateLight }}>
+                {form.days.length} day{form.days.length!==1?"s":""} · {form.days.reduce((n,d)=>n+(d.items?.length||0),0)} stops — tap any field to edit, or add / remove stops per day.
+              </div>
+            </div>
+            <EditableDailyItinerary days={form.days} onChange={days => setForm(p=>({...p,days}))} />
+            <div style={{ display:"flex", gap:"10px", marginTop:"16px" }}>
+              <button onClick={() => setStep(isLocalMode ? "local-weekend" : "prompt")} style={{ padding:"10px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>← Back</button>
+              <button onClick={() => setStep("form")} style={{ flex:1, padding:"10px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"13px", fontWeight:700, cursor:"pointer" }}>Looks good — fill in details →</button>
             </div>
           </div>
         )}
@@ -2258,6 +2372,10 @@ function AdminQueueModal({ onClose, onApprove }) {
   const [detail, setDetail] = useState(null);
   const [previewTripId, setPreviewTripId] = useState(null);
   const [queueTab, setQueueTab] = useState("pending");
+  const [adminMapOpen, setAdminMapOpen] = useState(false);
+  const [adminMapPins, setAdminMapPins] = useState([]);
+  const [adminMapLoading, setAdminMapLoading] = useState(false);
+  const adminMapRef = useRef(null);
 
   useEffect(() => {
     supabase.from("submissions").select("*").order("submitted_at", { ascending: false })
@@ -2295,6 +2413,47 @@ function AdminQueueModal({ onClose, onApprove }) {
     setSubmissions(p => p.map(s => s.id===sub.id ? {...s,status:"rejected"} : s));
     setDetail(null);
   };
+
+  const geocodeSubmission = async (tripData) => {
+    const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_KEY || "";
+    if (!mapsKey) return [];
+    const dest = tripData.destination || "";
+    const CAT_COLORS = { hotels:"#C1392B", restaurants:"#2980B9", bars:"#8E44AD", activities:"#27AE60" };
+    const venues = [];
+    for (const [cat, color] of Object.entries(CAT_COLORS)) {
+      (tripData[cat] || []).forEach(v => { if (v.item) venues.push({ name: v.item, cat, color }); });
+    }
+    const pins = [];
+    for (const v of venues) {
+      try {
+        const q = encodeURIComponent(`${v.name} ${dest}`);
+        const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${q}&key=${mapsKey}`);
+        const data = await res.json();
+        const loc = data.results?.[0]?.geometry?.location;
+        if (loc) pins.push({ lat: loc.lat, lng: loc.lng, name: v.name, cat: v.cat, color: v.color });
+      } catch {}
+    }
+    return pins;
+  };
+
+  useEffect(() => {
+    if (!adminMapOpen || !adminMapPins.length) return;
+    const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_KEY || "";
+    if (!mapsKey || !window.google) return;
+    const mapEl = adminMapRef.current;
+    if (!mapEl) return;
+    const bounds = new window.google.maps.LatLngBounds();
+    const map = new window.google.maps.Map(mapEl, { zoom: 12, center: { lat: adminMapPins[0].lat, lng: adminMapPins[0].lng }, mapTypeControl: false, streetViewControl: false });
+    const infoWindow = new window.google.maps.InfoWindow();
+    adminMapPins.forEach(pin => {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32"><path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z" fill="${pin.color}"/><circle cx="12" cy="12" r="5" fill="white"/></svg>`;
+      const marker = new window.google.maps.Marker({ position: { lat: pin.lat, lng: pin.lng }, map, icon: { url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg), scaledSize: new window.google.maps.Size(24, 32), anchor: new window.google.maps.Point(12, 32) }, title: pin.name });
+      marker.addListener("click", () => { infoWindow.setContent(`<div style="font-size:12px;font-weight:700">${pin.name}</div><div style="font-size:10px;color:#888;text-transform:uppercase">${pin.cat}</div>`); infoWindow.open(map, marker); });
+      bounds.extend({ lat: pin.lat, lng: pin.lng });
+    });
+    map.fitBounds(bounds);
+    window.google.maps.event.addListenerOnce(map, "idle", () => { if (map.getZoom() > 15) map.setZoom(15); });
+  }, [adminMapOpen, adminMapPins]);
 
   const statusCol = { pending:C.amber, flagged:C.red, approved:C.green, published:C.green, rejected:C.muted };
   const [regeocoding, setRegeocoding] = useState(false);
@@ -2407,11 +2566,36 @@ function AdminQueueModal({ onClose, onApprove }) {
               onBookmark={null}
             />
             {/* Admin action bar pinned above the fixed X button */}
+            {adminMapOpen && (
+              <div style={{ position:"fixed", bottom:"64px", left:0, right:0, zIndex:6000, background:"rgba(28,43,58,0.97)", padding:"12px 20px", borderTop:"1px solid rgba(255,255,255,0.1)" }}>
+                {adminMapLoading
+                  ? <div style={{ textAlign:"center", color:"rgba(255,255,255,0.6)", fontSize:"12px", padding:"20px" }}>Geocoding venues…</div>
+                  : adminMapPins.length === 0
+                    ? <div style={{ textAlign:"center", color:"rgba(255,255,255,0.5)", fontSize:"12px", padding:"20px" }}>No venues geocoded — check Maps API key.</div>
+                    : <div ref={adminMapRef} style={{ width:"100%", height:"280px", borderRadius:"8px", overflow:"hidden" }} />
+                }
+                <div style={{ display:"flex", gap:"8px", marginTop:"8px", fontSize:"10px", color:"rgba(255,255,255,0.4)", flexWrap:"wrap" }}>
+                  {[["#C1392B","Hotels"],["#2980B9","Restaurants"],["#8E44AD","Bars"],["#27AE60","Activities"]].map(([c,l]) => (
+                    <span key={l} style={{ display:"flex", alignItems:"center", gap:"4px" }}><span style={{ width:"10px", height:"10px", borderRadius:"50%", background:c, display:"inline-block" }} />{l}</span>
+                  ))}
+                </div>
+              </div>
+            )}
             <div style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:6000, background:"rgba(28,43,58,0.97)", padding:"14px 20px", display:"flex", gap:"10px", justifyContent:"center", alignItems:"center", borderTop:"2px solid rgba(255,255,255,0.1)" }}>
               <div style={{ fontSize:"12px", color:"rgba(255,255,255,0.6)", marginRight:"8px" }}>Admin Review — {detail.submitter_name}</div>
+              <button onClick={async () => {
+                if (adminMapOpen) { setAdminMapOpen(false); return; }
+                setAdminMapOpen(true);
+                setAdminMapLoading(true);
+                const pins = await geocodeSubmission(detail.trip_data);
+                setAdminMapPins(pins);
+                setAdminMapLoading(false);
+              }} style={{ padding:"10px 16px", borderRadius:"8px", border:"1px solid rgba(255,255,255,0.2)", background: adminMapOpen ? "rgba(255,255,255,0.15)" : "transparent", color:"rgba(255,255,255,0.8)", fontWeight:600, fontSize:"12px", cursor:"pointer" }}>
+                📍 {adminMapOpen ? "Hide Map" : "Preview Map"}
+              </button>
               <button onClick={() => approve(detail)} style={{ padding:"10px 28px", borderRadius:"8px", border:"none", background:C.green, color:C.white, fontWeight:700, fontSize:"13px", cursor:"pointer" }}>✓ Approve</button>
               <button onClick={() => reject(detail)} style={{ padding:"10px 28px", borderRadius:"8px", border:"none", background:C.red, color:C.white, fontWeight:700, fontSize:"13px", cursor:"pointer" }}>✕ Reject</button>
-              <button onClick={() => setDetail(null)} style={{ padding:"10px 18px", borderRadius:"8px", border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"rgba(255,255,255,0.7)", fontSize:"12px", cursor:"pointer" }}>Cancel</button>
+              <button onClick={() => { setDetail(null); setAdminMapOpen(false); setAdminMapPins([]); }} style={{ padding:"10px 18px", borderRadius:"8px", border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"rgba(255,255,255,0.7)", fontSize:"12px", cursor:"pointer" }}>Cancel</button>
             </div>
           </div>
         );
@@ -2433,7 +2617,7 @@ function AdminQueueModal({ onClose, onApprove }) {
 
 // ── Auth Modal (Login / Register) ─────────────────────────────────────────────
 // ── Hybrid Processor ──────────────────────────────────────────────────────────
-function HybridProcessor({ text, photos, onComplete, onBack }) {
+function HybridProcessor({ text, photos, onComplete, onBack, isLocalMode = false }) {
   const [progress, setProgress] = useState(0);
   const [label, setLabel] = useState("Preparing...");
   const [error, setError] = useState(null);
@@ -2485,11 +2669,43 @@ function HybridProcessor({ text, photos, onComplete, onBack }) {
       const hasText = text.trim().length > 0;
       const hasPhotos = photoUrls.length > 0;
 
-      const prompt = `You are helping a traveller document a trip for a crowd-sourced travel platform called TripCopycat.
+      const prompt = isLocalMode
+        ? `You are helping a local share their city's best spots as a weekend guide on a crowd-sourced travel platform called TripCopycat.
+
+The local wrote this about their city:
+
+"${text}"
+
+Your job is to structure this into a Fri–Sun local weekend itinerary (Friday evening, full Saturday, Sunday morning). Use only the specific venues and places they mentioned — do not add generic placeholder venues. Leave any field empty if not mentioned.
+
+PRICING: Use $ / $$ / $$$ / $$$$ as a price tier only when clearly inferable. Do NOT invent prices. If unknown, omit.
+
+Return ONLY a valid JSON object with no other text:
+{
+  "title": "Best of [City] — A Local's Weekend",
+  "destination": "City, State — or City, Country for international",
+  "region": "Europe|Asia|North America|Central America|South America|Africa|Oceania",
+  "date": "",
+  "duration": "Weekend",
+  "travelers": "Visitors",
+  "tags": [],
+  "loves": "What makes this city worth the visit — specific to the places mentioned",
+  "doNext": "What visitors should prioritize and absolutely not miss",
+  "airfare": [],
+  "hotels": [{"item": "Hotel or area to stay", "detail": "neighborhood · price tier if known", "tip": ""}],
+  "restaurants": [{"item": "Restaurant name", "detail": "cuisine type · price tier if known", "tip": ""}],
+  "bars": [{"item": "Bar name", "detail": "type", "tip": ""}],
+  "activities": [{"item": "Activity or attraction", "detail": "description", "tip": ""}],
+  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"time": "", "type": "activity|restaurant|bar|hotel|transport", "label": "venue or activity name", "note": ""}]}]
+}
+Valid tags: family-friendly, romantic, adventure, food & wine, culture, beach, wildlife, scenic drives`
+        : `You are helping a traveller document a trip for a crowd-sourced travel platform called TripCopycat.
 
 ${hasText ? `The traveller wrote this brain dump about their trip:\n\n"${text}"\n\n` : ""}${hasPhotos ? `They have also provided ${photoUrls.length} photos from the trip. Use GPS data, visible signage, and landmarks in the photos to identify specific venues and locations.\n\n` : ""}Your job is to extract and structure everything into a trip itinerary. Be as specific as possible — use real venue names from the text or photos. For anything not mentioned, leave it as an empty string or empty array rather than guessing.
 
 IMPORTANT: Never reference photos by number (e.g. "photo 1", "image 3", "in photo 17") anywhere in the output. Never mention photos at all in any field values. All output must read as if written by the traveller from memory, not derived from images.
+
+PRICING: Use $ / $$ / $$$ / $$$$ as a price tier only when clearly inferable from the text. Do NOT invent or estimate specific dollar amounts. If price is unknown, omit the price portion entirely.
 
 Return ONLY a valid JSON object with no other text:
 {
@@ -2502,11 +2718,11 @@ Return ONLY a valid JSON object with no other text:
   "tags": [],
   "loves": "What stood out — be specific with place names if mentioned",
   "doNext": "Honest advice for future travellers",
-  "airfare": [{"item": "Airline and route", "detail": "~$X per person", "tip": ""}],
-  "hotels": [{"item": "Hotel name", "detail": "N nights, ~$X/night", "tip": ""}],
-  "restaurants": [{"item": "Restaurant name", "detail": "cuisine, ~$X per person", "tip": ""}],
+  "airfare": [{"item": "Airline and route", "detail": "price if mentioned, otherwise omit", "tip": ""}],
+  "hotels": [{"item": "Hotel name", "detail": "N nights · $$$ (omit price tier if unknown)", "tip": ""}],
+  "restaurants": [{"item": "Restaurant name", "detail": "cuisine type · $$ (omit price tier if unknown)", "tip": ""}],
   "bars": [{"item": "Bar name", "detail": "type", "tip": ""}],
-  "activities": [{"item": "Activity name", "detail": "~$X per person", "tip": ""}],
+  "activities": [{"item": "Activity name", "detail": "description · price tier only if clearly mentioned", "tip": ""}],
   "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"time": "", "type": "activity|restaurant|bar|hotel|transport", "label": "what happened", "note": ""}]}]
 }
 Valid tags: family-friendly, romantic, adventure, food & wine, culture, beach, wildlife, scenic drives`;
