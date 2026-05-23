@@ -1515,9 +1515,9 @@ const EMPTY_FORM = {
   activities:[{item:"",detail:"",tip:""}], days:[], focalPoint:{x:50,y:50}, gallery:[]
 };
 
-function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, prefillData }) {
-  const [step, setStep] = useState(prefillData ? "form" : "prompt");
-  const [isLocalMode, setIsLocalMode] = useState(false);
+function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, prefillData, localMode = false }) {
+  const [step, setStep] = useState(prefillData ? "form" : localMode ? "local-weekend" : "prompt");
+  const [isLocalMode, setIsLocalMode] = useState(localMode);
   const [pastedText, setPastedText] = useState("");
   const [filterResult, setFilterResult] = useState(null);
   const [submitterName, setSubmitterName] = useState(displayName || "");
@@ -4426,10 +4426,12 @@ export default function App() {
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
+  const [submitLocalMode, setSubmitLocalMode] = useState(false);
   const [photoImportData, setPhotoImportData] = useState(null);
   const [pendingSubmit, setPendingSubmit] = useState(false);
   // Force login before submitting
-  const openSubmit = () => {
+  const openSubmit = (localMode = false) => {
+    setSubmitLocalMode(localMode);
     if (!currentUser) { setPendingSubmit(true); setShowAuth(true); }
     else setShowSubmit(true);
   };
@@ -4775,6 +4777,7 @@ export default function App() {
               {isMobile ? "+" : "+ Submit a Trip"}
               {hasDraft && <span style={{ position:"absolute", top:"-4px", right:"-4px", width:"8px", height:"8px", borderRadius:"50%", background:C.amber, border:`1.5px solid ${C.white}` }} />}
             </button>}
+            {!isAdmin && !isMobile && <button onClick={() => openSubmit(true)} style={{ background:C.green, color:C.white, border:"none", borderRadius:"6px", padding:"6px 14px", fontSize:"11px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>🏙️ My City</button>}
             {isAdmin && <button onClick={() => setShowAnalytics(true)} style={{ background:"rgba(91,143,185,0.12)", color:C.azureDeep, border:`1px solid ${C.azure}44`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>📊 Analytics</button>}
             {isAdmin && <button onClick={() => setShowQueue(true)} style={{ background:C.amberBg, color:C.amber, border:`1px solid ${C.amber}44`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>📋 Queue</button>}
             {isAdmin && <button onClick={() => setShowImport(true)} style={{ background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>🤖 Import</button>}
@@ -4814,6 +4817,9 @@ export default function App() {
           <div style={{ display:"flex", gap:"10px", justifyContent:"center", alignItems:"center", flexWrap:"wrap", marginBottom:"12px" }}>
             <button onClick={() => openSubmit()} style={{ background:C.amber, color:"#fff", border:`2px solid ${C.amber}`, borderRadius:"6px", padding:"9px 20px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
               Submit a Trip →
+            </button>
+            <button onClick={() => openSubmit(true)} style={{ background:C.green, color:"#fff", border:`2px solid ${C.green}`, borderRadius:"6px", padding:"9px 18px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", display:"inline-flex", alignItems:"center", gap:"6px" }}>
+              🏙️ Best of My City
             </button>
             <button onClick={() => { window.location.href = "/blueprint/sample"; }} style={{ background:"transparent", color:C.amber, border:`2px solid ${C.amber}`, borderRadius:"6px", padding:"9px 18px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", display:"inline-flex", alignItems:"center", gap:"6px" }}>
               <span style={{ fontSize:"11px" }}>▲</span>
@@ -5090,7 +5096,7 @@ export default function App() {
       {selected      && <TripModal trip={selected} onClose={closeTrip} allTrips={allTrips} isBookmarked={bookmarks.includes(selected.id)} onBookmark={toggleBookmark} isAdmin={isAdmin} />}
       {showAdd       && <AddTripModal onClose={() => setShowAdd(false)} onAdd={t => setTrips(p=>[t,...p])} />}
       {showImport    && <SmartImportHub onClose={() => setShowImport(false)} onPhotoComplete={(data) => { setPhotoImportData(data); setShowImport(false); openSubmit(); }} />}
-      {showSubmit    && <SubmitTripModal onClose={() => { setShowSubmit(false); setPhotoImportData(null); }} currentUser={currentUser} displayName={currentDisplayName} onSubmitSuccess={fetchTrips} prefillData={photoImportData} />}
+      {showSubmit    && <SubmitTripModal onClose={() => { setShowSubmit(false); setPhotoImportData(null); setSubmitLocalMode(false); }} currentUser={currentUser} displayName={currentDisplayName} onSubmitSuccess={fetchTrips} prefillData={photoImportData} localMode={submitLocalMode} />}
       {showAuth      && <AuthModal onClose={() => setShowAuth(false)} onSuccess={handleAuthSuccess} />}
       {showResetPassword && <ResetPasswordModal onClose={() => setShowResetPassword(false)} />}
       {viewingProfile && <ProfilePage authorName={viewingProfile} allTrips={allTrips} onClose={() => setViewingProfile(null)} onTripClick={openTrip} currentUser={currentUser} onEditTrip={(trip) => setEditingTrip(trip)} onDeleteTrip={(trip) => setConfirmDelete(trip)} />}
