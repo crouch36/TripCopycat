@@ -2670,17 +2670,47 @@ function HybridProcessor({ text, photos, onComplete, onBack, isLocalMode = false
       const hasPhotos = photoUrls.length > 0;
 
       const prompt = isLocalMode
-        ? `You are helping a local share their city's best spots as a weekend guide on a crowd-sourced travel platform called TripCopycat.
+        ? `You are helping a local share their city's best spots as a weekend guide on a travel platform called TripCopycat.
 
 The local wrote this about their city:
 
 "${text}"
 
-Your job is to structure this into a Fri–Sun local weekend itinerary (Friday evening, full Saturday, Sunday morning). Use only the specific venues and places they mentioned — do not add generic placeholder venues. Leave any field empty if not mentioned.
+Use ONLY the venues and places they mentioned. Never invent or add venues not in the text.
 
-PRICING: Use $ / $$ / $$$ / $$$$ as a price tier only when clearly inferable. Do NOT invent prices. If unknown, omit.
+WEEKEND TEMPLATE — assign each venue to exactly one slot following this structure:
 
-Return ONLY a valid JSON object with no other text:
+DAY 1 — Friday Evening only (no morning, no afternoon, no lunch)
+  5:00pm  happy_hour — bar or drinks venue only if one was mentioned; omit this slot if not
+  7:00pm  dinner — first restaurant appropriate for dinner
+  9:00pm  evening_bar — second bar only if one was mentioned; omit if not
+
+DAY 2 — Saturday (full day)
+  9:00am  breakfast — use a submitted coffee or breakfast venue if mentioned; otherwise set label to exactly "Breakfast / Coffee (your choice)" and do not invent a venue name
+  10:30am activity_morning — first activity or attraction
+  12:30pm lunch — next available restaurant
+  2:00pm  activity_afternoon — next activity or attraction
+  5:00pm  happy_hour — bar or drinks if available and not used Friday; omit if not
+  7:00pm  dinner — next available restaurant
+  9:00pm  evening — if an evening activity fits this slot (music venue, show, scenic walk, rooftop), use it; otherwise use a bar if one remains; omit if neither
+
+DAY 3 — Sunday Morning only (no afternoon, no dinner, no evening)
+  10:00am brunch — next available restaurant
+  11:30am activity_morning — next activity if available; otherwise set label to exactly "Explore the neighborhood"
+  1:00pm  depart — always include, label exactly "Head home"
+
+CLASSIFICATION RULES — strictly enforced:
+- Restaurants are food/dining only. NEVER place a restaurant in a bar, happy_hour, or evening_bar slot.
+- Bars are drinks only. NEVER place a bar in a meal slot (dinner, lunch, brunch, breakfast).
+- Meal slot priority order: Fri dinner → Sat lunch → Sat dinner → Sun brunch.
+- If more restaurants were submitted than the 4 meal slots, place the extras in the restaurants array with tip: "Alternate — swap this in for any meal slot."
+- If more activities were submitted than the 3 activity slots (Sat morning, Sat afternoon, Sun morning), place the extras in the activities array with tip: "Alternate — great swap for a similar time slot."
+- Saturday 9pm slot: an evening activity beats a bar. If both were submitted, activity wins the slot; bar becomes an alternate.
+- GEOGRAPHIC FLOW: Within each day, order stops to minimize travel and backtracking. Cluster venues in the same neighborhood. If you cannot confirm geographic proximity, preserve the exact order the user provided. If a stop requires notable travel from the previous one, set note to "Short drive from previous stop."
+
+PRICING: Use $ / $$ / $$$ / $$$$ only when clearly inferable from the text. Never invent prices. If unknown, omit.
+
+Return ONLY a valid JSON object with no other text, no markdown fences:
 {
   "title": "Best of [City] — A Local's Weekend",
   "destination": "City, State — or City, Country for international",
@@ -2692,11 +2722,12 @@ Return ONLY a valid JSON object with no other text:
   "loves": "What makes this city worth the visit — specific to the places mentioned",
   "doNext": "What visitors should prioritize and absolutely not miss",
   "airfare": [],
-  "hotels": [{"item": "Hotel or area to stay", "detail": "neighborhood · price tier if known", "tip": ""}],
+  "stay": {"item": "hotel name or neighborhood to base yourself in", "detail": "area · price tier if known", "tip": ""},
+  "hotels": [{"item": "Hotel name if mentioned", "detail": "neighborhood · price tier if known", "tip": ""}],
   "restaurants": [{"item": "Restaurant name", "detail": "cuisine type · price tier if known", "tip": ""}],
   "bars": [{"item": "Bar name", "detail": "type", "tip": ""}],
   "activities": [{"item": "Activity or attraction", "detail": "description", "tip": ""}],
-  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"time": "", "type": "activity|restaurant|bar|hotel|transport", "label": "venue or activity name", "note": ""}]}]
+  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"slot": "dinner", "time": "7:00pm", "type": "restaurant|bar|activity|transport", "label": "venue or activity name", "note": ""}]}]
 }
 Valid tags: family-friendly, romantic, adventure, food & wine, culture, beach, wildlife, scenic drives`
         : `You are helping a traveller document a trip for a crowd-sourced travel platform called TripCopycat.
