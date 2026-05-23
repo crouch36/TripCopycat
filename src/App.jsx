@@ -1001,51 +1001,62 @@ function DailyItinerary({ days }) {
 }
 
 // ── Editable Daily Itinerary (submit form) ────────────────────────────────────
-function EditableDailyItinerary({ days, onChange }) {
-  const [active, setActive] = useState(0);
-  const safeActive = Math.min(active, days.length - 1);
-  const d = days[safeActive];
-  if (!d) return null;
+function EditableDailyItinerary({ days, onChange, destination }) {
+  const SLOTS = [
+    { key:"morning",   label:"Morning",   emoji:"🌅" },
+    { key:"afternoon", label:"Afternoon", emoji:"☀️" },
+    { key:"evening",   label:"Evening",   emoji:"🌙" },
+    { key:"late_night",label:"Late Night",emoji:"🌃" },
+  ];
+  const toSlot = s => {
+    if (!s) return "morning";
+    const v = s.toLowerCase();
+    if (["morning","breakfast","brunch","activity_morning"].includes(v)) return "morning";
+    if (["afternoon","lunch","activity_afternoon"].includes(v)) return "afternoon";
+    if (["evening","dinner","happy_hour","evening_bar"].includes(v)) return "evening";
+    if (["late_night","late night","depart","bar"].includes(v)) return "late_night";
+    return "morning";
+  };
   const inp = { width:"100%", padding:"5px 8px", borderRadius:"6px", border:`1px solid ${C.tide}`, fontSize:"11px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate };
-  const updItem = (ii, field, val) => onChange(days.map((day, di) =>
-    di !== safeActive ? day : { ...day, items: day.items.map((it, idx) => idx !== ii ? it : { ...it, [field]: val }) }
-  ));
-  const delItem = (ii) => onChange(days.map((day, di) =>
-    di !== safeActive ? day : { ...day, items: day.items.filter((_, idx) => idx !== ii) }
-  ));
-  const addItem = () => onChange(days.map((day, di) =>
-    di !== safeActive ? day : { ...day, items: [...day.items, { time:"", type:"activity", label:"", note:"" }] }
-  ));
+  const updItem = (di,ii,field,val) => onChange(days.map((day,d)=>d!==di?day:{...day,items:day.items.map((it,idx)=>idx!==ii?it:{...it,[field]:val})}));
+  const delItem = (di,ii) => onChange(days.map((day,d)=>d!==di?day:{...day,items:day.items.filter((_,idx)=>idx!==ii)}));
+  const addItem = (di,slot) => onChange(days.map((day,d)=>d!==di?day:{...day,items:[...day.items,{slot,type:slot==="evening"?"restaurant":slot==="late_night"?"bar":"activity",label:"",note:""}]}));
   return (
-    <div style={{ marginBottom:"14px" }}>
-      <div style={{ fontSize:"12px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>
-        📅 Daily Itinerary <span style={{ fontWeight:400, color:C.muted, fontSize:"10px" }}>— AI-generated, edit as needed</span>
-      </div>
-      <div style={{ border:`1px solid ${C.tide}`, borderRadius:"10px", overflow:"hidden" }}>
-        <div style={{ display:"flex", gap:"5px", padding:"8px 12px", overflowX:"auto", background:C.seafoam, borderBottom:`1px solid ${C.tide}` }}>
-          {days.map((day, i) => (
-            <button key={i} onClick={() => setActive(i)} style={{ padding:"5px 11px", borderRadius:"7px", border:`1px solid ${safeActive===i?C.slate:C.tide}`, cursor:"pointer", flexShrink:0, background:safeActive===i?C.slate:C.white, color:safeActive===i?C.white:C.slateLight, fontSize:"11px", fontWeight:700, whiteSpace:"nowrap" }}>
-              Day {day.day}{day.title ? ` · ${day.title}` : ""}
-            </button>
-          ))}
-        </div>
-        <div style={{ padding:"10px 12px" }}>
-          {d.items.map((item, ii) => (
-            <div key={ii} style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"8px", marginBottom:"7px" }}>
-              <div style={{ display:"grid", gridTemplateColumns:"58px 1fr 96px auto", gap:"5px", marginBottom:"5px" }}>
-                <input style={inp} placeholder="Time" value={item.time||""} onChange={e=>updItem(ii,"time",e.target.value)} />
-                <input style={inp} placeholder="Venue / activity" value={item.label||""} onChange={e=>updItem(ii,"label",e.target.value)} />
-                <select style={inp} value={item.type||"activity"} onChange={e=>updItem(ii,"type",e.target.value)}>
-                  {["activity","restaurant","bar","hotel","transport"].map(t=><option key={t}>{t}</option>)}
-                </select>
-                <button onClick={()=>delItem(ii)} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px", flexShrink:0 }}>✕</button>
+    <div>
+      {days.map((day,di) => (
+        <div key={di} style={{ marginBottom:"14px", border:`1px solid ${C.tide}`, borderRadius:"10px", overflow:"hidden" }}>
+          <div style={{ padding:"10px 14px", background:C.seafoam, borderBottom:`1px solid ${C.tide}` }}>
+            <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Day {day.day}{day.title?` — ${day.title}`:""}</div>
+          </div>
+          {SLOTS.map(slot => {
+            const slotItems = (day.items||[]).map((item,ii)=>({item,ii})).filter(({item})=>toSlot(item.slot||item.time||"")===slot.key);
+            return (
+              <div key={slot.key} style={{ borderBottom:`1px solid ${C.tide}`, padding:"10px 14px" }}>
+                <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"7px" }}>{slot.emoji} {slot.label}</div>
+                {slotItems.length===0 && (
+                  <div style={{ border:`1px dashed ${C.tide}`, borderRadius:"7px", padding:"7px 10px", color:C.muted, fontSize:"11px", textAlign:"center", marginBottom:"5px" }}>Nothing planned — add a stop below</div>
+                )}
+                {slotItems.map(({item,ii}) => (
+                  <div key={ii} style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"7px", padding:"8px", marginBottom:"6px" }}>
+                    <div style={{ display:"flex", gap:"5px", alignItems:"center", marginBottom:"5px" }}>
+                      <input style={{...inp,flex:1}} placeholder="Venue or activity" value={item.label||""} onChange={e=>updItem(di,ii,"label",e.target.value)} />
+                      <select style={{...inp,width:"90px",flexShrink:0}} value={item.type||"activity"} onChange={e=>updItem(di,ii,"type",e.target.value)}>
+                        {["activity","restaurant","bar","hotel","transport"].map(t=><option key={t}>{t}</option>)}
+                      </select>
+                      {item.label && (
+                        <a href={`https://www.google.com/maps/search/${encodeURIComponent((item.label||"")+(destination?" "+destination:""))}`} target="_blank" rel="noopener noreferrer" title="Verify on Google Maps" style={{ fontSize:"15px", flexShrink:0, textDecoration:"none", lineHeight:1 }}>📍</a>
+                      )}
+                      <button onClick={()=>delItem(di,ii)} style={{ padding:"4px 7px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px", flexShrink:0 }}>✕</button>
+                    </div>
+                    <input style={inp} placeholder="Note (optional)" value={item.note||""} onChange={e=>updItem(di,ii,"note",e.target.value)} />
+                  </div>
+                ))}
+                <button onClick={()=>addItem(di,slot.key)} style={{ fontSize:"11px", color:C.muted, background:"none", border:"none", cursor:"pointer", marginTop:"2px", padding:"2px 0" }}>+ Add {slot.label.toLowerCase()} stop</button>
               </div>
-              <input style={inp} placeholder="Note (optional)" value={item.note||""} onChange={e=>updItem(ii,"note",e.target.value)} />
-            </div>
-          ))}
-          <button onClick={addItem} style={{ fontSize:"11px", color:C.azure, background:"none", border:`1px dashed ${C.azure}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600 }}>+ Add stop</button>
+            );
+          })}
         </div>
-      </div>
+      ))}
     </div>
   );
 }
@@ -2148,7 +2159,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                 {form.days.length} day{form.days.length!==1?"s":""} · {form.days.reduce((n,d)=>n+(d.items?.length||0),0)} stops — tap any field to edit, or add / remove stops per day.
               </div>
             </div>
-            <EditableDailyItinerary days={form.days} onChange={days => setForm(p=>({...p,days}))} />
+            <EditableDailyItinerary days={form.days} onChange={days => setForm(p=>({...p,days}))} destination={form.destination} />
             <div style={{ display:"flex", gap:"10px", marginTop:"16px" }}>
               <button onClick={() => setStep(isLocalMode ? "local-weekend" : "prompt")} style={{ padding:"10px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>← Back</button>
               <button onClick={() => setStep("form")} style={{ flex:1, padding:"10px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"13px", fontWeight:700, cursor:"pointer" }}>Looks good — fill in details →</button>
@@ -2678,39 +2689,38 @@ The local wrote this about their city:
 
 Use ONLY the venues and places they mentioned. Never invent or add venues not in the text.
 
-WEEKEND TEMPLATE — assign each venue to exactly one slot following this structure:
+WEEKEND STRUCTURE — three days, four time slots each. Use slot values: morning / afternoon / evening / late_night only.
 
-DAY 1 — Friday Evening only (no morning, no afternoon, no lunch)
-  5:00pm  happy_hour — bar or drinks venue only if one was mentioned; omit this slot if not
-  7:00pm  dinner — first restaurant appropriate for dinner
-  9:00pm  evening_bar — second bar only if one was mentioned; omit if not
+DAY 1 — Friday (evening only — no morning or afternoon items)
+  evening:    bar (happy hour) if one was submitted; otherwise first dinner restaurant
+  evening:    dinner restaurant (if happy hour filled the first evening slot)
+  late_night: bar (drinks) if a second bar was submitted; omit if not
 
 DAY 2 — Saturday (full day)
-  9:00am  breakfast — use a submitted coffee or breakfast venue if mentioned; otherwise set label to exactly "Breakfast / Coffee (your choice)" and do not invent a venue name
-  10:30am activity_morning — first activity or attraction
-  12:30pm lunch — next available restaurant
-  2:00pm  activity_afternoon — next activity or attraction
-  5:00pm  happy_hour — bar or drinks if available and not used Friday; omit if not
-  7:00pm  dinner — next available restaurant
-  9:00pm  evening — if an evening activity fits this slot (music venue, show, scenic walk, rooftop), use it; otherwise use a bar if one remains; omit if neither
+  morning:    submitted breakfast or coffee venue if mentioned; otherwise label exactly "Breakfast / Coffee (your choice)" — never invent a name
+  morning:    first activity or attraction
+  afternoon:  next available restaurant for lunch
+  afternoon:  next activity
+  evening:    bar (happy hour) if available and not used Friday; plus next dinner restaurant
+  late_night: evening activity if one fits (show, music, rooftop, scenic walk); otherwise a bar; omit if neither
 
-DAY 3 — Sunday Morning only (no afternoon, no dinner, no evening)
-  10:00am brunch — next available restaurant
-  11:30am activity_morning — next activity if available; otherwise set label to exactly "Explore the neighborhood"
-  1:00pm  depart — always include, label exactly "Head home"
+DAY 3 — Sunday (morning only — no afternoon, evening, or late_night items)
+  morning:    next available restaurant for brunch
+  morning:    next activity if available; otherwise label exactly "Explore the neighborhood"
+  morning:    always add one final item: type "transport", label "Head home", slot "morning"
 
-CLASSIFICATION RULES — strictly enforced:
-- Restaurants are food/dining only. NEVER place a restaurant in a bar, happy_hour, or evening_bar slot.
-- Bars are drinks only. NEVER place a bar in a meal slot (dinner, lunch, brunch, breakfast).
-- Meal slot priority order: Fri dinner → Sat lunch → Sat dinner → Sun brunch.
-- If more restaurants were submitted than the 4 meal slots, place the extras in the restaurants array with tip: "Alternate — swap this in for any meal slot."
-- If more activities were submitted than the 3 activity slots (Sat morning, Sat afternoon, Sun morning), place the extras in the activities array with tip: "Alternate — great swap for a similar time slot."
-- Saturday 9pm slot: an evening activity beats a bar. If both were submitted, activity wins the slot; bar becomes an alternate.
-- GEOGRAPHIC FLOW: Within each day, order stops to minimize travel and backtracking. Cluster venues in the same neighborhood. If you cannot confirm geographic proximity, preserve the exact order the user provided. If a stop requires notable travel from the previous one, set note to "Short drive from previous stop."
+CLASSIFICATION — strictly enforced:
+- Restaurants = food only. Never put a restaurant in a late_night or bar slot.
+- Bars = drinks only. Never put a bar in a meal position.
+- Meal priority order: Fri evening → Sat afternoon (lunch) → Sat evening (dinner) → Sun morning (brunch).
+- Extra restaurants beyond 4 meal slots: add to restaurants array, tip = "Alternate — swap this in for any meal slot."
+- Extra activities beyond 3 activity slots: add to activities array, tip = "Alternate — great swap for a similar time slot."
+- Late night Sat: activity beats bar. If both available, activity wins; bar becomes alternate.
+- GEOGRAPHIC ORDER: within each day cluster nearby venues together. If unsure of proximity, keep the user's original order. If a stop is noticeably far from the previous, set note = "Short drive from previous stop."
 
-PRICING: Use $ / $$ / $$$ / $$$$ only when clearly inferable from the text. Never invent prices. If unknown, omit.
+PRICING: $ / $$ / $$$ / $$$$ only when clearly inferable. Never invent prices.
 
-Return ONLY a valid JSON object with no other text, no markdown fences:
+Return ONLY a valid JSON object, no markdown fences:
 {
   "title": "Best of [City] — A Local's Weekend",
   "destination": "City, State — or City, Country for international",
@@ -2719,15 +2729,15 @@ Return ONLY a valid JSON object with no other text, no markdown fences:
   "duration": "Weekend",
   "travelers": "Visitors",
   "tags": [],
-  "loves": "What makes this city worth the visit — specific to the places mentioned",
-  "doNext": "What visitors should prioritize and absolutely not miss",
+  "loves": "What makes this city worth the visit — specific to places mentioned",
+  "doNext": "What visitors should prioritize and not miss",
   "airfare": [],
-  "stay": {"item": "hotel name or neighborhood to base yourself in", "detail": "area · price tier if known", "tip": ""},
+  "stay": {"item": "hotel name or neighborhood to base in", "detail": "area · price tier if known", "tip": ""},
   "hotels": [{"item": "Hotel name if mentioned", "detail": "neighborhood · price tier if known", "tip": ""}],
-  "restaurants": [{"item": "Restaurant name", "detail": "cuisine type · price tier if known", "tip": ""}],
+  "restaurants": [{"item": "Restaurant name", "detail": "cuisine · price tier if known", "tip": ""}],
   "bars": [{"item": "Bar name", "detail": "type", "tip": ""}],
   "activities": [{"item": "Activity or attraction", "detail": "description", "tip": ""}],
-  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"slot": "dinner", "time": "7:00pm", "type": "restaurant|bar|activity|transport", "label": "venue or activity name", "note": ""}]}]
+  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"slot": "morning|afternoon|evening|late_night", "type": "restaurant|bar|activity|transport", "label": "venue or activity name", "note": ""}]}]
 }
 Valid tags: family-friendly, romantic, adventure, food & wine, culture, beach, wildlife, scenic drives`
         : `You are helping a traveller document a trip for a crowd-sourced travel platform called TripCopycat.
