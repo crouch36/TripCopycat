@@ -1947,17 +1947,17 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
             </div>
 
             {/* Best of My City — local weekend guide */}
-            <div style={{ background:C.seafoam, borderRadius:"14px", border:`1.5px solid ${C.green}`, padding:"18px", marginBottom:"14px", cursor:"pointer" }}
+            <div style={{ background:C.seafoam, borderRadius:"14px", border:`1.5px solid ${C.cta}`, padding:"18px", marginBottom:"14px", cursor:"pointer" }}
               onClick={() => { setIsLocalMode(true); setStep("local-weekend"); }}>
               <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px" }}>
                 <span style={{ fontSize:"18px" }}>🏙️</span>
                 <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Best of My City</div>
-                <span style={{ fontSize:"9px", fontWeight:700, background:C.green, color:C.white, padding:"2px 8px", borderRadius:"20px" }}>New</span>
+                <span style={{ fontSize:"9px", fontWeight:700, background:C.slate, color:C.white, padding:"2px 8px", borderRadius:"20px" }}>New</span>
               </div>
               <div style={{ fontSize:"11px", color:C.slateMid, lineHeight:1.6 }}>
                 Know your city better than any guidebook? Drop your go-to spots — we'll build a shareable weekend itinerary that visitors can copy.
               </div>
-              <div style={{ fontSize:"12px", fontWeight:700, color:C.green, marginTop:"10px" }}>Build My City Guide →</div>
+              <div style={{ fontSize:"12px", fontWeight:700, color:C.amber, marginTop:"10px" }}>Build My City Guide →</div>
             </div>
 
             {/* Secondary options */}
@@ -2115,7 +2115,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
               <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"4px" }}>Your city. Your picks.</div>
               <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.6 }}>Dump your go-to spots — restaurants, bars, activities, neighborhoods. We'll turn it into a shareable weekend guide titled <em>Best of [City] — A Local's Weekend.</em></div>
             </div>
-            <div style={{ background:C.seafoam, borderRadius:"14px", border:`1.5px solid ${C.green}`, padding:"18px", marginBottom:"14px" }}>
+            <div style={{ background:C.seafoam, borderRadius:"14px", border:`1.5px solid ${C.tide}`, padding:"18px", marginBottom:"14px" }}>
               <div style={{ fontSize:"11px", color:C.slateMid, marginBottom:"8px", lineHeight:1.6 }}>
                 Just list your favorites — no format needed. Include the city, neighborhoods, restaurants, bars, things to do, and anything visitors shouldn't miss.
               </div>
@@ -2132,7 +2132,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                   window.__hybridPhotos = [];
                   setStep("hybrid-processing");
                 }}
-                style={{ width:"100%", marginTop:"14px", padding:"12px", borderRadius:"8px", border:"none", background:C.green, color:C.white, fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
+                style={{ width:"100%", marginTop:"14px", padding:"12px", borderRadius:"8px", border:"none", background:C.amber, color:C.white, fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
                 Build My Weekend Guide →
               </button>
             </div>
@@ -4777,7 +4777,7 @@ export default function App() {
               {isMobile ? "+" : "+ Submit a Trip"}
               {hasDraft && <span style={{ position:"absolute", top:"-4px", right:"-4px", width:"8px", height:"8px", borderRadius:"50%", background:C.amber, border:`1.5px solid ${C.white}` }} />}
             </button>}
-            {!isAdmin && !isMobile && <button onClick={() => openSubmit(true)} style={{ background:C.green, color:C.white, border:"none", borderRadius:"6px", padding:"6px 14px", fontSize:"11px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>🏙️ My City</button>}
+            {!isAdmin && !isMobile && <button onClick={() => openSubmit(true)} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"6px", padding:"6px 14px", fontSize:"11px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>🏙️ My City</button>}
             {isAdmin && <button onClick={() => setShowAnalytics(true)} style={{ background:"rgba(91,143,185,0.12)", color:C.azureDeep, border:`1px solid ${C.azure}44`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>📊 Analytics</button>}
             {isAdmin && <button onClick={() => setShowQueue(true)} style={{ background:C.amberBg, color:C.amber, border:`1px solid ${C.amber}44`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>📋 Queue</button>}
             {isAdmin && <button onClick={() => setShowImport(true)} style={{ background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>🤖 Import</button>}
@@ -4818,7 +4818,7 @@ export default function App() {
             <button onClick={() => openSubmit()} style={{ background:C.amber, color:"#fff", border:`2px solid ${C.amber}`, borderRadius:"6px", padding:"9px 20px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
               Submit a Trip →
             </button>
-            <button onClick={() => openSubmit(true)} style={{ background:C.green, color:"#fff", border:`2px solid ${C.green}`, borderRadius:"6px", padding:"9px 18px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", display:"inline-flex", alignItems:"center", gap:"6px" }}>
+            <button onClick={() => openSubmit(true)} style={{ background:C.slate, color:C.white, border:`2px solid ${C.slate}`, borderRadius:"6px", padding:"9px 18px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", display:"inline-flex", alignItems:"center", gap:"6px" }}>
               🏙️ Best of My City
             </button>
             <button onClick={() => { window.location.href = "/blueprint/sample"; }} style={{ background:"transparent", color:C.amber, border:`2px solid ${C.amber}`, borderRadius:"6px", padding:"9px 18px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", display:"inline-flex", alignItems:"center", gap:"6px" }}>
