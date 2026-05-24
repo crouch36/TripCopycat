@@ -2181,6 +2181,141 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                 Supplement with photos → let AI fill in missing details
               </button>
             </div>
+            {isLocalMode ? (<>
+            {/* ── Box 1: Trip Overview (catch-all) ── */}
+            <div style={{ border:`1px solid ${C.tide}`, borderRadius:"12px", overflow:"hidden", marginBottom:"12px" }}>
+              <div style={{ padding:"10px 14px", background:C.slate, display:"flex", alignItems:"center", gap:"8px" }}>
+                <span style={{ fontSize:"14px" }}>🗒️</span>
+                <span style={{ fontSize:"12px", fontWeight:700, color:C.white }}>Trip Overview</span>
+              </div>
+              <div style={{ padding:"14px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px" }}>
+                <div style={{ gridColumn:"1/-1" }}><label style={lbl}>Trip Title</label><input style={inp} value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))} /></div>
+                <div><label style={lbl}>Destination</label><input style={inp} value={form.destination} onChange={e=>setForm(p=>({...p,destination:e.target.value}))} /></div>
+                <div><label style={lbl}>Region</label><select style={inp} value={form.region} onChange={e=>setForm(p=>({...p,region:e.target.value}))}>{REGIONS.filter(r=>r!=="All Regions").map(r=><option key={r}>{r}</option>)}</select></div>
+                <div><label style={lbl}>Duration</label><input style={inp} value={form.duration} onChange={e=>setForm(p=>({...p,duration:e.target.value}))} /></div>
+                <div><label style={lbl}>Date</label><input style={inp} value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value}))} /></div>
+                <div style={{ gridColumn:"1/-1" }}><label style={lbl}>Who Traveled</label><input style={inp} value={form.travelers} onChange={e=>setForm(p=>({...p,travelers:e.target.value}))} /></div>
+                <div style={{ gridColumn:"1/-1" }}>
+                  <label style={lbl}>Tags</label>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:"5px", marginTop:"3px" }}>
+                    {TAGS.filter(t=>t!=="All").map(tag=><button key={tag} onClick={()=>toggleTag(tag)} style={{ padding:"3px 10px", borderRadius:"20px", fontSize:"11px", fontWeight:600, cursor:"pointer", border:`1px solid ${form.tags.includes(tag)?C.azure:C.tide}`, background:form.tags.includes(tag)?C.azure:C.white, color:form.tags.includes(tag)?C.white:C.slateLight }}>{tag}</button>)}
+                  </div>
+                </div>
+                <div style={{ gridColumn:"1/-1" }}><label style={{...lbl,color:C.green}}>What did you love?</label><textarea style={{...inp,height:"80px",resize:"vertical"}} value={form.loves} onChange={e=>setForm(p=>({...p,loves:e.target.value}))} /></div>
+                <div style={{ gridColumn:"1/-1" }}><label style={{...lbl,color:C.amber}}>What would you do differently?</label><textarea style={{...inp,height:"80px",resize:"vertical"}} value={form.doNext} onChange={e=>setForm(p=>({...p,doNext:e.target.value}))} /></div>
+                {!isLocalMode && form.airfare?.length > 0 && (
+                  <div style={{ gridColumn:"1/-1" }}>
+                    <label style={lbl}>✈️ Airfare</label>
+                    {form.airfare.map((row,i)=>(
+                      <div key={i} style={{ background:C.seafoam, borderRadius:"8px", padding:"8px", marginBottom:"6px", border:`1px solid ${C.tide}` }}>
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:"5px", marginBottom:"4px" }}>
+                          <input style={inp} placeholder="Airline / route" value={row.item} onChange={e=>updRow("airfare",i,"item",e.target.value)} />
+                          <button onClick={()=>delRow("airfare",i)} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px" }}>✕</button>
+                        </div>
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px" }}>
+                          <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Details" value={row.detail} onChange={e=>updRow("airfare",i,"detail",e.target.value)} />
+                          <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Tip" value={row.tip} onChange={e=>updRow("airfare",i,"tip",e.target.value)} />
+                        </div>
+                      </div>
+                    ))}
+                    <button onClick={()=>addRow("airfare")} style={{ fontSize:"11px", color:C.azure, background:"none", border:`1px dashed ${C.azure}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600 }}>+ Add flight</button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── Box 2: Where to Stay ── */}
+            <div style={{ border:`1px solid ${C.tide}`, borderRadius:"12px", overflow:"hidden", marginBottom:"12px" }}>
+              <div style={{ padding:"10px 14px", background:C.slateMid, display:"flex", alignItems:"center", gap:"8px" }}>
+                <span style={{ fontSize:"14px" }}>🏨</span>
+                <span style={{ fontSize:"12px", fontWeight:700, color:C.white }}>Where to Stay</span>
+              </div>
+              <div style={{ padding:"14px" }}>
+                {form.hotels.map((row,i)=>(
+                  <div key={i} style={{ background:C.seafoam, borderRadius:"8px", padding:"8px", marginBottom:"8px", border:`1px solid ${C.tide}` }}>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:"5px", marginBottom:"4px" }}>
+                      <input style={inp} placeholder="Hotel or neighborhood" value={row.item} onChange={e=>updRow("hotels",i,"item",e.target.value)} />
+                      <button onClick={()=>delRow("hotels",i)} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px" }}>✕</button>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px" }}>
+                      <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Details / Price tier" value={row.detail} onChange={e=>updRow("hotels",i,"detail",e.target.value)} />
+                      <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Insider tip" value={row.tip} onChange={e=>updRow("hotels",i,"tip",e.target.value)} />
+                    </div>
+                  </div>
+                ))}
+                {form.hotels.length === 0 && <div style={{ fontSize:"11px", color:C.muted, marginBottom:"8px" }}>No hotels added yet.</div>}
+                <button onClick={()=>addRow("hotels")} style={{ fontSize:"11px", color:C.slateMid, background:"none", border:`1px dashed ${C.slateMid}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600 }}>+ Add hotel or neighborhood</button>
+              </div>
+            </div>
+
+            {/* ── Box 3: What to Do ── */}
+            <div style={{ border:`1px solid ${C.tide}`, borderRadius:"12px", overflow:"hidden", marginBottom:"12px" }}>
+              <div style={{ padding:"10px 14px", background:C.slateLight, display:"flex", alignItems:"center", gap:"8px" }}>
+                <span style={{ fontSize:"14px" }}>🎯</span>
+                <span style={{ fontSize:"12px", fontWeight:700, color:C.white }}>What to Do</span>
+              </div>
+              <div style={{ padding:"14px" }}>
+                {form.activities.map((row,i)=>(
+                  <div key={i} style={{ background:C.seafoam, borderRadius:"8px", padding:"8px", marginBottom:"8px", border:`1px solid ${C.tide}` }}>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:"5px", marginBottom:"4px" }}>
+                      <input style={inp} placeholder="Activity or attraction" value={row.item} onChange={e=>updRow("activities",i,"item",e.target.value)} />
+                      <button onClick={()=>delRow("activities",i)} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px" }}>✕</button>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px" }}>
+                      <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Details" value={row.detail} onChange={e=>updRow("activities",i,"detail",e.target.value)} />
+                      <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Insider tip" value={row.tip} onChange={e=>updRow("activities",i,"tip",e.target.value)} />
+                    </div>
+                  </div>
+                ))}
+                {form.activities.length === 0 && <div style={{ fontSize:"11px", color:C.muted, marginBottom:"8px" }}>No activities added yet.</div>}
+                <button onClick={()=>addRow("activities")} style={{ fontSize:"11px", color:C.slateLight, background:"none", border:`1px dashed ${C.slateLight}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600 }}>+ Add activity</button>
+              </div>
+            </div>
+
+            {/* ── Box 4: Where to Eat & Drink ── */}
+            <div style={{ border:`1px solid ${C.tide}`, borderRadius:"12px", overflow:"hidden", marginBottom:"12px" }}>
+              <div style={{ padding:"10px 14px", background:C.amber, display:"flex", alignItems:"center", gap:"8px" }}>
+                <span style={{ fontSize:"14px" }}>🍽️</span>
+                <span style={{ fontSize:"12px", fontWeight:700, color:C.white }}>Where to Eat & Drink</span>
+              </div>
+              <div style={{ padding:"14px" }}>
+                <div style={{ fontSize:"11px", fontWeight:700, color:C.slateLight, marginBottom:"8px", textTransform:"uppercase", letterSpacing:"0.05em" }}>Restaurants</div>
+                {form.restaurants.map((row,i)=>(
+                  <div key={i} style={{ background:C.seafoam, borderRadius:"8px", padding:"8px", marginBottom:"8px", border:`1px solid ${C.tide}` }}>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:"5px", marginBottom:"4px" }}>
+                      <input style={inp} placeholder="Restaurant name" value={row.item} onChange={e=>updRow("restaurants",i,"item",e.target.value)} />
+                      <button onClick={()=>delRow("restaurants",i)} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px" }}>✕</button>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px" }}>
+                      <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Cuisine · price tier" value={row.detail} onChange={e=>updRow("restaurants",i,"detail",e.target.value)} />
+                      <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Insider tip" value={row.tip} onChange={e=>updRow("restaurants",i,"tip",e.target.value)} />
+                    </div>
+                  </div>
+                ))}
+                {form.restaurants.length === 0 && <div style={{ fontSize:"11px", color:C.muted, marginBottom:"8px" }}>No restaurants added yet.</div>}
+                <button onClick={()=>addRow("restaurants")} style={{ fontSize:"11px", color:C.amber, background:"none", border:`1px dashed ${C.amber}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600, marginBottom:"14px" }}>+ Add restaurant</button>
+
+                <div style={{ borderTop:`1px solid ${C.tide}`, paddingTop:"12px", marginTop:"4px" }}>
+                  <div style={{ fontSize:"11px", fontWeight:700, color:C.slateLight, marginBottom:"8px", textTransform:"uppercase", letterSpacing:"0.05em" }}>Bars & Drinks</div>
+                  {form.bars.map((row,i)=>(
+                    <div key={i} style={{ background:C.seafoam, borderRadius:"8px", padding:"8px", marginBottom:"8px", border:`1px solid ${C.tide}` }}>
+                      <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:"5px", marginBottom:"4px" }}>
+                        <input style={inp} placeholder="Bar or drinks spot" value={row.item} onChange={e=>updRow("bars",i,"item",e.target.value)} />
+                        <button onClick={()=>delRow("bars",i)} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px" }}>✕</button>
+                      </div>
+                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px" }}>
+                        <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Type / vibe" value={row.detail} onChange={e=>updRow("bars",i,"detail",e.target.value)} />
+                        <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Insider tip" value={row.tip} onChange={e=>updRow("bars",i,"tip",e.target.value)} />
+                      </div>
+                    </div>
+                  ))}
+                  {form.bars.length === 0 && <div style={{ fontSize:"11px", color:C.muted, marginBottom:"8px" }}>No bars added yet.</div>}
+                  <button onClick={()=>addRow("bars")} style={{ fontSize:"11px", color:C.amber, background:"none", border:`1px dashed ${C.amber}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600 }}>+ Add bar</button>
+                </div>
+              </div>
+            </div>
+
+            </>) : (<>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px", marginBottom:"14px" }}>
               <div style={{ gridColumn:"1/-1" }}><label style={lbl}>Trip Title</label><input style={inp} value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))} /></div>
               <div><label style={lbl}>Destination</label><input style={inp} value={form.destination} onChange={e=>setForm(p=>({...p,destination:e.target.value}))} /></div>
@@ -2194,7 +2329,6 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                   {TAGS.filter(t=>t!=="All").map(tag=><button key={tag} onClick={()=>toggleTag(tag)} style={{ padding:"3px 10px", borderRadius:"20px", fontSize:"11px", fontWeight:600, cursor:"pointer", border:`1px solid ${form.tags.includes(tag)?C.azure:C.tide}`, background:form.tags.includes(tag)?C.azure:C.white, color:form.tags.includes(tag)?C.white:C.slateLight }}>{tag}</button>)}
                 </div>
               </div>
-
               <div style={{ gridColumn:"1/-1" }}><label style={{...lbl,color:C.green}}>What did you love?</label><textarea style={{...inp,height:"100px",resize:"vertical"}} value={form.loves} onChange={e=>setForm(p=>({...p,loves:e.target.value}))} /></div>
               <div style={{ gridColumn:"1/-1" }}><label style={{...lbl,color:C.amber}}>What would you do differently?</label><textarea style={{...inp,height:"100px",resize:"vertical"}} value={form.doNext} onChange={e=>setForm(p=>({...p,doNext:e.target.value}))} /></div>
             </div>
@@ -2216,6 +2350,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                 <button onClick={()=>addRow(key)} style={{ fontSize:"11px", color:cfg.color, background:"none", border:`1px dashed ${cfg.color}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600 }}>+ Add</button>
               </div>
             ))}
+            </>)}
             <div style={{ borderTop:`1px solid ${C.tide}`, paddingTop:"14px", marginTop:"6px" }}>
               <div style={{ fontSize:"12px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>📸 Cover Photo <span style={{ fontWeight:400, color:C.muted }}>(optional)</span></div>
               <input ref={photoRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif,image/avif,image/tiff" style={{ display:"none" }} onChange={handlePhotoChange} />
