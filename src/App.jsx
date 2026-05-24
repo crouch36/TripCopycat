@@ -1450,6 +1450,17 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
 function TripCard({ trip, onClick, isBookmarked, onBookmark }) {
   const grad = REGION_GRADIENTS[trip.region] || "linear-gradient(135deg,#8B7355,#C4A882)";
   const emoji = REGION_EMOJI[trip.region] || "🌍";
+  const [liked, setLiked] = React.useState(() => {
+    try { return (JSON.parse(localStorage.getItem("tc_liked_trips")||"[]")).includes(String(trip.id)); } catch { return false; }
+  });
+  const [likeCount, setLikeCount] = React.useState(trip.likes_count || 0);
+  const handleLike = async (e) => {
+    e.stopPropagation();
+    if (liked) return;
+    setLiked(true); setLikeCount(n => n + 1);
+    try { const s = JSON.parse(localStorage.getItem("tc_liked_trips")||"[]"); localStorage.setItem("tc_liked_trips", JSON.stringify([...s, String(trip.id)])); } catch {}
+    await supabase.from("trips").update({ likes_count: likeCount + 1 }).eq("id", trip.id);
+  };
   return (
     <div onClick={() => onClick(trip)} className="tc-card" style={{ background:C.white, border:`${trip.featured?"2px solid #C4A882":"1px solid "+C.tide}`, borderRadius:"16px", overflow:"hidden", cursor:"pointer", transition:"transform .18s ease, box-shadow .18s ease, border-color .18s ease", boxShadow:trip.featured?`0 4px 20px rgba(196,168,130,0.25)`:`0 2px 12px rgba(44,62,80,0.07)` }}>
       {/* Image / placeholder */}
@@ -1498,7 +1509,12 @@ function TripCard({ trip, onClick, isBookmarked, onBookmark }) {
         </div>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:`1px solid ${C.seafoamDeep}`, paddingTop:"10px" }}>
           <div style={{ fontSize:"11px", color:C.muted }}>by <strong onClick={e => { e.stopPropagation(); if (window.__closeTripModal) window.__closeTripModal(); setTimeout(() => window.__setViewingProfile && window.__setViewingProfile(trip.author), window.__closeTripModal ? 200 : 0); }} style={{ color:C.amber, cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted" }}>{trip.author}</strong> · {trip.date}</div>
-          <div style={{ fontSize:"11px", color:C.slateMid, fontWeight:600 }}>{trip.travelers}</div>
+          <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+            <button onClick={handleLike} title={liked?"Loved":"Love this trip"} style={{ display:"inline-flex", alignItems:"center", gap:"3px", background:"none", border:"none", cursor:liked?"default":"pointer", padding:"2px 4px", borderRadius:"6px", fontSize:"12px", color:liked?C.red:C.muted, fontWeight:700, transition:"color .15s" }}>
+              {liked ? "❤️" : "🤍"}{likeCount > 0 ? <span style={{ fontSize:"10px", color:liked?C.red:C.muted }}>{likeCount}</span> : null}
+            </button>
+            <div style={{ fontSize:"11px", color:C.slateMid, fontWeight:600 }}>{trip.travelers}</div>
+          </div>
         </div>
       </div>
     </div>
