@@ -1137,6 +1137,17 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
   const [lightboxIdx, setLightboxIdx] = useState(null);
   const [showRelated, setShowRelated] = useState(false);
   const [showBlueprintPreview, setShowBlueprintPreview] = useState(false);
+  const [likesCount, setLikesCount] = useState(trip.likes_count || 0);
+  const [hasLiked, setHasLiked] = useState(() => {
+    try { return (JSON.parse(localStorage.getItem("tc_liked_trips") || "[]")).includes(String(trip.id)); } catch { return false; }
+  });
+  const handleLike = async () => {
+    if (hasLiked) return;
+    const n = likesCount + 1;
+    setLikesCount(n); setHasLiked(true);
+    try { const s = JSON.parse(localStorage.getItem("tc_liked_trips")||"[]"); localStorage.setItem("tc_liked_trips", JSON.stringify([...s, String(trip.id)])); } catch {}
+    await supabase.from("trips").update({ likes_count: n }).eq("id", trip.id);
+  };
 
   // Always include cover photo as first lightbox image (Option C)
   const coverEntry = trip.image ? [{ url: trip.image, caption: "Cover photo" }] : [];
@@ -1181,6 +1192,9 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                 <div style={{ marginTop:"4px", fontSize:"14px", color:"rgba(255,255,255,0.95)", fontWeight:500, textShadow:"0 1px 4px rgba(0,0,0,0.5)" }}>{trip.destination}</div>
               </div>
               <div style={{ display:"flex", gap:"5px", flexWrap:"wrap", justifyContent:"flex-end", alignSelf:"flex-start" }}>
+                  <button onClick={handleLike} onTouchEnd={e=>{e.preventDefault();handleLike();}} title={hasLiked?"Loved":"Love this trip"} style={{ background:hasLiked?"rgba(176,58,46,0.35)":"rgba(196,168,130,0.2)", border:`1px solid ${hasLiked?"rgba(176,58,46,0.7)":"rgba(196,168,130,0.4)"}`, color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:hasLiked?"default":"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", display:"inline-flex", alignItems:"center", gap:"4px", transition:"all 0.15s" }}>
+                    {hasLiked ? "❤️" : "🤍"}{likesCount > 0 ? ` ${likesCount}` : ""}
+                  </button>
                   <button onClick={handleShare} onTouchEnd={e=>{e.preventDefault();handleShare();}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>{shareCopied ? "✓" : "🔗"}</button>
                   <button onClick={handleTwitterShare} onTouchEnd={e=>{e.preventDefault();handleTwitterShare();}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>𝕏</button>
                   <button onClick={() => onBookmark && onBookmark(trip.id)} onTouchEnd={e=>{e.preventDefault(); onBookmark && onBookmark(trip.id);}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>{isBookmarked ? "🔖" : "🏷️"}</button>
@@ -4720,6 +4734,7 @@ export default function App() {
   const [region, setRegion] = useState("All Regions");
   const [tag, setTag] = useState("All");
   const [sortBy, setSortBy] = useState("default");
+  const [weekenderOnly, setWeekenderOnly] = useState(false);
   const [duration, setDuration] = useState("Any Length");
   const { bookmarks, toggle: toggleBookmark } = useBookmarks();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
@@ -4748,7 +4763,8 @@ export default function App() {
     airfare:t.airfare||[], hotels:t.hotels||[], restaurants:t.restaurants||[],
     bars:t.bars||[], activities:t.activities||[], days:t.days||[],
     image:t.image??null, userId:t.user_id||null, featured:t.featured||false,
-    focalPoint:t.focal_point||{x:50,y:50}, gallery:t.gallery||[]
+    focalPoint:t.focal_point||{x:50,y:50}, gallery:t.gallery||[],
+    likes_count:t.likes_count||0, stay:t.stay||null
   });
 
   const fetchTrips = () => {
@@ -5008,10 +5024,12 @@ export default function App() {
       matchesDuration(t, duration)
     );
     if (sortBy === "submitter") f.sort((a,b) => a.author.localeCompare(b.author));
-    else if (sortBy === "destination") f.sort((a,b) => a.destination.localeCompare(b.destination));
+    else if (sortBy === "destination" || sortBy === "city") f.sort((a,b) => a.destination.localeCompare(b.destination));
     else if (sortBy === "duration") f.sort((a,b) => parseInt(a.duration)||0 - (parseInt(b.duration)||0));
+    else if (sortBy === "likes") f.sort((a,b) => (b.likes_count||0) - (a.likes_count||0));
+    if (weekenderOnly) f = f.filter(t => t.duration === "Weekend");
     return f;
-  }, [dbTrips, trips, searchDebounced, region, tag, sortBy, duration, bookmarks]);
+  }, [dbTrips, trips, searchDebounced, region, tag, sortBy, duration, bookmarks, weekenderOnly]);
 
   return (
     <ErrorBoundary>
@@ -5297,12 +5315,17 @@ export default function App() {
               <button onClick={() => { setRegion("All Regions"); setTag("All"); setDuration("Any Length"); }} style={{ fontSize:"11px", color:C.amber, background:"none", border:"none", cursor:"pointer", fontWeight:600 }}>Clear filters ×</button>
             )}
             <div style={{ display:"flex", alignItems:"center", gap:"5px" }}>
+              <button onClick={()=>{ setWeekenderOnly(w=>!w); if(!weekenderOnly) setSortBy("default"); }} style={{ fontSize:"11px", fontWeight:700, padding:"3px 10px", borderRadius:"20px", border:`1px solid ${weekenderOnly?C.amber:C.tide}`, background:weekenderOnly?C.amberBg:C.white, color:weekenderOnly?C.amber:C.slateLight, cursor:"pointer" }}>🏙️ Weekender{weekenderOnly?" ×":""}</button>
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:"5px" }}>
               <span style={{ fontSize:"11px", color:C.muted }}>Sort:</span>
               <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{ fontSize:"11px", fontWeight:600, color:C.slate, border:`1px solid ${C.tide}`, borderRadius:"6px", padding:"3px 7px", background:C.white, cursor:"pointer", outline:"none", fontFamily:"inherit" }}>
                 <option value="default">Default</option>
-                <option value="submitter">By Submitter</option>
-                <option value="destination">By Destination</option>
-                <option value="duration">By Duration</option>
+                <option value="likes">Most Loved</option>
+                {weekenderOnly && <option value="city">By City</option>}
+                {!weekenderOnly && <option value="submitter">By Submitter</option>}
+                {!weekenderOnly && <option value="destination">By Destination</option>}
+                {!weekenderOnly && <option value="duration">By Duration</option>}
               </select>
             </div>
           </div>
