@@ -1510,10 +1510,10 @@ function TripCard({ trip, onClick, isBookmarked, onBookmark }) {
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:`1px solid ${C.seafoamDeep}`, paddingTop:"10px" }}>
           <div style={{ fontSize:"11px", color:C.muted }}>by <strong onClick={e => { e.stopPropagation(); if (window.__closeTripModal) window.__closeTripModal(); setTimeout(() => window.__setViewingProfile && window.__setViewingProfile(trip.author), window.__closeTripModal ? 200 : 0); }} style={{ color:C.amber, cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted" }}>{trip.author}</strong> · {trip.date}</div>
           <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-            <button onClick={handleLike} title={liked?"Loved":"Love this trip"} style={{ display:"inline-flex", alignItems:"center", gap:"3px", background:"none", border:"none", cursor:liked?"default":"pointer", padding:"2px 4px", borderRadius:"6px", fontSize:"12px", color:liked?C.red:C.muted, fontWeight:700, transition:"color .15s" }}>
-              {liked ? "❤️" : "🤍"}{likeCount > 0 ? <span style={{ fontSize:"10px", color:liked?C.red:C.muted }}>{likeCount}</span> : null}
-            </button>
             <div style={{ fontSize:"11px", color:C.slateMid, fontWeight:600 }}>{trip.travelers}</div>
+            <button onClick={handleLike} title={liked?"Liked":"Like this trip"} style={{ display:"inline-flex", alignItems:"center", gap:"3px", background:"none", border:"none", cursor:liked?"default":"pointer", padding:"2px 4px", borderRadius:"6px", fontSize:"13px", color:liked?C.amber:C.muted, fontWeight:700, transition:"color .15s" }}>
+              👍{likeCount > 0 ? <span style={{ fontSize:"10px", color:liked?C.amber:C.muted }}>{likeCount}</span> : null}
+            </button>
           </div>
         </div>
       </div>
