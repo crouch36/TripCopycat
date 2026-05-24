@@ -1615,8 +1615,39 @@ function AddTripModal({ onClose, onAdd }) {
 }
 
 
-// ── Submit Trip Modal ─────────────────────────────────────────────────────────
-// ── Submit Trip Modal ─────────────────────────────────────────────────────────
+// ── Review Itinerary Step (extracted to satisfy Rules of Hooks) ───────────────
+function ReviewItineraryStep({ form, setForm, isLocalMode, onBack, onNext }) {
+  const [previewMode, setPreviewMode] = useState(isLocalMode);
+  return (
+    <div style={{ display:"flex", flexDirection:"column", maxHeight:"78vh", overflow:"hidden" }}>
+      <div style={{ padding:"14px 24px 10px", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, borderBottom:`1px solid ${C.tide}` }}>
+        <div>
+          <div style={{ fontSize:"14px", fontWeight:800, color:C.slate }}>
+            {isLocalMode ? "Your weekend guide" : "Review your itinerary"}
+          </div>
+          <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"2px" }}>
+            {form.days.length} day{form.days.length!==1?"s":""} · {form.days.reduce((n,d)=>n+(d.items?.length||0),0)} stops
+          </div>
+        </div>
+        {isLocalMode && (
+          <button onClick={()=>setPreviewMode(p=>!p)} style={{ padding:"5px 12px", borderRadius:"6px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"11px", fontWeight:600, cursor:"pointer" }}>
+            {previewMode ? "✏️ Edit stops" : "👁 Preview"}
+          </button>
+        )}
+      </div>
+      <div style={{ flex:1, overflow:previewMode?"hidden":"auto", WebkitOverflowScrolling:"touch", ...(previewMode?{}:{padding:"16px 24px"}) }}>
+        {previewMode
+          ? <LocalWeekendSnapshot trip={{ ...form, days:form.days }} />
+          : <EditableDailyItinerary days={form.days} onChange={days => setForm(p=>({...p,days}))} destination={form.destination} />
+        }
+      </div>
+      <div style={{ display:"flex", gap:"10px", padding:"12px 24px", borderTop:`1px solid ${C.tide}`, flexShrink:0 }}>
+        <button onClick={onBack} style={{ padding:"10px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>← Back</button>
+        <button onClick={onNext} style={{ flex:1, padding:"10px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"13px", fontWeight:700, cursor:"pointer" }}>Looks good — fill in details →</button>
+      </div>
+    </div>
+  );
+}
 const EMPTY_FORM = {
   title:"", destination:"", region:"Europe", duration:"", travelers:"", date:"", tags:[], loves:"", doNext:"",
   airfare:[{item:"",detail:"",tip:""}], hotels:[{item:"",detail:"",tip:""}],
@@ -2262,38 +2293,15 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
           </div>
         )}
 
-        {step === "review-itinerary" && (() => {
-          const [previewMode, setPreviewMode] = React.useState(isLocalMode);
-          return (
-          <div style={{ display:"flex", flexDirection:"column", maxHeight:"78vh", overflow:"hidden" }}>
-            <div style={{ padding:"14px 24px 10px", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, borderBottom:`1px solid ${C.tide}` }}>
-              <div>
-                <div style={{ fontSize:"14px", fontWeight:800, color:C.slate }}>
-                  {isLocalMode ? "Your weekend guide" : "Review your itinerary"}
-                </div>
-                <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"2px" }}>
-                  {form.days.length} day{form.days.length!==1?"s":""} · {form.days.reduce((n,d)=>n+(d.items?.length||0),0)} stops
-                </div>
-              </div>
-              {isLocalMode && (
-                <button onClick={()=>setPreviewMode(p=>!p)} style={{ padding:"5px 12px", borderRadius:"6px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"11px", fontWeight:600, cursor:"pointer" }}>
-                  {previewMode ? "✏️ Edit stops" : "👁 Preview"}
-                </button>
-              )}
-            </div>
-            <div style={{ flex:1, overflow:previewMode?"hidden":"auto", WebkitOverflowScrolling:"touch", ...(previewMode?{}:{padding:"16px 24px"}) }}>
-              {previewMode
-                ? <LocalWeekendSnapshot trip={{ ...form, days:form.days }} />
-                : <EditableDailyItinerary days={form.days} onChange={days => setForm(p=>({...p,days}))} destination={form.destination} />
-              }
-            </div>
-            <div style={{ display:"flex", gap:"10px", padding:"12px 24px", borderTop:`1px solid ${C.tide}`, flexShrink:0 }}>
-              <button onClick={() => setStep(isLocalMode ? "local-weekend" : "prompt")} style={{ padding:"10px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>← Back</button>
-              <button onClick={() => setStep("form")} style={{ flex:1, padding:"10px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"13px", fontWeight:700, cursor:"pointer" }}>Looks good — fill in details →</button>
-            </div>
-          </div>
-          );
-        })()}
+        {step === "review-itinerary" && (
+          <ReviewItineraryStep
+            form={form}
+            setForm={setForm}
+            isLocalMode={isLocalMode}
+            onBack={() => setStep(isLocalMode ? "local-weekend" : "prompt")}
+            onNext={() => setStep("form")}
+          />
+        )}
 
         {step === "form" && (
           <div style={{ padding:"20px 28px", maxHeight:"65vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
@@ -5032,7 +5040,7 @@ export default function App() {
   };
 
   const filtered = useMemo(() => {
-    const f = allTrips.filter(t =>
+    let f = allTrips.filter(t =>
       (!searchDebounced || [t.title,t.destination,t.travelers,t.loves].some(s=>s?.toLowerCase().includes(searchDebounced.toLowerCase()))) &&
       (region==="All Regions"||t.region===region) &&
       (tag==="All"||tag==="__bookmarks__"?true:t.tags.includes(tag)) &&
