@@ -1061,10 +1061,76 @@ function EditableDailyItinerary({ days, onChange, destination }) {
   );
 }
 
+// ── Local Weekend Snapshot (three-column one-page view) ──────────────────────
+function LocalWeekendSnapshot({ trip }) {
+  const SLOTS = [
+    { key:"morning",    label:"Morning",    emoji:"🌅" },
+    { key:"afternoon",  label:"Afternoon",  emoji:"☀️" },
+    { key:"evening",    label:"Evening",    emoji:"🌙" },
+    { key:"late_night", label:"Late Night", emoji:"🌃" },
+  ];
+  const toSlot = s => {
+    if (!s) return "morning";
+    const v = (s||"").toLowerCase();
+    if (["morning","breakfast","brunch","activity_morning"].includes(v)) return "morning";
+    if (["afternoon","lunch","activity_afternoon"].includes(v)) return "afternoon";
+    if (["evening","dinner","happy_hour","evening_bar"].includes(v)) return "evening";
+    return "late_night";
+  };
+  const days = (trip.days || []).slice(0,3);
+  const stay = trip.stay?.item;
+  return (
+    <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden" }}>
+      {stay && (
+        <div style={{ padding:"7px 16px", background:C.seafoam, borderBottom:`1px solid ${C.tide}`, display:"flex", alignItems:"center", gap:"8px", flexShrink:0 }}>
+          <span style={{ fontSize:"13px" }}>🏨</span>
+          <span style={{ fontSize:"11px", fontWeight:700, color:C.slate }}>Where to stay: </span>
+          <span style={{ fontSize:"11px", color:C.slateMid }}>{stay}</span>
+          {trip.stay?.detail && <span style={{ fontSize:"10px", color:C.muted }}>· {trip.stay.detail}</span>}
+        </div>
+      )}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", flex:1, overflow:"hidden" }}>
+        {days.map((day, di) => (
+          <div key={di} style={{ borderRight:di<2?`1px solid ${C.tide}`:"none", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+            <div style={{ padding:"8px 12px", background:C.slate, flexShrink:0, borderBottom:`1px solid rgba(255,255,255,0.1)` }}>
+              <div style={{ fontSize:"9px", fontWeight:700, color:"rgba(255,255,255,0.45)", textTransform:"uppercase", letterSpacing:"0.1em" }}>Day {day.day}</div>
+              <div style={{ fontSize:"12px", fontWeight:700, color:C.white, lineHeight:1.3 }}>{day.title||""}</div>
+            </div>
+            {SLOTS.map(slot => {
+              const items = (day.items||[]).filter(it => toSlot(it.slot||it.time||"")===slot.key && it.label!=="Head home");
+              if (items.length===0 && (slot.key==="late_night" || (slot.key==="morning"&&di===0) || (slot.key==="afternoon"&&di===0))) return null;
+              return (
+                <div key={slot.key} style={{ borderBottom:`1px solid ${C.tide}`, padding:"8px 10px", flex:slot.key==="afternoon"?2:1, overflow:"hidden", minHeight:0 }}>
+                  <div style={{ fontSize:"9px", fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:"5px" }}>{slot.emoji} {slot.label}</div>
+                  {items.length===0
+                    ? <div style={{ fontSize:"10px", color:C.mutedLight, fontStyle:"italic" }}>—</div>
+                    : items.map((item,ii) => (
+                      <div key={ii} style={{ marginBottom:"4px", overflow:"hidden" }}>
+                        <div style={{ fontSize:"11px", fontWeight:600, color:C.slate, lineHeight:1.35, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.label}</div>
+                        {item.note && <div style={{ fontSize:"10px", color:C.muted, lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.note}</div>}
+                      </div>
+                    ))
+                  }
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      {(trip.loves || trip.doNext) && (
+        <div style={{ padding:"8px 16px", borderTop:`1px solid ${C.tide}`, background:C.seafoam, flexShrink:0, display:"flex", gap:"24px" }}>
+          {trip.loves  && <div style={{ flex:1, fontSize:"11px", color:C.slateMid, lineHeight:1.4 }}><span style={{ fontWeight:700, color:C.slate }}>Why visit: </span>{trip.loves}</div>}
+          {trip.doNext && <div style={{ flex:1, fontSize:"11px", color:C.slateMid, lineHeight:1.4 }}><span style={{ fontWeight:700, color:C.slate }}>Don't miss: </span>{trip.doNext}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Trip Modal ────────────────────────────────────────────────────────────────
 
 function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin }) {
-  const [view, setView] = useState("overview");
+  const [view, setView] = useState(trip.duration === "Weekend" ? "daily" : "overview");
   const [tab, setTab] = useState("all");
   const [showExport, setShowExport] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -1257,9 +1323,11 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
           )}
 
           {view === "daily" && (
-            <div style={{ padding:"24px 28px", background:C.white }}>
+            <div style={{ background:C.white, ...(trip.duration==="Weekend" && trip.days?.length ? { height:"calc(100vh - 180px)", overflow:"hidden", display:"flex", flexDirection:"column" } : { padding:"24px 28px" }) }}>
               {trip.days?.length
-                ? <DailyItinerary days={trip.days} />
+                ? trip.duration === "Weekend"
+                  ? <LocalWeekendSnapshot trip={trip} />
+                  : <DailyItinerary days={trip.days} />
                 : <div style={{ textAlign:"center", padding:"56px 20px", color:C.muted }}><div style={{ fontSize:"34px", marginBottom:"12px" }}>📅</div><div style={{ fontWeight:600 }}>No daily itinerary yet</div></div>
               }
             </div>
@@ -2164,21 +2232,38 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
           </div>
         )}
 
-        {step === "review-itinerary" && (
-          <div style={{ padding:"24px 28px", maxHeight:"70vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
-            <div style={{ marginBottom:"16px" }}>
-              <div style={{ fontSize:"15px", fontWeight:800, color:C.slate, marginBottom:"4px" }}>Here's your itinerary — edit as needed</div>
-              <div style={{ fontSize:"11px", color:C.slateLight }}>
-                {form.days.length} day{form.days.length!==1?"s":""} · {form.days.reduce((n,d)=>n+(d.items?.length||0),0)} stops — tap any field to edit, or add / remove stops per day.
+        {step === "review-itinerary" && (() => {
+          const [previewMode, setPreviewMode] = React.useState(isLocalMode);
+          return (
+          <div style={{ display:"flex", flexDirection:"column", maxHeight:"78vh", overflow:"hidden" }}>
+            <div style={{ padding:"14px 24px 10px", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, borderBottom:`1px solid ${C.tide}` }}>
+              <div>
+                <div style={{ fontSize:"14px", fontWeight:800, color:C.slate }}>
+                  {isLocalMode ? "Your weekend guide" : "Review your itinerary"}
+                </div>
+                <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"2px" }}>
+                  {form.days.length} day{form.days.length!==1?"s":""} · {form.days.reduce((n,d)=>n+(d.items?.length||0),0)} stops
+                </div>
               </div>
+              {isLocalMode && (
+                <button onClick={()=>setPreviewMode(p=>!p)} style={{ padding:"5px 12px", borderRadius:"6px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"11px", fontWeight:600, cursor:"pointer" }}>
+                  {previewMode ? "✏️ Edit stops" : "👁 Preview"}
+                </button>
+              )}
             </div>
-            <EditableDailyItinerary days={form.days} onChange={days => setForm(p=>({...p,days}))} destination={form.destination} />
-            <div style={{ display:"flex", gap:"10px", marginTop:"16px" }}>
+            <div style={{ flex:1, overflow:previewMode?"hidden":"auto", WebkitOverflowScrolling:"touch", ...(previewMode?{}:{padding:"16px 24px"}) }}>
+              {previewMode
+                ? <LocalWeekendSnapshot trip={{ ...form, days:form.days }} />
+                : <EditableDailyItinerary days={form.days} onChange={days => setForm(p=>({...p,days}))} destination={form.destination} />
+              }
+            </div>
+            <div style={{ display:"flex", gap:"10px", padding:"12px 24px", borderTop:`1px solid ${C.tide}`, flexShrink:0 }}>
               <button onClick={() => setStep(isLocalMode ? "local-weekend" : "prompt")} style={{ padding:"10px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>← Back</button>
               <button onClick={() => setStep("form")} style={{ flex:1, padding:"10px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"13px", fontWeight:700, cursor:"pointer" }}>Looks good — fill in details →</button>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {step === "form" && (
           <div style={{ padding:"20px 28px", maxHeight:"65vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
@@ -2870,7 +2955,7 @@ CLASSIFICATION — strictly enforced:
 - Extra restaurants beyond 4 meal slots: add to restaurants array, tip = "Alternate — swap this in for any meal slot."
 - Extra activities beyond 3 activity slots: add to activities array, tip = "Alternate — great swap for a similar time slot."
 - Late night Sat: activity beats bar. If both available, activity wins; bar becomes alternate.
-- GEOGRAPHIC ORDER: within each day cluster nearby venues together. If unsure of proximity, keep the user's original order. If a stop is noticeably far from the previous, set note = "Short drive from previous stop."
+- GEOGRAPHIC DAY UNITS: Build each day as a neighborhood unit, not just filling slots in list order. Step 1 — group activities that are geographically close or sequentially listed together into the same day. Step 2 — once activities are assigned to a day, assign the nearest restaurant (by proximity or listing proximity) to that day's meal slots, not the next one in list order. Step 3 — assign the nearest bar to that day's evening slot. Result: if an activity and a bar are in the same area, they belong on the same day, and the dinner closest to that area goes on that same evening. If geographic relationships are unclear, preserve the user's listed order.
 
 PRICING: $ / $$ / $$$ / $$$$ only when clearly inferable. Never invent prices.
 
