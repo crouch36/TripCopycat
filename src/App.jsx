@@ -2120,34 +2120,47 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
         )}
 
         {step === "local-weekend" && (
-          <div style={{ padding:"28px", maxHeight:"70vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
-            <div style={{ textAlign:"center", marginBottom:"20px" }}>
-              <div style={{ fontSize:"28px", marginBottom:"8px" }}>🏙️</div>
-              <div style={{ fontSize:"16px", fontWeight:700, color:C.slate, marginBottom:"4px" }}>Your city. Your picks.</div>
-              <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.6 }}>Dump your go-to spots — restaurants, bars, activities, neighborhoods. We'll turn it into a shareable weekend guide titled <em>Best of [City] — A Local's Weekend.</em></div>
+          <div style={{ padding:"20px 24px", maxHeight:"78vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
+            <div style={{ textAlign:"center", marginBottom:"18px" }}>
+              <div style={{ fontSize:"26px", marginBottom:"6px" }}>🏙️</div>
+              <div style={{ fontSize:"15px", fontWeight:700, color:C.slate, marginBottom:"4px" }}>Your city. Your picks.</div>
+              <div style={{ fontSize:"11px", color:C.slateLight, lineHeight:1.6 }}>Fill in what you know — AI stitches it into a Fri–Sun weekend guide. You only need one box to start.</div>
             </div>
-            <div style={{ background:C.seafoam, borderRadius:"14px", border:`1.5px solid ${C.tide}`, padding:"18px", marginBottom:"14px" }}>
-              <div style={{ fontSize:"11px", color:C.slateMid, marginBottom:"8px", lineHeight:1.6 }}>
-                Just list your favorites — no format needed. Include the city, neighborhoods, restaurants, bars, things to do, and anything visitors shouldn't miss.
+
+            {[
+              { id:"lw-city",  label:"📍 City & Where to Stay",          color:C.slate,      placeholder:"City and state, plus hotel names or neighborhoods to base yourself in.\ne.g. Canton, Ohio — stay near downtown or Hotel Gervasi area" },
+              { id:"lw-eat",   label:"🍽️ Where to Eat & Drink",          color:C.amber,      placeholder:"Restaurants and bars — list them all, any order.\ne.g. Taggart's Ice Cream for lunch, Gervasi Vineyard for dinner, Bender's Tavern for drinks" },
+              { id:"lw-do",    label:"🎯 What to Do",                     color:C.slateLight, placeholder:"Activities, attractions, experiences.\ne.g. Sippo Lake hike, Pro Football Hall of Fame, McKinley Presidential Library" },
+              { id:"lw-other", label:"💡 Anything Else",                  color:C.muted,      placeholder:"Tips, best season, who it's great for, what to avoid.\ne.g. Best in fall. Great for couples. Avoid August — too hot." },
+            ].map(box => (
+              <div key={box.id} style={{ marginBottom:"10px", border:`1.5px solid ${C.tide}`, borderRadius:"10px", overflow:"hidden" }}>
+                <div style={{ padding:"8px 12px", background:C.seafoam, borderBottom:`1px solid ${C.tide}` }}>
+                  <span style={{ fontSize:"11px", fontWeight:700, color:box.color }}>{box.label}</span>
+                </div>
+                <textarea id={box.id} placeholder={box.placeholder}
+                  style={{ width:"100%", minHeight:"68px", padding:"9px 12px", border:"none", fontSize:"12px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate, resize:"vertical", lineHeight:1.6, display:"block" }} />
               </div>
-              <textarea
-                id="local-brain-dump"
-                placeholder={`e.g. "Canton, Ohio weekend — Friday night at Bender's Tavern downtown, Saturday morning hike at Sippo Lake, lunch at Taggart's Ice Cream, afternoon at the Pro Football Hall of Fame, dinner at Gervasi Vineyard, Sunday brunch at Steel Magnolias. Stay near downtown. Avoid going in August — too hot."`}
-                style={{ width:"100%", minHeight:"120px", padding:"10px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"12px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate, resize:"vertical", lineHeight:1.6 }}
-              />
-              <button
-                onClick={() => {
-                  const text = document.getElementById("local-brain-dump")?.value || "";
-                  if (!text.trim()) { alert("Tell us about your city first."); return; }
-                  window.__hybridText = text;
-                  window.__hybridPhotos = [];
-                  setStep("hybrid-processing");
-                }}
-                style={{ width:"100%", marginTop:"14px", padding:"12px", borderRadius:"8px", border:"none", background:C.amber, color:C.white, fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
-                Build My Weekend Guide →
-              </button>
-            </div>
-            <button onClick={() => { setIsLocalMode(false); setStep("prompt"); }} style={{ background:"none", border:"none", color:C.muted, fontSize:"12px", cursor:"pointer", width:"100%", textAlign:"center", paddingTop:"4px" }}>← Back</button>
+            ))}
+
+            <button onClick={() => {
+              const city  = document.getElementById("lw-city")?.value.trim()  || "";
+              const eat   = document.getElementById("lw-eat")?.value.trim()   || "";
+              const doIt  = document.getElementById("lw-do")?.value.trim()    || "";
+              const other = document.getElementById("lw-other")?.value.trim() || "";
+              if (!city && !eat && !doIt) { alert("Fill in at least the city and one category."); return; }
+              const structured = [
+                city  && `CITY & WHERE TO STAY:\n${city}`,
+                eat   && `WHERE TO EAT & DRINK:\n${eat}`,
+                doIt  && `WHAT TO DO:\n${doIt}`,
+                other && `OTHER NOTES:\n${other}`,
+              ].filter(Boolean).join("\n\n");
+              window.__hybridText = structured;
+              window.__hybridPhotos = [];
+              setStep("hybrid-processing");
+            }} style={{ width:"100%", marginTop:"6px", padding:"13px", borderRadius:"8px", border:"none", background:C.amber, color:C.white, fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
+              Build My Weekend Guide →
+            </button>
+            <button onClick={() => { setIsLocalMode(false); setStep("prompt"); }} style={{ background:"none", border:"none", color:C.muted, fontSize:"12px", cursor:"pointer", width:"100%", textAlign:"center", marginTop:"10px" }}>← Back</button>
           </div>
         )}
 
@@ -2818,11 +2831,17 @@ function HybridProcessor({ text, photos, onComplete, onBack, isLocalMode = false
       const prompt = isLocalMode
         ? `You are helping a local share their city's best spots as a weekend guide on a travel platform called TripCopycat.
 
-The local wrote this about their city:
+The local has organized their picks into these categories:
 
 "${text}"
 
-Use ONLY the venues and places they mentioned. Never invent or add venues not in the text.
+The input is already sorted by category — trust it:
+- "CITY & WHERE TO STAY" → destination, region, and hotels array
+- "WHERE TO EAT & DRINK" → restaurants array (food venues) and bars array (drinks venues). If ambiguous, food = restaurant, drinks = bar.
+- "WHAT TO DO" → activities array
+- "OTHER NOTES" → informs loves, doNext, tags, and seasonal tips
+
+Use ONLY the venues and places listed. Never invent venues not mentioned.
 
 WEEKEND STRUCTURE — three days, four time slots each. Use slot values: morning / afternoon / evening / late_night only.
 
