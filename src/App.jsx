@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import supabase from "./supabaseClient.js";
 
 // ── Analytics ─────────────────────────────────────────────────────────────────
@@ -102,14 +102,6 @@ const GLOBAL_STYLES = `
 
   /* Spinner animation */
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-  @keyframes skeleton-shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
-  @keyframes toast-in {
-    from { opacity:0; transform:translateY(8px); }
-    to   { opacity:1; transform:translateY(0); }
-  }
   @keyframes progress-pulse {
     0% { transform: translateX(-100%); }
     50% { transform: translateX(60%); }
@@ -164,29 +156,6 @@ function runContentFilter(trip) {
 // Border:    Linen        #E8DDD0  (borders, dividers)
 // Accent:    Terracotta   #C1692A  (tags, highlights)
 // Font:      Playfair Display (display) + Nunito (body)
-
-// ── Error Boundary ───────────────────────────────────────────────────────────
-class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
-  static getDerivedStateFromError(error) { return { hasError: true, error }; }
-  componentDidCatch(error, info) { console.error("TripCopycat error:", error, info); }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#FAF7F2", fontFamily:"'DM Sans',sans-serif", padding:"32px 16px", textAlign:"center" }}>
-          <div>
-            <div style={{ fontSize:"40px", marginBottom:"16px" }}>🐾</div>
-            <div style={{ fontSize:"20px", fontWeight:700, color:"#1C2B3A", marginBottom:"8px" }}>Something went wrong</div>
-            <div style={{ fontSize:"14px", color:"#7A8A96", marginBottom:"24px" }}>An unexpected error occurred. Your data is safe.</div>
-            <button onClick={() => window.location.reload()} style={{ background:"#C1692A", color:"#fff", border:"none", borderRadius:"8px", padding:"10px 24px", fontSize:"14px", fontWeight:700, cursor:"pointer" }}>Reload page</button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 
 const C = {
   azure:       "#C4A882",
@@ -448,7 +417,7 @@ async function extractExif(file) {
 }
 
 // Compress image via Canvas to ~200KB max
-async function compressImage(file, maxW = 640, quality = 0.5) {
+async function compressImage(file, maxW = 1200, quality = 0.65) {
   return new Promise(resolve => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -474,12 +443,9 @@ async function compressImage(file, maxW = 640, quality = 0.5) {
 // Reverse geocode lat/lon to place name using OpenStreetMap (free, no key needed)
 async function reverseGeocode(lat, lon) {
   try {
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 3000);
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`, {
-      headers: { "Accept-Language": "en" }, signal: controller.signal
+      headers: { "Accept-Language": "en" }
     });
-    clearTimeout(t);
     const data = await res.json();
     const a = data.address || {};
     return [a.tourism || a.amenity || a.leisure || a.building, a.city || a.town || a.village, a.country]
@@ -516,43 +482,20 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
       setProgress(Math.round((i + 1) / fileArr.length * 30));
     }
 
-    // Step 2: Compress photos to blob and upload to R2 (avoids Vercel 4.5MB client payload limit)
-    setProgressLabel("Uploading photos for analysis…");
-    const photoUrls = [];
+    // Step 2: Compress all photos
+    setProgressLabel("Compressing photos…");
+    const compressed = [];
     for (let i = 0; i < fileArr.length; i++) {
-      const blob = await new Promise(resolve => {
-        const objUrl = URL.createObjectURL(fileArr[i]);
-        const img = new Image();
-        img.onload = () => {
-          const scale = Math.min(1, 1200 / img.width);
-          const canvas = document.createElement("canvas");
-          canvas.width = Math.round(img.width * scale);
-          canvas.height = Math.round(img.height * scale);
-          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-          canvas.toBlob(b => { URL.revokeObjectURL(objUrl); resolve(b); }, "image/jpeg", 0.7);
-        };
-        img.onerror = () => { URL.revokeObjectURL(objUrl); resolve(null); };
-        img.src = objUrl;
-      });
-      if (blob) {
-        try {
-          const ext = (fileArr[i].name.split(".").pop() || "jpg").toLowerCase();
-          const resp = await fetch(`/api/upload-image?folder=temp&type=image%2Fjpeg&name=photo.${ext}`, {
-            method: "POST",
-            body: blob
-          });
-          const upData = await resp.json();
-          if (upData.url) photoUrls.push({ url: upData.url, meta: metaArr[i] });
-        } catch {}
-      }
+      const b64 = await compressImage(fileArr[i]);
+      if (b64) compressed.push({ b64, meta: metaArr[i], idx: i });
       setProgress(30 + Math.round((i + 1) / fileArr.length * 40));
     }
 
-    // Step 3: Send R2 URLs to Gemini server function (server fetches images — no client payload limit)
+    // Step 3: Send to Claude API
     setProgressLabel("Analysing with AI…");
     setProgress(70);
 
-    const metaSummary = photoUrls.map((p, i) => {
+    const metaSummary = compressed.map((p, i) => {
       const m = p.meta;
       const parts = [`Photo ${i + 1}: ${m.filename || "photo"}`];
       if (m.placeName) parts.push(`GPS location: ${m.placeName}`);
@@ -561,16 +504,23 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
       return parts.join(" | ");
     }).join("\n");
 
-    const geminiPrompt = `You are analysing a travel photo album to reconstruct a trip itinerary. Here is the GPS location and timestamp metadata extracted from each photo:\n\n${metaSummary}\n\nIMPORTANT: Use the GPS location data to identify SPECIFIC venue names. If GPS shows a photo was taken at a specific street address or named place, use that exact place name. Do not use generic descriptions like "local restaurant" or "hotel balcony" — always try to name the specific venue based on GPS coordinates, visible signage, or recognisable landmarks.\n\nReturn ONLY a JSON object with this exact structure, no other text:\n{\n  "destination": "City, Country",\n  "region": "Europe|Asia|North America|Central America|South America|Africa|Oceania",\n  "duration": "N days",\n  "travelers": "description e.g. Couple, Family, Guys trip",\n  "tags": ["tag1", "tag2"],\n  "loves": "2-4 sentences about specific highlights visible in the photos — name actual places",\n  "doNext": "1-2 sentences of honest advice",\n  "hotels": [{"item": "hotel name from GPS or signage", "detail": "location", "tip": ""}],\n  "restaurants": [{"item": "restaurant name from GPS or signage", "detail": "cuisine type", "tip": ""}],\n  "bars": [{"item": "bar name from GPS or signage", "detail": "type", "tip": ""}],\n  "activities": [{"item": "specific activity or landmark name", "detail": "description", "tip": ""}],\n  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"time": "", "type": "activity|restaurant|bar|hotel|transport", "label": "specific venue or activity name", "note": ""}]}]\n}`;
-
     try {
+      const parts = [
+        {
+          text: `You are analysing travel photos to reconstruct a trip itinerary. Here is the GPS and timestamp metadata extracted from each photo:\n\n${metaSummary}\n\nIMPORTANT: Use the GPS location data to identify SPECIFIC venue names. If GPS shows a photo was taken at a specific street address or named place, use that exact place name. Do not use generic descriptions like "local restaurant" or "hotel balcony" — always try to name the specific venue based on GPS coordinates, visible signage, or recognisable landmarks.\n\nReturn ONLY a JSON object with this exact structure, no other text:\n{\n  "destination": "City, Country",\n  "region": "Europe|Asia|North America|Central America|South America|Africa|Oceania",\n  "duration": "N days",\n  "travelers": "description e.g. Couple, Family, Guys trip",\n  "tags": ["tag1", "tag2"],\n  "loves": "2-4 sentences about specific highlights visible in the photos — name actual places",\n  "doNext": "1-2 sentences of honest advice",\n  "hotels": [{"item": "hotel name from GPS or signage", "detail": "location", "tip": ""}],\n  "restaurants": [{"item": "restaurant name from GPS or signage", "detail": "cuisine type", "tip": ""}],\n  "bars": [{"item": "bar name from GPS or signage", "detail": "type", "tip": ""}],\n  "activities": [{"item": "specific activity or landmark name", "detail": "description", "tip": ""}],\n  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"time": "", "type": "activity|restaurant|bar|hotel|transport", "label": "specific venue or activity name", "note": ""}]}]\n}`
+        },
+        ...compressed.map(p => ({
+          inline_data: { mime_type: "image/jpeg", data: p.b64 }
+        }))
+      ];
+
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 55000);
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
 
       const res = await fetch("/api/gemini", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageUrls: photoUrls.map(p => p.url), prompt: geminiPrompt }),
+          body: JSON.stringify({ contents: [{ parts }] }),
           signal: controller.signal
         });
       clearTimeout(timeoutId);
@@ -589,14 +539,9 @@ function PhotoImportModal({ onClose, onComplete, skipCloseOnComplete }) {
       setProgress(100);
     } catch(e) {
       console.error("Gemini API error:", e);
-      let msg;
-      if (e.name === "AbortError") {
-        msg = "Request timed out after 45 seconds. Try with fewer photos or on a stronger connection.";
-      } else if (e.message?.includes("413") || e.message?.includes("too large") || e.message?.includes("payload")) {
-        msg = "Photos are too large to process. Try selecting fewer photos (10-15) and try again.";
-      } else {
-        msg = `Analysis failed: ${e.message}. Please try again.`;
-      }
+      const msg = e.name === "AbortError"
+        ? "Request timed out after 45 seconds. Try with fewer photos or on a stronger connection."
+        : `Analysis failed: ${e.message}. Please try again.`;
       setError(msg);
       setPhase("error");
     }
@@ -1000,159 +945,17 @@ function DailyItinerary({ days }) {
   );
 }
 
-// ── Editable Daily Itinerary (submit form) ────────────────────────────────────
-function EditableDailyItinerary({ days, onChange, destination }) {
-  const SLOTS = [
-    { key:"morning",   label:"Morning",   emoji:"🌅" },
-    { key:"afternoon", label:"Afternoon", emoji:"☀️" },
-    { key:"evening",   label:"Evening",   emoji:"🌙" },
-    { key:"late_night",label:"Late Night",emoji:"🌃" },
-  ];
-  const toSlot = s => {
-    if (!s) return "morning";
-    const v = s.toLowerCase();
-    if (["morning","breakfast","brunch","activity_morning"].includes(v)) return "morning";
-    if (["afternoon","lunch","activity_afternoon"].includes(v)) return "afternoon";
-    if (["evening","dinner","happy_hour","evening_bar"].includes(v)) return "evening";
-    if (["late_night","late night","depart","bar"].includes(v)) return "late_night";
-    return "morning";
-  };
-  const inp = { width:"100%", padding:"5px 8px", borderRadius:"6px", border:`1px solid ${C.tide}`, fontSize:"11px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate };
-  const updItem = (di,ii,field,val) => onChange(days.map((day,d)=>d!==di?day:{...day,items:day.items.map((it,idx)=>idx!==ii?it:{...it,[field]:val})}));
-  const delItem = (di,ii) => onChange(days.map((day,d)=>d!==di?day:{...day,items:day.items.filter((_,idx)=>idx!==ii)}));
-  const addItem = (di,slot) => onChange(days.map((day,d)=>d!==di?day:{...day,items:[...day.items,{slot,type:slot==="evening"?"restaurant":slot==="late_night"?"bar":"activity",label:"",note:""}]}));
-  return (
-    <div>
-      {days.map((day,di) => (
-        <div key={di} style={{ marginBottom:"14px", border:`1px solid ${C.tide}`, borderRadius:"10px", overflow:"hidden" }}>
-          <div style={{ padding:"10px 14px", background:C.seafoam, borderBottom:`1px solid ${C.tide}` }}>
-            <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Day {day.day}{day.title?` — ${day.title}`:""}</div>
-          </div>
-          {SLOTS.map(slot => {
-            const slotItems = (day.items||[]).map((item,ii)=>({item,ii})).filter(({item})=>toSlot(item.slot||item.time||"")===slot.key);
-            return (
-              <div key={slot.key} style={{ borderBottom:`1px solid ${C.tide}`, padding:"10px 14px" }}>
-                <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"7px" }}>{slot.emoji} {slot.label}</div>
-                {slotItems.length===0 && (
-                  <div style={{ border:`1px dashed ${C.tide}`, borderRadius:"7px", padding:"7px 10px", color:C.muted, fontSize:"11px", textAlign:"center", marginBottom:"5px" }}>Nothing planned — add a stop below</div>
-                )}
-                {slotItems.map(({item,ii}) => (
-                  <div key={ii} style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"7px", padding:"8px", marginBottom:"6px" }}>
-                    <div style={{ display:"flex", gap:"5px", alignItems:"center", marginBottom:"5px" }}>
-                      <input style={{...inp,flex:1}} placeholder="Venue or activity" value={item.label||""} onChange={e=>updItem(di,ii,"label",e.target.value)} />
-                      <select style={{...inp,width:"90px",flexShrink:0}} value={item.type||"activity"} onChange={e=>updItem(di,ii,"type",e.target.value)}>
-                        {["activity","restaurant","bar","hotel","transport"].map(t=><option key={t}>{t}</option>)}
-                      </select>
-                      {item.label && (
-                        <a href={`https://www.google.com/maps/search/${encodeURIComponent((item.label||"")+(destination?" "+destination:""))}`} target="_blank" rel="noopener noreferrer" title="Verify on Google Maps" style={{ fontSize:"15px", flexShrink:0, textDecoration:"none", lineHeight:1 }}>📍</a>
-                      )}
-                      <button onClick={()=>delItem(di,ii)} style={{ padding:"4px 7px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px", flexShrink:0 }}>✕</button>
-                    </div>
-                    <input style={inp} placeholder="Note (optional)" value={item.note||""} onChange={e=>updItem(di,ii,"note",e.target.value)} />
-                  </div>
-                ))}
-                <button onClick={()=>addItem(di,slot.key)} style={{ fontSize:"11px", color:C.muted, background:"none", border:"none", cursor:"pointer", marginTop:"2px", padding:"2px 0" }}>+ Add {slot.label.toLowerCase()} stop</button>
-              </div>
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── Local Weekend Snapshot (three-column one-page view) ──────────────────────
-function LocalWeekendSnapshot({ trip }) {
-  const SLOTS = [
-    { key:"morning",    label:"Morning",    emoji:"🌅" },
-    { key:"afternoon",  label:"Afternoon",  emoji:"☀️" },
-    { key:"evening",    label:"Evening",    emoji:"🌙" },
-    { key:"late_night", label:"Late Night", emoji:"🌃" },
-  ];
-  const toSlot = s => {
-    if (!s) return "morning";
-    const v = (s||"").toLowerCase();
-    if (["morning","breakfast","brunch","activity_morning"].includes(v)) return "morning";
-    if (["afternoon","lunch","activity_afternoon"].includes(v)) return "afternoon";
-    if (["evening","dinner","happy_hour","evening_bar"].includes(v)) return "evening";
-    return "late_night";
-  };
-  const days = (trip.days || []).slice(0,3);
-  const stay = trip.stay?.item;
-  return (
-    <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden" }}>
-      {stay && (
-        <div style={{ padding:"7px 16px", background:C.seafoam, borderBottom:`1px solid ${C.tide}`, display:"flex", alignItems:"center", gap:"8px", flexShrink:0 }}>
-          <span style={{ fontSize:"13px" }}>🏨</span>
-          <span style={{ fontSize:"11px", fontWeight:700, color:C.slate }}>Where to stay: </span>
-          <span style={{ fontSize:"11px", color:C.slateMid }}>{stay}</span>
-          {trip.stay?.detail && <span style={{ fontSize:"10px", color:C.muted }}>· {trip.stay.detail}</span>}
-        </div>
-      )}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", flex:1, overflow:"hidden" }}>
-        {days.map((day, di) => (
-          <div key={di} style={{ borderRight:di<2?`1px solid ${C.tide}`:"none", display:"flex", flexDirection:"column", overflow:"hidden" }}>
-            <div style={{ padding:"8px 12px", background:C.slate, flexShrink:0, borderBottom:`1px solid rgba(255,255,255,0.1)` }}>
-              <div style={{ fontSize:"9px", fontWeight:700, color:"rgba(255,255,255,0.45)", textTransform:"uppercase", letterSpacing:"0.1em" }}>Day {day.day}</div>
-              <div style={{ fontSize:"12px", fontWeight:700, color:C.white, lineHeight:1.3 }}>{day.title||""}</div>
-            </div>
-            {SLOTS.map(slot => {
-              const items = (day.items||[]).filter(it => toSlot(it.slot||it.time||"")===slot.key && it.label!=="Head home");
-              if (items.length===0 && (slot.key==="late_night" || (slot.key==="morning"&&di===0) || (slot.key==="afternoon"&&di===0))) return null;
-              return (
-                <div key={slot.key} style={{ borderBottom:`1px solid ${C.tide}`, padding:"8px 10px", flex:slot.key==="afternoon"?2:1, overflow:"hidden", minHeight:0 }}>
-                  <div style={{ fontSize:"9px", fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:"5px" }}>{slot.emoji} {slot.label}</div>
-                  {items.length===0
-                    ? <div style={{ fontSize:"10px", color:C.mutedLight, fontStyle:"italic" }}>—</div>
-                    : items.map((item,ii) => (
-                      <div key={ii} style={{ marginBottom:"4px", overflow:"hidden" }}>
-                        <div style={{ fontSize:"11px", fontWeight:600, color:C.slate, lineHeight:1.35, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.label}</div>
-                        {item.note && <div style={{ fontSize:"10px", color:C.muted, lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.note}</div>}
-                      </div>
-                    ))
-                  }
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-      {(trip.loves || trip.doNext) && (
-        <div style={{ padding:"8px 16px", borderTop:`1px solid ${C.tide}`, background:C.seafoam, flexShrink:0, display:"flex", gap:"24px" }}>
-          {trip.loves  && <div style={{ flex:1, fontSize:"11px", color:C.slateMid, lineHeight:1.4 }}><span style={{ fontWeight:700, color:C.slate }}>Why visit: </span>{trip.loves}</div>}
-          {trip.doNext && <div style={{ flex:1, fontSize:"11px", color:C.slateMid, lineHeight:1.4 }}><span style={{ fontWeight:700, color:C.slate }}>Don't miss: </span>{trip.doNext}</div>}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Trip Modal ────────────────────────────────────────────────────────────────
 
-function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin }) {
-  const [view, setView] = useState(trip.duration === "Weekend" ? "daily" : "overview");
+function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin, currentUser }) {
+  const [view, setView] = useState("overview");
   const [tab, setTab] = useState("all");
   const [showExport, setShowExport] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState(null);
   const [showRelated, setShowRelated] = useState(false);
-  const [showBlueprintPreview, setShowBlueprintPreview] = useState(false);
-  const [likesCount, setLikesCount] = useState(trip.likes_count || 0);
-  const [hasLiked, setHasLiked] = useState(() => {
-    try { return (JSON.parse(localStorage.getItem("tc_liked_trips") || "[]")).includes(String(trip.id)); } catch { return false; }
-  });
-  const handleLike = async () => {
-    if (hasLiked) return;
-    const n = likesCount + 1;
-    setLikesCount(n); setHasLiked(true);
-    try { const s = JSON.parse(localStorage.getItem("tc_liked_trips")||"[]"); localStorage.setItem("tc_liked_trips", JSON.stringify([...s, String(trip.id)])); } catch {}
-    await supabase.from("trips").update({ likes_count: n }).eq("id", trip.id);
-  };
 
-  // Always include cover photo as first lightbox image (Option C)
-  const coverEntry = trip.image ? [{ url: trip.image, caption: "Cover photo" }] : [];
-  const galleryEntries = (trip.gallery || []).filter(g => g.url !== trip.image);
-  const gallery = [...coverEntry, ...galleryEntries];
+  const gallery = trip.gallery || [];
 
   // Related trips algorithm: prioritise same author, then matching tags, then same region
   const related = (allTrips || []).filter(t => t.id !== trip.id).map(t => {
@@ -1192,16 +995,19 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                 <div style={{ marginTop:"4px", fontSize:"14px", color:"rgba(255,255,255,0.95)", fontWeight:500, textShadow:"0 1px 4px rgba(0,0,0,0.5)" }}>{trip.destination}</div>
               </div>
               <div style={{ display:"flex", gap:"5px", flexWrap:"wrap", justifyContent:"flex-end", alignSelf:"flex-start" }}>
-                  <button onClick={handleLike} onTouchEnd={e=>{e.preventDefault();handleLike();}} title={hasLiked?"Loved":"Love this trip"} style={{ background:hasLiked?"rgba(176,58,46,0.35)":"rgba(196,168,130,0.2)", border:`1px solid ${hasLiked?"rgba(176,58,46,0.7)":"rgba(196,168,130,0.4)"}`, color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:hasLiked?"default":"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", display:"inline-flex", alignItems:"center", gap:"4px", transition:"all 0.15s" }}>
-                    {hasLiked ? "❤️" : "🤍"}{likesCount > 0 ? ` ${likesCount}` : ""}
-                  </button>
                   <button onClick={handleShare} onTouchEnd={e=>{e.preventDefault();handleShare();}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>{shareCopied ? "✓" : "🔗"}</button>
                   <button onClick={handleTwitterShare} onTouchEnd={e=>{e.preventDefault();handleTwitterShare();}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>𝕏</button>
                   <button onClick={() => onBookmark && onBookmark(trip.id)} onTouchEnd={e=>{e.preventDefault(); onBookmark && onBookmark(trip.id);}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>{isBookmarked ? "🔖" : "🏷️"}</button>
                   <button onClick={() => setShowExport(true)} onTouchEnd={e=>{e.preventDefault();setShowExport(true);}} style={{ background:"rgba(196,168,130,0.2)", border:"1px solid rgba(196,168,130,0.4)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation" }}>📤</button>
-                  {/* Blueprint purchase button — public */}
+                  {/* Blueprint button — free for admin and trip owner, $1.99 for everyone else */}
                   {(() => {
+                    const isOwner = currentUser && trip.userId && currentUser.id === trip.userId;
+                    const isFree = isAdmin || isOwner;
                     const handleBlueprint = async () => {
+                      if (isFree) {
+                        window.location.href = `/blueprint/${trip.id}`;
+                        return;
+                      }
                       try {
                         const res = await fetch("/api/create-checkout", {
                           method: "POST",
@@ -1209,28 +1015,24 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                           body: JSON.stringify({ tripId: trip.id, tripTitle: trip.title }),
                         });
                         const { url, error } = await res.json();
-                        if (error) { window.__toast && window.__toast("Checkout error — please try again."); return; }
+                        if (error) { alert("Could not start checkout: " + error); return; }
                         window.location.href = url;
                       } catch (e) {
-                        window.__toast && window.__toast("Checkout failed — please try again.");
+                        alert("Checkout failed. Please try again.");
                       }
                     };
                     return (
-                      <button onClick={handleBlueprint} onTouchEnd={e=>{e.preventDefault();handleBlueprint();}} style={{ background:"#FAF7F2", color:"#1C2B3A", border:"2px solid #C4A882", borderRadius:"6px", padding:"5px 12px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap", display:"inline-flex", alignItems:"center", gap:"7px" }}>
+                      <button title="Get full trip Blueprint — AI alternatives, PDF, Google Maps pins" onClick={handleBlueprint} onTouchEnd={e=>{e.preventDefault();handleBlueprint();}} style={{ background:"#FAF7F2", color:"#1C2B3A", border:"2px solid #C4A882", borderRadius:"6px", padding:"5px 12px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap", display:"inline-flex", alignItems:"center", gap:"7px" }}>
                         <span style={{ display:"inline-block", transform:"rotate(-45deg)", fontSize:"13px", lineHeight:1, color:"#C4A882" }}>▲</span>
                         GET BLUEPRINT
-                        <span style={{ background:"#1C2B3A", color:"#C4A882", fontSize:"9px", fontWeight:700, padding:"1px 6px", borderRadius:"20px", letterSpacing:"0.05em" }}>PREMIUM</span>
-                        <span style={{ background:"#C4A882", color:"#1C2B3A", fontSize:"9px", fontWeight:700, padding:"1px 6px", borderRadius:"20px", letterSpacing:"0.05em" }}>$1.99</span>
+                        <span style={{ background:"#1C2B3A", color:"#C4A882", fontSize:"9px", fontWeight:700, padding:"1px 6px", borderRadius:"20px", letterSpacing:"0.05em" }}>{isFree ? "FREE" : "PREMIUM"}</span>
+                        {!isFree && <span style={{ background:"#C4A882", color:"#1C2B3A", fontSize:"9px", fontWeight:700, padding:"1px 6px", borderRadius:"20px", letterSpacing:"0.05em" }}>$1.99</span>}
                       </button>
                     );
                   })()}
                   {/* Admin-only Instagram post button */}
-                  {isAdmin && (
-                    <button onClick={e => { e.stopPropagation(); setShowBlueprintPreview(true); }} onTouchEnd={e=>{e.stopPropagation();e.preventDefault();setShowBlueprintPreview(true);}} style={{ background:"rgba(70,130,90,0.3)", border:"1px solid rgba(70,180,100,0.5)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>🗺 Preview</button>
-                  )}
                   {isAdmin && (() => {
-                    const handleGenPost = (e) => {
-                      e.stopPropagation();
+                    const handleGenPost = () => {
                       const rests = (trip.restaurants || []).slice(0,3).map(r => r.item).filter(Boolean);
                       const quote = (trip.loves || "").slice(0, 160);
                       const params = new URLSearchParams({
@@ -1242,17 +1044,10 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                         r2: rests[1] || "",
                         r3: rests[2] || "",
                       });
-                      const url = `/instagram-template.html?${params.toString()}`;
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.target = "_blank";
-                      a.rel = "noopener noreferrer";
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
+                      window.open(`/instagram-template.html?${params.toString()}`, "_blank");
                     };
                     return (
-                      <button onClick={handleGenPost} onTouchEnd={e=>{e.stopPropagation();e.preventDefault();handleGenPost(e);}} style={{ background:"rgba(193,105,42,0.3)", border:"1px solid rgba(193,105,42,0.6)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>📸 Post</button>
+                      <button onClick={handleGenPost} onTouchEnd={e=>{e.preventDefault();handleGenPost();}} style={{ background:"rgba(193,105,42,0.3)", border:"1px solid rgba(193,105,42,0.6)", color:"#FAF7F2", borderRadius:"8px", padding:"5px 10px", cursor:"pointer", fontSize:"11px", fontWeight:700, touchAction:"manipulation", whiteSpace:"nowrap" }}>📸 Post</button>
                     );
                   })()}
                 </div>
@@ -1277,7 +1072,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
               {gallery.map((g, idx) => (
                 <div key={idx} onClick={() => setLightboxIdx(idx)} style={{ flexShrink:0, width:"80px", height:"60px", borderRadius:"6px", overflow:"hidden", cursor:"pointer", border:`1.5px solid ${C.tide}`, position:"relative" }}
                   className="tc-hover-border">
-                  <img src={g.url} alt={g.caption||""} loading="lazy" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
+                  <img src={g.url} alt={g.caption||""} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
                 </div>
               ))}
               <div style={{ flexShrink:0, display:"flex", alignItems:"center", paddingLeft:"4px" }}>
@@ -1337,11 +1132,9 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
           )}
 
           {view === "daily" && (
-            <div style={{ background:C.white, ...(trip.duration==="Weekend" && trip.days?.length ? { height:"calc(100vh - 180px)", overflow:"hidden", display:"flex", flexDirection:"column" } : { padding:"24px 28px" }) }}>
+            <div style={{ padding:"24px 28px", background:C.white }}>
               {trip.days?.length
-                ? trip.duration === "Weekend"
-                  ? <LocalWeekendSnapshot trip={trip} />
-                  : <DailyItinerary days={trip.days} />
+                ? <DailyItinerary days={trip.days} />
                 : <div style={{ textAlign:"center", padding:"56px 20px", color:C.muted }}><div style={{ fontSize:"34px", marginBottom:"12px" }}>📅</div><div style={{ fontWeight:600 }}>No daily itinerary yet</div></div>
               }
             </div>
@@ -1407,7 +1200,7 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
                       style={{ background:C.white, borderRadius:"12px", border:`1px solid ${C.tide}`, overflow:"hidden", cursor:"pointer", transition:"background-color .15s ease, box-shadow .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease" }}
                       className="tc-hover-border">
                       <div style={{ height:"65px", background:t.image?"transparent":grad, position:"relative", overflow:"hidden" }}>
-                        {t.image && <img src={t.image} alt={t.title} loading="lazy" style={{ width:"100%", height:"100%", objectFit:"cover" }} />}
+                        {t.image && <img src={t.image} alt={t.title} style={{ width:"100%", height:"100%", objectFit:"cover" }} />}
                         {t.image && <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.2)" }} />}
                         {isSameAuthor && <div style={{ position:"absolute", top:"5px", left:"6px", background:"rgba(196,168,130,0.9)", borderRadius:"20px", padding:"2px 7px", fontSize:"9px", color:"#fff", fontWeight:700 }}>Same author</div>}
                       </div>
@@ -1421,14 +1214,6 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
               </div>
             </div>
           )}
-        </div>
-      )}
-      {showBlueprintPreview && (
-        <div style={{ position:"fixed", inset:0, zIndex:3000, overflowY:"auto" }}>
-          <BlueprintPage tripId={trip.id} onClose={() => setShowBlueprintPreview(false)} />
-          <div style={{ position:"fixed", top:"16px", right:"16px", zIndex:4000 }}>
-            <button onClick={() => setShowBlueprintPreview(false)} style={{ background:"rgba(28,43,58,0.9)", border:"1px solid rgba(255,255,255,0.2)", color:"#fff", borderRadius:"8px", padding:"8px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>✕ Close Preview</button>
-          </div>
         </div>
       )}
       {showExport && <ExportModal trip={trip} onClose={() => setShowExport(false)} />}
@@ -1450,23 +1235,12 @@ function TripModal({ trip, onClose, allTrips, isBookmarked, onBookmark, isAdmin 
 function TripCard({ trip, onClick, isBookmarked, onBookmark }) {
   const grad = REGION_GRADIENTS[trip.region] || "linear-gradient(135deg,#8B7355,#C4A882)";
   const emoji = REGION_EMOJI[trip.region] || "🌍";
-  const [liked, setLiked] = React.useState(() => {
-    try { return (JSON.parse(localStorage.getItem("tc_liked_trips")||"[]")).includes(String(trip.id)); } catch { return false; }
-  });
-  const [likeCount, setLikeCount] = React.useState(trip.likes_count || 0);
-  const handleLike = async (e) => {
-    e.stopPropagation();
-    if (liked) return;
-    setLiked(true); setLikeCount(n => n + 1);
-    try { const s = JSON.parse(localStorage.getItem("tc_liked_trips")||"[]"); localStorage.setItem("tc_liked_trips", JSON.stringify([...s, String(trip.id)])); } catch {}
-    await supabase.from("trips").update({ likes_count: likeCount + 1 }).eq("id", trip.id);
-  };
   return (
     <div onClick={() => onClick(trip)} className="tc-card" style={{ background:C.white, border:`${trip.featured?"2px solid #C4A882":"1px solid "+C.tide}`, borderRadius:"16px", overflow:"hidden", cursor:"pointer", transition:"transform .18s ease, box-shadow .18s ease, border-color .18s ease", boxShadow:trip.featured?`0 4px 20px rgba(196,168,130,0.25)`:`0 2px 12px rgba(44,62,80,0.07)` }}>
       {/* Image / placeholder */}
       <div style={{ height:"148px", background:trip.image ? "transparent" : grad, position:"relative", display:"flex", alignItems:"flex-end", padding:"14px", overflow:"hidden" }}>
         {trip.image
-          ? <img src={trip.image} alt={trip.title} loading="lazy" style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:`${trip.focalPoint?.x||50}% ${trip.focalPoint?.y||50}%` }} />
+          ? <img src={trip.image} alt={trip.title} style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", objectPosition:`${trip.focalPoint?.x||50}% ${trip.focalPoint?.y||50}%` }} />
           : <span style={{ fontSize:"42px", position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-60%)", opacity:0.35 }}>{emoji}</span>
         }
         {trip.image && <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.1) 60%)" }} />}
@@ -1488,33 +1262,12 @@ function TripCard({ trip, onClick, isBookmarked, onBookmark }) {
         <div style={{ display:"flex", flexWrap:"wrap", gap:"4px", marginBottom:"10px" }}>
           {trip.tags.map(t => <span key={t} style={{ fontSize:"10px", fontWeight:600, padding:"2px 8px", borderRadius:"20px", background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}` }}>{t}</span>)}
         </div>
-        {(() => {
-          const venueCount = ["hotels","restaurants","bars","activities"].reduce((n,k) => n + (trip[k]?.filter(r=>r.item).length||0), 0);
-          const hasGallery = trip.gallery?.length > 0;
-          const hasPhoto = !!trip.image;
-          const hasItinerary = trip.days?.length > 0;
-          const parts = [];
-          if (venueCount > 0) parts.push(`${venueCount} venue${venueCount!==1?"s":""}`);
-          if (hasGallery) parts.push(`${trip.gallery.length} photo${trip.gallery.length!==1?"s":""}`);
-          if (hasItinerary) parts.push("day-by-day");
-          if (parts.length === 0 && hasPhoto) parts.push("cover photo");
-          return parts.length > 0 ? (
-            <div style={{ fontSize:"10px", color:C.azureDeep, fontWeight:600, marginBottom:"8px", display:"flex", alignItems:"center", gap:"4px" }}>
-              <span style={{ color:C.amber }}>✦</span>{parts.join(" · ")}
-            </div>
-          ) : null;
-        })()}
         <div style={{ fontSize:"12px", color:C.slateMid, lineHeight:1.65, marginBottom:"12px" }}>
           <span style={{ fontWeight:700, color:C.green }}>❤️ </span>{trip.loves.substring(0,100)}…
         </div>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:`1px solid ${C.seafoamDeep}`, paddingTop:"10px" }}>
           <div style={{ fontSize:"11px", color:C.muted }}>by <strong onClick={e => { e.stopPropagation(); if (window.__closeTripModal) window.__closeTripModal(); setTimeout(() => window.__setViewingProfile && window.__setViewingProfile(trip.author), window.__closeTripModal ? 200 : 0); }} style={{ color:C.amber, cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted" }}>{trip.author}</strong> · {trip.date}</div>
-          <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-            <div style={{ fontSize:"11px", color:C.slateMid, fontWeight:600 }}>{trip.travelers}</div>
-            <button onClick={handleLike} title={liked?"Liked":"Like this trip"} style={{ display:"inline-flex", alignItems:"center", gap:"3px", background:"none", border:"none", cursor:liked?"default":"pointer", padding:"2px 4px", borderRadius:"6px", fontSize:"13px", color:liked?C.amber:C.muted, fontWeight:700, transition:"color .15s" }}>
-              👍{likeCount > 0 ? <span style={{ fontSize:"10px", color:liked?C.amber:C.muted }}>{likeCount}</span> : null}
-            </button>
-          </div>
+          <div style={{ fontSize:"11px", color:C.slateMid, fontWeight:600 }}>{trip.travelers}</div>
         </div>
       </div>
     </div>
@@ -1615,39 +1368,8 @@ function AddTripModal({ onClose, onAdd }) {
 }
 
 
-// ── Review Itinerary Step (extracted to satisfy Rules of Hooks) ───────────────
-function ReviewItineraryStep({ form, setForm, isLocalMode, onBack, onNext }) {
-  const [previewMode, setPreviewMode] = useState(isLocalMode);
-  return (
-    <div style={{ display:"flex", flexDirection:"column", maxHeight:"78vh", overflow:"hidden" }}>
-      <div style={{ padding:"14px 24px 10px", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, borderBottom:`1px solid ${C.tide}` }}>
-        <div>
-          <div style={{ fontSize:"14px", fontWeight:800, color:C.slate }}>
-            {isLocalMode ? "Your weekend guide" : "Review your itinerary"}
-          </div>
-          <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"2px" }}>
-            {form.days.length} day{form.days.length!==1?"s":""} · {form.days.reduce((n,d)=>n+(d.items?.length||0),0)} stops
-          </div>
-        </div>
-        {isLocalMode && (
-          <button onClick={()=>setPreviewMode(p=>!p)} style={{ padding:"5px 12px", borderRadius:"6px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"11px", fontWeight:600, cursor:"pointer" }}>
-            {previewMode ? "✏️ Edit stops" : "👁 Preview"}
-          </button>
-        )}
-      </div>
-      <div style={{ flex:1, overflow:previewMode?"hidden":"auto", WebkitOverflowScrolling:"touch", ...(previewMode?{}:{padding:"16px 24px"}) }}>
-        {previewMode
-          ? <LocalWeekendSnapshot trip={{ ...form, days:form.days }} />
-          : <EditableDailyItinerary days={form.days} onChange={days => setForm(p=>({...p,days}))} destination={form.destination} />
-        }
-      </div>
-      <div style={{ display:"flex", gap:"10px", padding:"12px 24px", borderTop:`1px solid ${C.tide}`, flexShrink:0 }}>
-        <button onClick={onBack} style={{ padding:"10px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateLight, fontSize:"12px", fontWeight:600, cursor:"pointer" }}>← Back</button>
-        <button onClick={onNext} style={{ flex:1, padding:"10px", borderRadius:"8px", border:"none", background:C.cta, color:C.ctaText, fontSize:"13px", fontWeight:700, cursor:"pointer" }}>Looks good — fill in details →</button>
-      </div>
-    </div>
-  );
-}
+// ── Submit Trip Modal ─────────────────────────────────────────────────────────
+// ── Submit Trip Modal ─────────────────────────────────────────────────────────
 const EMPTY_FORM = {
   title:"", destination:"", region:"Europe", duration:"", travelers:"", date:"", tags:[], loves:"", doNext:"",
   airfare:[{item:"",detail:"",tip:""}], hotels:[{item:"",detail:"",tip:""}],
@@ -1655,9 +1377,8 @@ const EMPTY_FORM = {
   activities:[{item:"",detail:"",tip:""}], days:[], focalPoint:{x:50,y:50}, gallery:[]
 };
 
-function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, prefillData, localMode = false }) {
-  const [step, setStep] = useState(prefillData ? "form" : localMode ? "local-weekend" : "prompt");
-  const [isLocalMode, setIsLocalMode] = useState(localMode);
+function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, prefillData }) {
+  const [step, setStep] = useState(prefillData ? "form" : "prompt");
   const [pastedText, setPastedText] = useState("");
   const [filterResult, setFilterResult] = useState(null);
   const [submitterName, setSubmitterName] = useState(displayName || "");
@@ -1673,7 +1394,8 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
   const [galleryError, setGalleryError] = useState("");
   const galleryRef = useRef();
   const [draftExists, setDraftExists] = useState(false);
-
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [checkingDraft, setCheckingDraft] = useState(true);
   const photoRef = useRef(null);
   const autoSaveTimer = useRef(null);
@@ -1711,15 +1433,11 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
       });
   }, []);
 
-  const updateDraftStatus = (msg, color) => {
-    const el = document.getElementById("draft-status");
-    if (el) { el.textContent = msg; el.style.color = color; }
-  };
-
-  const saveDraft = async (formData, showIndicator = false) => {
-    if (!currentUser) { localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(formData)); return; }
-    if (showIndicator) updateDraftStatus("Saving…", C.amber);
+  const saveDraft = async (formData) => {
+    if (!currentUser) return;
+    setDraftSaving(true);
     try {
+      // Refresh session before saving to prevent auth expiry issues
       await supabase.auth.getSession();
       const { error } = await supabase.from("drafts").upsert({
         user_id: currentUser.id,
@@ -1727,17 +1445,29 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
         updated_at: new Date().toISOString()
       }, { onConflict: "user_id" });
       if (error) {
-        localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(formData));
-        updateDraftStatus("✓ Saved locally", C.amber);
+        // Session expired — save to localStorage as fallback
+        if (error.code === "PGRST301" || error.message?.includes("JWT")) {
+          localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(formData));
+          setDraftSaved(true);
+          setTimeout(() => setDraftSaved(false), 2000);
+        } else {
+          console.error("Draft save error:", error);
+        }
       } else {
+        // Also clear any localStorage fallback
         localStorage.removeItem("tripcopycat_draft_fallback");
-        updateDraftStatus("✓ Draft saved", C.green);
+        setDraftSaved(true);
+        setTimeout(() => setDraftSaved(false), 2000);
       }
     } catch(e) {
+      // Network error — save to localStorage as fallback
       localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(formData));
-      updateDraftStatus("✓ Saved locally", C.amber);
+      setDraftSaved(true);
+      setTimeout(() => setDraftSaved(false), 2000);
+      console.warn("Draft saved to local fallback:", e.message);
+    } finally {
+      setDraftSaving(false);
     }
-    if (showIndicator) setTimeout(() => updateDraftStatus("Auto-saving", C.muted), 2500);
   };
 
   const loadDraft = async () => {
@@ -1780,19 +1510,12 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
 
   const uploadPhoto = async () => {
     if (!coverPhoto) return null;
-    const blob = await compressForUpload(coverPhoto);
-    if (!blob) return null;
-    try {
-      const resp = await fetch(`/api/upload-image?folder=photos&type=image%2Fjpeg&name=cover.jpg`, {
-        method: "POST", body: blob,
-        signal: AbortSignal.timeout(30000),
-      });
-      const data = await resp.json();
-      return data.url || null;
-    } catch (err) {
-      console.error("Cover photo upload error:", err);
-      return null;
-    }
+    const ext = coverPhoto.name.split(".").pop();
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error } = await supabase.storage.from("trip-photos").upload(path, coverPhoto, { contentType: coverPhoto.type, upsert: false });
+    if (error) { console.error("Photo upload error:", error); return null; }
+    const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
+    return data.publicUrl;
   };
 
   const compressForUpload = (file) => new Promise(resolve => {
@@ -1801,7 +1524,8 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
     img.onload = () => {
       const scale = Math.min(1, 1200 / img.width);
       const canvas = document.createElement("canvas");
-      canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
       canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
       canvas.toBlob(blob => { URL.revokeObjectURL(url); resolve(blob); }, "image/jpeg", 0.7);
     };
@@ -1811,31 +1535,19 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
 
   const uploadGallery = async (onProgress) => {
     if (!galleryFiles.length) return [];
-    const total = galleryFiles.length;
-    let completed = 0;
-    if (onProgress) onProgress(`Uploading ${total} photo${total > 1 ? "s" : ""}…`);
-    const results = await Promise.all(
-      galleryFiles.map(async (gf) => {
-        try {
-          const compressed = await compressForUpload(gf.file);
-          if (!compressed) return null;
-          const resp = await fetch(`/api/upload-image?folder=gallery&type=image%2Fjpeg&name=gallery.jpg`, {
-            method: "POST", body: compressed,
-            signal: AbortSignal.timeout(45000),
-          });
-          const data = await resp.json();
-          completed++;
-          if (onProgress) onProgress(`Uploaded ${completed} of ${total} photo${total > 1 ? "s" : ""}…`);
-          return data.url ? { url: data.url, caption: gf.caption || "" } : null;
-        } catch (err) {
-          console.error("Gallery photo upload error:", err);
-          completed++;
-          if (onProgress) onProgress(`Uploaded ${completed} of ${total} photo${total > 1 ? "s" : ""}…`);
-          return null;
-        }
-      })
-    );
-    return results.filter(Boolean);
+    const urls = [];
+    for (let i = 0; i < galleryFiles.length; i++) {
+      const gf = galleryFiles[i];
+      if (onProgress) onProgress(`Uploading photo ${i + 1} of ${galleryFiles.length}…`);
+      const compressed = await compressForUpload(gf.file);
+      if (!compressed) continue;
+      const path = `gallery-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+      const { error } = await supabase.storage.from("trip-photos").upload(path, compressed, { contentType: "image/jpeg", upsert: false });
+      if (error) { console.error("Gallery upload error:", error); continue; }
+      const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
+      urls.push({ url: data.publicUrl, caption: gf.caption || "" });
+    }
+    return urls;
   };
 
   const handleGalleryAdd = (e) => {
@@ -1875,30 +1587,13 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
     days: prefillData?.days || []
   } : EMPTY_FORM);
 
-  // Keep latest form in ref — zero re-renders, used by auto-save
-  const formRef = useRef(form);
+  // Auto-save draft 3 seconds after last form change
   useEffect(() => {
-    formRef.current = form;
-    // Always persist to localStorage immediately on every change — zero network cost, prevents data loss
-    try { localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(form)); } catch {}
-  }, [form]);
-
-  // Auto-save to Supabase every 20 seconds — runs silently, no state updates
-  useEffect(() => {
-    if (step !== "form") return;
+    if (step !== "form" || !currentUser) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(() => saveDraft(formRef.current, false), 20000);
+    autoSaveTimer.current = setTimeout(() => saveDraft(form), 10000);
     return () => clearTimeout(autoSaveTimer.current);
-  }, [step]);
-
-  // Also save on unmount to catch any unsaved changes
-  useEffect(() => {
-    return () => {
-      if (formRef.current) {
-        try { localStorage.setItem("tripcopycat_draft_fallback", JSON.stringify(formRef.current)); } catch {}
-      }
-    };
-  }, []);
+  }, [form, step]);
 
   const inp = { width:"100%", padding:"8px 11px", borderRadius:"7px", border:`1px solid ${C.tide}`, fontSize:"12px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate };
   const lbl = { fontSize:"11px", fontWeight:600, color:C.slateMid, marginBottom:"3px", display:"block" };
@@ -2005,10 +1700,12 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
             {step === "form" && (
-              <>
-                <span id="draft-status" style={{ fontSize:"10px", color:C.muted, fontWeight:600, transition:"color .3s" }}>Auto-saving</span>
-                <button onClick={() => saveDraft(form, true)} style={{ fontSize:"11px", padding:"5px 12px", borderRadius:"6px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateMid, cursor:"pointer", fontWeight:600 }}>Save Draft</button>
-              </>
+              <span style={{ fontSize:"10px", color: draftSaving ? C.amber : draftSaved ? C.green : C.muted, fontWeight:600, transition:"color .3s" }}>
+                {draftSaving ? "Saving…" : draftSaved ? "✓ Draft saved" : "Auto-saving"}
+              </span>
+            )}
+            {step === "form" && (
+              <button onClick={() => saveDraft(form)} style={{ fontSize:"11px", padding:"5px 12px", borderRadius:"6px", border:`1px solid ${C.tide}`, background:C.white, color:C.slateMid, cursor:"pointer", fontWeight:600 }}>Save Draft</button>
             )}
             <button onClick={onClose} style={{ background:C.seafoamDeep, border:"none", color:C.slateLight, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>×</button>
           </div>
@@ -2086,20 +1783,6 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
               </button>
             </div>
 
-            {/* Best of My City — local weekend guide */}
-            <div style={{ background:C.seafoam, borderRadius:"14px", border:`1.5px solid ${C.cta}`, padding:"18px", marginBottom:"14px", cursor:"pointer" }}
-              onClick={() => { setIsLocalMode(true); setStep("local-weekend"); }}>
-              <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px" }}>
-                <span style={{ fontSize:"18px" }}>🏙️</span>
-                <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>Best of My City</div>
-                <span style={{ fontSize:"9px", fontWeight:700, background:C.slate, color:C.white, padding:"2px 8px", borderRadius:"20px" }}>New</span>
-              </div>
-              <div style={{ fontSize:"11px", color:C.slateMid, lineHeight:1.6 }}>
-                Know your city better than any guidebook? Drop your go-to spots — we'll build a shareable weekend itinerary that visitors can copy.
-              </div>
-              <div style={{ fontSize:"12px", fontWeight:700, color:C.amber, marginTop:"10px" }}>Build My City Guide →</div>
-            </div>
-
             {/* Secondary options */}
             <div style={{ display:"flex", gap:"8px", alignItems:"stretch" }}>
               <button onClick={() => setStep("ai-prompt")} style={{ flex:1, padding:"12px", borderRadius:"10px", border:`1px solid ${C.tide}`, background:C.white, cursor:"pointer", textAlign:"left" }}>
@@ -2168,10 +1851,9 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
               window.__hybridPhotos = [];
               window.__supplementPhotos = [];
               window.__hybridText = "";
-              setStep(data.days?.length > 0 ? "review-itinerary" : "form");
+              setStep("form");
             }}
-            onBack={() => setStep(window.__supplementPhotos?.length ? "photo-supplement" : isLocalMode ? "local-weekend" : "prompt")}
-            isLocalMode={isLocalMode}
+            onBack={() => setStep(window.__supplementPhotos?.length ? "photo-supplement" : "prompt")}
           />
         )}
 
@@ -2248,61 +1930,6 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
           </div>
         )}
 
-        {step === "local-weekend" && (
-          <div style={{ padding:"20px 24px", maxHeight:"78vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
-            <div style={{ textAlign:"center", marginBottom:"18px" }}>
-              <div style={{ fontSize:"26px", marginBottom:"6px" }}>🏙️</div>
-              <div style={{ fontSize:"15px", fontWeight:700, color:C.slate, marginBottom:"4px" }}>Your city. Your picks.</div>
-              <div style={{ fontSize:"11px", color:C.slateLight, lineHeight:1.6 }}>Fill in what you know — AI stitches it into a Fri–Sun weekend guide. You only need one box to start.</div>
-            </div>
-
-            {[
-              { id:"lw-city",  label:"📍 City & Where to Stay",          color:C.slate,      placeholder:"City and state, plus hotel names or neighborhoods to base yourself in.\ne.g. Canton, Ohio — stay near downtown or Hotel Gervasi area" },
-              { id:"lw-eat",   label:"🍽️ Where to Eat & Drink",          color:C.amber,      placeholder:"Restaurants and bars — list them all, any order.\ne.g. Taggart's Ice Cream for lunch, Gervasi Vineyard for dinner, Bender's Tavern for drinks" },
-              { id:"lw-do",    label:"🎯 What to Do",                     color:C.slateLight, placeholder:"Activities, attractions, experiences.\ne.g. Sippo Lake hike, Pro Football Hall of Fame, McKinley Presidential Library" },
-              { id:"lw-other", label:"💡 Anything Else",                  color:C.muted,      placeholder:"Tips, best season, who it's great for, what to avoid.\ne.g. Best in fall. Great for couples. Avoid August — too hot." },
-            ].map(box => (
-              <div key={box.id} style={{ marginBottom:"10px", border:`1.5px solid ${C.tide}`, borderRadius:"10px", overflow:"hidden" }}>
-                <div style={{ padding:"8px 12px", background:C.seafoam, borderBottom:`1px solid ${C.tide}` }}>
-                  <span style={{ fontSize:"11px", fontWeight:700, color:box.color }}>{box.label}</span>
-                </div>
-                <textarea id={box.id} placeholder={box.placeholder}
-                  style={{ width:"100%", minHeight:"68px", padding:"9px 12px", border:"none", fontSize:"12px", outline:"none", boxSizing:"border-box", fontFamily:"inherit", background:C.white, color:C.slate, resize:"vertical", lineHeight:1.6, display:"block" }} />
-              </div>
-            ))}
-
-            <button onClick={() => {
-              const city  = document.getElementById("lw-city")?.value.trim()  || "";
-              const eat   = document.getElementById("lw-eat")?.value.trim()   || "";
-              const doIt  = document.getElementById("lw-do")?.value.trim()    || "";
-              const other = document.getElementById("lw-other")?.value.trim() || "";
-              if (!city && !eat && !doIt) { alert("Fill in at least the city and one category."); return; }
-              const structured = [
-                city  && `CITY & WHERE TO STAY:\n${city}`,
-                eat   && `WHERE TO EAT & DRINK:\n${eat}`,
-                doIt  && `WHAT TO DO:\n${doIt}`,
-                other && `OTHER NOTES:\n${other}`,
-              ].filter(Boolean).join("\n\n");
-              window.__hybridText = structured;
-              window.__hybridPhotos = [];
-              setStep("hybrid-processing");
-            }} style={{ width:"100%", marginTop:"6px", padding:"13px", borderRadius:"8px", border:"none", background:C.amber, color:C.white, fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
-              Build My Weekend Guide →
-            </button>
-            <button onClick={() => { setIsLocalMode(false); setStep("prompt"); }} style={{ background:"none", border:"none", color:C.muted, fontSize:"12px", cursor:"pointer", width:"100%", textAlign:"center", marginTop:"10px" }}>← Back</button>
-          </div>
-        )}
-
-        {step === "review-itinerary" && (
-          <ReviewItineraryStep
-            form={form}
-            setForm={setForm}
-            isLocalMode={isLocalMode}
-            onBack={() => setStep(isLocalMode ? "local-weekend" : "prompt")}
-            onNext={() => setStep("form")}
-          />
-        )}
-
         {step === "form" && (
           <div style={{ padding:"20px 28px", maxHeight:"65vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
             <div style={{ background:C.seafoam, border:`1px solid ${C.tide}`, borderRadius:"10px", padding:"10px 14px", marginBottom:"14px" }}>
@@ -2317,141 +1944,6 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                 Supplement with photos → let AI fill in missing details
               </button>
             </div>
-            {isLocalMode ? (<>
-            {/* ── Box 1: Trip Overview (catch-all) ── */}
-            <div style={{ border:`1px solid ${C.tide}`, borderRadius:"12px", overflow:"hidden", marginBottom:"12px" }}>
-              <div style={{ padding:"10px 14px", background:C.slate, display:"flex", alignItems:"center", gap:"8px" }}>
-                <span style={{ fontSize:"14px" }}>🗒️</span>
-                <span style={{ fontSize:"12px", fontWeight:700, color:C.white }}>Trip Overview</span>
-              </div>
-              <div style={{ padding:"14px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px" }}>
-                <div style={{ gridColumn:"1/-1" }}><label style={lbl}>Trip Title</label><input style={inp} value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))} /></div>
-                <div><label style={lbl}>Destination</label><input style={inp} value={form.destination} onChange={e=>setForm(p=>({...p,destination:e.target.value}))} /></div>
-                <div><label style={lbl}>Region</label><select style={inp} value={form.region} onChange={e=>setForm(p=>({...p,region:e.target.value}))}>{REGIONS.filter(r=>r!=="All Regions").map(r=><option key={r}>{r}</option>)}</select></div>
-                <div><label style={lbl}>Duration</label><input style={inp} value={form.duration} onChange={e=>setForm(p=>({...p,duration:e.target.value}))} /></div>
-                <div><label style={lbl}>Date</label><input style={inp} value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value}))} /></div>
-                <div style={{ gridColumn:"1/-1" }}><label style={lbl}>Who Traveled</label><input style={inp} value={form.travelers} onChange={e=>setForm(p=>({...p,travelers:e.target.value}))} /></div>
-                <div style={{ gridColumn:"1/-1" }}>
-                  <label style={lbl}>Tags</label>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:"5px", marginTop:"3px" }}>
-                    {TAGS.filter(t=>t!=="All").map(tag=><button key={tag} onClick={()=>toggleTag(tag)} style={{ padding:"3px 10px", borderRadius:"20px", fontSize:"11px", fontWeight:600, cursor:"pointer", border:`1px solid ${form.tags.includes(tag)?C.azure:C.tide}`, background:form.tags.includes(tag)?C.azure:C.white, color:form.tags.includes(tag)?C.white:C.slateLight }}>{tag}</button>)}
-                  </div>
-                </div>
-                <div style={{ gridColumn:"1/-1" }}><label style={{...lbl,color:C.green}}>What did you love?</label><textarea style={{...inp,height:"80px",resize:"vertical"}} value={form.loves} onChange={e=>setForm(p=>({...p,loves:e.target.value}))} /></div>
-                <div style={{ gridColumn:"1/-1" }}><label style={{...lbl,color:C.amber}}>What would you do differently?</label><textarea style={{...inp,height:"80px",resize:"vertical"}} value={form.doNext} onChange={e=>setForm(p=>({...p,doNext:e.target.value}))} /></div>
-                {!isLocalMode && form.airfare?.length > 0 && (
-                  <div style={{ gridColumn:"1/-1" }}>
-                    <label style={lbl}>✈️ Airfare</label>
-                    {form.airfare.map((row,i)=>(
-                      <div key={i} style={{ background:C.seafoam, borderRadius:"8px", padding:"8px", marginBottom:"6px", border:`1px solid ${C.tide}` }}>
-                        <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:"5px", marginBottom:"4px" }}>
-                          <input style={inp} placeholder="Airline / route" value={row.item} onChange={e=>updRow("airfare",i,"item",e.target.value)} />
-                          <button onClick={()=>delRow("airfare",i)} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px" }}>✕</button>
-                        </div>
-                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px" }}>
-                          <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Details" value={row.detail} onChange={e=>updRow("airfare",i,"detail",e.target.value)} />
-                          <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Tip" value={row.tip} onChange={e=>updRow("airfare",i,"tip",e.target.value)} />
-                        </div>
-                      </div>
-                    ))}
-                    <button onClick={()=>addRow("airfare")} style={{ fontSize:"11px", color:C.azure, background:"none", border:`1px dashed ${C.azure}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600 }}>+ Add flight</button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ── Box 2: Where to Stay ── */}
-            <div style={{ border:`1px solid ${C.tide}`, borderRadius:"12px", overflow:"hidden", marginBottom:"12px" }}>
-              <div style={{ padding:"10px 14px", background:C.slateMid, display:"flex", alignItems:"center", gap:"8px" }}>
-                <span style={{ fontSize:"14px" }}>🏨</span>
-                <span style={{ fontSize:"12px", fontWeight:700, color:C.white }}>Where to Stay</span>
-              </div>
-              <div style={{ padding:"14px" }}>
-                {form.hotels.map((row,i)=>(
-                  <div key={i} style={{ background:C.seafoam, borderRadius:"8px", padding:"8px", marginBottom:"8px", border:`1px solid ${C.tide}` }}>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:"5px", marginBottom:"4px" }}>
-                      <input style={inp} placeholder="Hotel or neighborhood" value={row.item} onChange={e=>updRow("hotels",i,"item",e.target.value)} />
-                      <button onClick={()=>delRow("hotels",i)} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px" }}>✕</button>
-                    </div>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px" }}>
-                      <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Details / Price tier" value={row.detail} onChange={e=>updRow("hotels",i,"detail",e.target.value)} />
-                      <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Insider tip" value={row.tip} onChange={e=>updRow("hotels",i,"tip",e.target.value)} />
-                    </div>
-                  </div>
-                ))}
-                {form.hotels.length === 0 && <div style={{ fontSize:"11px", color:C.muted, marginBottom:"8px" }}>No hotels added yet.</div>}
-                <button onClick={()=>addRow("hotels")} style={{ fontSize:"11px", color:C.slateMid, background:"none", border:`1px dashed ${C.slateMid}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600 }}>+ Add hotel or neighborhood</button>
-              </div>
-            </div>
-
-            {/* ── Box 3: What to Do ── */}
-            <div style={{ border:`1px solid ${C.tide}`, borderRadius:"12px", overflow:"hidden", marginBottom:"12px" }}>
-              <div style={{ padding:"10px 14px", background:C.slateLight, display:"flex", alignItems:"center", gap:"8px" }}>
-                <span style={{ fontSize:"14px" }}>🎯</span>
-                <span style={{ fontSize:"12px", fontWeight:700, color:C.white }}>What to Do</span>
-              </div>
-              <div style={{ padding:"14px" }}>
-                {form.activities.map((row,i)=>(
-                  <div key={i} style={{ background:C.seafoam, borderRadius:"8px", padding:"8px", marginBottom:"8px", border:`1px solid ${C.tide}` }}>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:"5px", marginBottom:"4px" }}>
-                      <input style={inp} placeholder="Activity or attraction" value={row.item} onChange={e=>updRow("activities",i,"item",e.target.value)} />
-                      <button onClick={()=>delRow("activities",i)} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px" }}>✕</button>
-                    </div>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px" }}>
-                      <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Details" value={row.detail} onChange={e=>updRow("activities",i,"detail",e.target.value)} />
-                      <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Insider tip" value={row.tip} onChange={e=>updRow("activities",i,"tip",e.target.value)} />
-                    </div>
-                  </div>
-                ))}
-                {form.activities.length === 0 && <div style={{ fontSize:"11px", color:C.muted, marginBottom:"8px" }}>No activities added yet.</div>}
-                <button onClick={()=>addRow("activities")} style={{ fontSize:"11px", color:C.slateLight, background:"none", border:`1px dashed ${C.slateLight}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600 }}>+ Add activity</button>
-              </div>
-            </div>
-
-            {/* ── Box 4: Where to Eat & Drink ── */}
-            <div style={{ border:`1px solid ${C.tide}`, borderRadius:"12px", overflow:"hidden", marginBottom:"12px" }}>
-              <div style={{ padding:"10px 14px", background:C.amber, display:"flex", alignItems:"center", gap:"8px" }}>
-                <span style={{ fontSize:"14px" }}>🍽️</span>
-                <span style={{ fontSize:"12px", fontWeight:700, color:C.white }}>Where to Eat & Drink</span>
-              </div>
-              <div style={{ padding:"14px" }}>
-                <div style={{ fontSize:"11px", fontWeight:700, color:C.slateLight, marginBottom:"8px", textTransform:"uppercase", letterSpacing:"0.05em" }}>Restaurants</div>
-                {form.restaurants.map((row,i)=>(
-                  <div key={i} style={{ background:C.seafoam, borderRadius:"8px", padding:"8px", marginBottom:"8px", border:`1px solid ${C.tide}` }}>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:"5px", marginBottom:"4px" }}>
-                      <input style={inp} placeholder="Restaurant name" value={row.item} onChange={e=>updRow("restaurants",i,"item",e.target.value)} />
-                      <button onClick={()=>delRow("restaurants",i)} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px" }}>✕</button>
-                    </div>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px" }}>
-                      <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Cuisine · price tier" value={row.detail} onChange={e=>updRow("restaurants",i,"detail",e.target.value)} />
-                      <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Insider tip" value={row.tip} onChange={e=>updRow("restaurants",i,"tip",e.target.value)} />
-                    </div>
-                  </div>
-                ))}
-                {form.restaurants.length === 0 && <div style={{ fontSize:"11px", color:C.muted, marginBottom:"8px" }}>No restaurants added yet.</div>}
-                <button onClick={()=>addRow("restaurants")} style={{ fontSize:"11px", color:C.amber, background:"none", border:`1px dashed ${C.amber}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600, marginBottom:"14px" }}>+ Add restaurant</button>
-
-                <div style={{ borderTop:`1px solid ${C.tide}`, paddingTop:"12px", marginTop:"4px" }}>
-                  <div style={{ fontSize:"11px", fontWeight:700, color:C.slateLight, marginBottom:"8px", textTransform:"uppercase", letterSpacing:"0.05em" }}>Bars & Drinks</div>
-                  {form.bars.map((row,i)=>(
-                    <div key={i} style={{ background:C.seafoam, borderRadius:"8px", padding:"8px", marginBottom:"8px", border:`1px solid ${C.tide}` }}>
-                      <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:"5px", marginBottom:"4px" }}>
-                        <input style={inp} placeholder="Bar or drinks spot" value={row.item} onChange={e=>updRow("bars",i,"item",e.target.value)} />
-                        <button onClick={()=>delRow("bars",i)} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${C.red}`, background:C.redBg, color:C.red, cursor:"pointer", fontSize:"11px" }}>✕</button>
-                      </div>
-                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"5px" }}>
-                        <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Type / vibe" value={row.detail} onChange={e=>updRow("bars",i,"detail",e.target.value)} />
-                        <textarea style={{...inp,height:"44px",resize:"vertical",fontSize:"11px"}} placeholder="Insider tip" value={row.tip} onChange={e=>updRow("bars",i,"tip",e.target.value)} />
-                      </div>
-                    </div>
-                  ))}
-                  {form.bars.length === 0 && <div style={{ fontSize:"11px", color:C.muted, marginBottom:"8px" }}>No bars added yet.</div>}
-                  <button onClick={()=>addRow("bars")} style={{ fontSize:"11px", color:C.amber, background:"none", border:`1px dashed ${C.amber}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600 }}>+ Add bar</button>
-                </div>
-              </div>
-            </div>
-
-            </>) : (<>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px", marginBottom:"14px" }}>
               <div style={{ gridColumn:"1/-1" }}><label style={lbl}>Trip Title</label><input style={inp} value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))} /></div>
               <div><label style={lbl}>Destination</label><input style={inp} value={form.destination} onChange={e=>setForm(p=>({...p,destination:e.target.value}))} /></div>
@@ -2465,6 +1957,7 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                   {TAGS.filter(t=>t!=="All").map(tag=><button key={tag} onClick={()=>toggleTag(tag)} style={{ padding:"3px 10px", borderRadius:"20px", fontSize:"11px", fontWeight:600, cursor:"pointer", border:`1px solid ${form.tags.includes(tag)?C.azure:C.tide}`, background:form.tags.includes(tag)?C.azure:C.white, color:form.tags.includes(tag)?C.white:C.slateLight }}>{tag}</button>)}
                 </div>
               </div>
+
               <div style={{ gridColumn:"1/-1" }}><label style={{...lbl,color:C.green}}>What did you love?</label><textarea style={{...inp,height:"100px",resize:"vertical"}} value={form.loves} onChange={e=>setForm(p=>({...p,loves:e.target.value}))} /></div>
               <div style={{ gridColumn:"1/-1" }}><label style={{...lbl,color:C.amber}}>What would you do differently?</label><textarea style={{...inp,height:"100px",resize:"vertical"}} value={form.doNext} onChange={e=>setForm(p=>({...p,doNext:e.target.value}))} /></div>
             </div>
@@ -2486,7 +1979,6 @@ function SubmitTripModal({ onClose, currentUser, displayName, onSubmitSuccess, p
                 <button onClick={()=>addRow(key)} style={{ fontSize:"11px", color:cfg.color, background:"none", border:`1px dashed ${cfg.color}`, padding:"3px 10px", borderRadius:"5px", cursor:"pointer", fontWeight:600 }}>+ Add</button>
               </div>
             ))}
-            </>)}
             <div style={{ borderTop:`1px solid ${C.tide}`, paddingTop:"14px", marginTop:"6px" }}>
               <div style={{ fontSize:"12px", fontWeight:700, color:C.slate, marginBottom:"6px" }}>📸 Cover Photo <span style={{ fontWeight:400, color:C.muted }}>(optional)</span></div>
               <input ref={photoRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif,image/avif,image/tiff" style={{ display:"none" }} onChange={handlePhotoChange} />
@@ -2652,12 +2144,6 @@ function AdminQueueModal({ onClose, onApprove }) {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
-  const [previewTripId, setPreviewTripId] = useState(null);
-  const [queueTab, setQueueTab] = useState("pending");
-  const [adminMapOpen, setAdminMapOpen] = useState(false);
-  const [adminMapPins, setAdminMapPins] = useState([]);
-  const [adminMapLoading, setAdminMapLoading] = useState(false);
-  const adminMapRef = useRef(null);
 
   useEffect(() => {
     supabase.from("submissions").select("*").order("submitted_at", { ascending: false })
@@ -2666,7 +2152,7 @@ function AdminQueueModal({ onClose, onApprove }) {
 
   const approve = async (sub) => {
     const t = sub.trip_data;
-    const { data: inserted } = await supabase.from("trips").insert([{
+    await supabase.from("trips").insert([{
       title:t.title, destination:t.destination, region:t.region,
       author_name:sub.submitter_name, author_email:sub.submitter_email,
       date:t.date, duration:t.duration, travelers:t.travelers,
@@ -2674,17 +2160,8 @@ function AdminQueueModal({ onClose, onApprove }) {
       airfare:t.airfare||[], hotels:t.hotels||[], restaurants:t.restaurants||[],
       bars:t.bars||[], activities:t.activities||[], days:t.days||[],
       image:t.image??null, status:"published", user_id:sub.user_id||null, focal_point:t.focalPoint||{x:50,y:50}, gallery:t.gallery||[]
-    }]).select("id");
-    // Fire-and-forget geocoding — never blocks approval, errors are silent
-    const newTripId = inserted?.[0]?.id;
-    if (newTripId) {
-      fetch("/api/geocode-venues", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-geocode-secret": import.meta.env.VITE_GEOCODE_SECRET || "" },
-        body: JSON.stringify({ tripId: newTripId }),
-      }).catch(() => {});
-    }
-    await supabase.from("submissions").update({ status:"approved", reviewed_at:new Date().toISOString(), approved_trip_id:newTripId||null }).eq("id",sub.id);
+    }]);
+    await supabase.from("submissions").update({ status:"approved", reviewed_at:new Date().toISOString() }).eq("id",sub.id);
     setSubmissions(p => p.map(s => s.id===sub.id ? {...s,status:"approved"} : s));
     if (onApprove) onApprove();
     setDetail(null);
@@ -2696,69 +2173,7 @@ function AdminQueueModal({ onClose, onApprove }) {
     setDetail(null);
   };
 
-  const geocodeSubmission = async (tripData) => {
-    const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_KEY || "";
-    if (!mapsKey) return [];
-    const dest = tripData.destination || "";
-    const CAT_COLORS = { hotels:"#C1392B", restaurants:"#2980B9", bars:"#8E44AD", activities:"#27AE60" };
-    const venues = [];
-    for (const [cat, color] of Object.entries(CAT_COLORS)) {
-      (tripData[cat] || []).forEach(v => { if (v.item) venues.push({ name: v.item, cat, color }); });
-    }
-    const pins = [];
-    for (const v of venues) {
-      try {
-        const q = encodeURIComponent(`${v.name} ${dest}`);
-        const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${q}&key=${mapsKey}`);
-        const data = await res.json();
-        const loc = data.results?.[0]?.geometry?.location;
-        if (loc) pins.push({ lat: loc.lat, lng: loc.lng, name: v.name, cat: v.cat, color: v.color });
-      } catch {}
-    }
-    return pins;
-  };
-
-  useEffect(() => {
-    if (!adminMapOpen || !adminMapPins.length) return;
-    const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_KEY || "";
-    if (!mapsKey || !window.google) return;
-    const mapEl = adminMapRef.current;
-    if (!mapEl) return;
-    const bounds = new window.google.maps.LatLngBounds();
-    const map = new window.google.maps.Map(mapEl, { zoom: 12, center: { lat: adminMapPins[0].lat, lng: adminMapPins[0].lng }, mapTypeControl: false, streetViewControl: false });
-    const infoWindow = new window.google.maps.InfoWindow();
-    adminMapPins.forEach(pin => {
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32"><path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z" fill="${pin.color}"/><circle cx="12" cy="12" r="5" fill="white"/></svg>`;
-      const marker = new window.google.maps.Marker({ position: { lat: pin.lat, lng: pin.lng }, map, icon: { url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg), scaledSize: new window.google.maps.Size(24, 32), anchor: new window.google.maps.Point(12, 32) }, title: pin.name });
-      marker.addListener("click", () => { infoWindow.setContent(`<div style="font-size:12px;font-weight:700">${pin.name}</div><div style="font-size:10px;color:#888;text-transform:uppercase">${pin.cat}</div>`); infoWindow.open(map, marker); });
-      bounds.extend({ lat: pin.lat, lng: pin.lng });
-    });
-    map.fitBounds(bounds);
-    window.google.maps.event.addListenerOnce(map, "idle", () => { if (map.getZoom() > 15) map.setZoom(15); });
-  }, [adminMapOpen, adminMapPins]);
-
-  const statusCol = { pending:C.amber, flagged:C.red, approved:C.green, published:C.green, rejected:C.muted };
-  const [regeocoding, setRegeocoding] = useState(false);
-  const [regeocodeStatus, setRegeocodeStatus] = useState("");
-
-  const regeocodeAll = async () => {
-    setRegeocoding(true);
-    setRegeocodeStatus("Fetching trips…");
-    const { data: trips } = await supabase.from("trips").select("id, title").eq("status", "published");
-    if (!trips?.length) { setRegeocodeStatus("No trips found."); setRegeocoding(false); return; }
-    let done = 0;
-    for (const t of trips) {
-      setRegeocodeStatus(`Geocoding ${done + 1}/${trips.length}: ${t.title}`);
-      await fetch("/api/geocode-venues", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-geocode-secret": import.meta.env.VITE_GEOCODE_SECRET || "" },
-        body: JSON.stringify({ tripId: t.id }),
-      }).catch(() => {});
-      done++;
-    }
-    setRegeocodeStatus(`Done — ${done} trips geocoded.`);
-    setRegeocoding(false);
-  };
+  const statusCol = { pending:C.amber, flagged:C.red, approved:C.green, rejected:C.muted };
 
   return (
     <div className="tc-modal-overlay" style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:4000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"28px 16px", overflowY:"auto", WebkitOverflowScrolling:"touch", backdropFilter:"blur(8px)" }}>
@@ -2767,35 +2182,18 @@ function AdminQueueModal({ onClose, onApprove }) {
           <div>
             <div style={{ fontSize:"17px", fontWeight:800, color:C.slate, fontFamily:"'Playfair Display',Georgia,serif" }}>Submission Queue</div>
             <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"2px" }}>{submissions.filter(s=>s.status==="flagged"||s.status==="pending").length} awaiting review</div>
-            {regeocodeStatus && <div style={{ fontSize:"10px", color:C.amber, marginTop:"4px", fontWeight:600 }}>{regeocodeStatus}</div>}
           </div>
-          <div style={{ display:"flex", gap:"8px", alignItems:"center" }}>
-            <button onClick={regeocodeAll} disabled={regeocoding} style={{ padding:"6px 12px", borderRadius:"7px", border:`1px solid ${C.amber}`, background:C.amberBg, color:C.amber, fontSize:"11px", fontWeight:700, cursor:regeocoding?"not-allowed":"pointer" }}>{regeocoding ? "Geocoding…" : "🗺 Regeocode All"}</button>
-            <button onClick={onClose} style={{ background:C.seafoamDeep, border:"none", color:C.slateLight, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>x</button>
-          </div>
+          <button onClick={onClose} style={{ background:C.seafoamDeep, border:"none", color:C.slateLight, borderRadius:"50%", width:"34px", height:"34px", cursor:"pointer", fontSize:"17px" }}>x</button>
         </div>
-        <div style={{ display:"flex", borderBottom:`1px solid ${C.tide}`, background:C.white, padding:"0 22px" }}>
-          {[["pending","Needs Review"],["completed","Completed"]].map(([tab, label]) => {
-            const count = tab === "pending"
-              ? submissions.filter(s => s.status === "pending" || s.status === "flagged").length
-              : submissions.filter(s => s.status === "approved" || s.status === "rejected" || s.status === "published").length;
-            return (
-              <button key={tab} onClick={() => setQueueTab(tab)} style={{ padding:"12px 18px", fontSize:"12px", fontWeight:queueTab===tab?700:400, border:"none", background:"transparent", cursor:"pointer", color:queueTab===tab?C.slate:C.muted, borderBottom:queueTab===tab?`2px solid ${C.amber}`:"2px solid transparent", fontFamily:"inherit", display:"flex", alignItems:"center", gap:"6px" }}>
-                {label}
-                <span style={{ background:queueTab===tab?C.amber:C.tide, color:queueTab===tab?"#fff":C.muted, fontSize:"10px", fontWeight:700, padding:"1px 7px", borderRadius:"20px" }}>{count}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div style={{ padding:"16px 22px", maxHeight:"60vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
+        <div style={{ padding:"16px 22px", maxHeight:"70vh", overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
           {loading && <div style={{ textAlign:"center", padding:"40px", color:C.muted }}>Loading…</div>}
-          {!loading && submissions.filter(s => queueTab === "pending" ? (s.status === "pending" || s.status === "flagged") : (s.status === "approved" || s.status === "rejected" || s.status === "published")).length === 0 && (
+          {!loading && submissions.length === 0 && (
             <div style={{ textAlign:"center", padding:"40px", color:C.muted }}>
-              <div style={{ fontSize:"32px", marginBottom:"10px" }}>{queueTab === "pending" ? "✅" : "💭"}</div>
-              <div>{queueTab === "pending" ? "All caught up — nothing pending review" : "No completed submissions yet"}</div>
+              <div style={{ fontSize:"32px", marginBottom:"10px" }}>📭</div>
+              <div>No submissions yet</div>
             </div>
           )}
-          {submissions.filter(s => queueTab === "pending" ? (s.status === "pending" || s.status === "flagged") : (s.status === "approved" || s.status === "rejected" || s.status === "published")).map(sub => (
+          {submissions.map(sub => (
             <div key={sub.id} style={{ background:C.white, border:`1px solid ${sub.status==="flagged"?C.red:C.tide}`, borderRadius:"12px", padding:"14px 16px", marginBottom:"10px" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"6px" }}>
                 <div>
@@ -2815,11 +2213,6 @@ function AdminQueueModal({ onClose, onApprove }) {
                   <button onClick={() => setDetail(sub)} style={{ padding:"6px 12px", borderRadius:"7px", border:`1px solid ${C.tide}`, background:C.seafoam, color:C.slateMid, fontSize:"11px", fontWeight:600, cursor:"pointer" }}>View</button>
                   <button onClick={() => approve(sub)} style={{ padding:"6px 12px", borderRadius:"7px", border:"none", background:C.green, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>Approve</button>
                   <button onClick={() => reject(sub)} style={{ padding:"6px 12px", borderRadius:"7px", border:"none", background:C.red, color:C.white, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>Reject</button>
-                </div>
-              )}
-              {sub.status==="approved" && sub.approved_trip_id && (
-                <div style={{ display:"flex", gap:"7px", marginTop:"6px" }}>
-                  <button onClick={() => setPreviewTripId(sub.approved_trip_id)} style={{ padding:"6px 12px", borderRadius:"7px", border:`1px solid ${C.amber}`, background:C.amberBg, color:C.amber, fontSize:"11px", fontWeight:700, cursor:"pointer" }}>🗺 Preview Blueprint</button>
                 </div>
               )}
             </div>
@@ -2848,48 +2241,15 @@ function AdminQueueModal({ onClose, onApprove }) {
               onBookmark={null}
             />
             {/* Admin action bar pinned above the fixed X button */}
-            {adminMapOpen && (
-              <div style={{ position:"fixed", bottom:"64px", left:0, right:0, zIndex:6000, background:"rgba(28,43,58,0.97)", padding:"12px 20px", borderTop:"1px solid rgba(255,255,255,0.1)" }}>
-                {adminMapLoading
-                  ? <div style={{ textAlign:"center", color:"rgba(255,255,255,0.6)", fontSize:"12px", padding:"20px" }}>Geocoding venues…</div>
-                  : adminMapPins.length === 0
-                    ? <div style={{ textAlign:"center", color:"rgba(255,255,255,0.5)", fontSize:"12px", padding:"20px" }}>No venues geocoded — check Maps API key.</div>
-                    : <div ref={adminMapRef} style={{ width:"100%", height:"280px", borderRadius:"8px", overflow:"hidden" }} />
-                }
-                <div style={{ display:"flex", gap:"8px", marginTop:"8px", fontSize:"10px", color:"rgba(255,255,255,0.4)", flexWrap:"wrap" }}>
-                  {[["#C1392B","Hotels"],["#2980B9","Restaurants"],["#8E44AD","Bars"],["#27AE60","Activities"]].map(([c,l]) => (
-                    <span key={l} style={{ display:"flex", alignItems:"center", gap:"4px" }}><span style={{ width:"10px", height:"10px", borderRadius:"50%", background:c, display:"inline-block" }} />{l}</span>
-                  ))}
-                </div>
-              </div>
-            )}
             <div style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:6000, background:"rgba(28,43,58,0.97)", padding:"14px 20px", display:"flex", gap:"10px", justifyContent:"center", alignItems:"center", borderTop:"2px solid rgba(255,255,255,0.1)" }}>
               <div style={{ fontSize:"12px", color:"rgba(255,255,255,0.6)", marginRight:"8px" }}>Admin Review — {detail.submitter_name}</div>
-              <button onClick={async () => {
-                if (adminMapOpen) { setAdminMapOpen(false); return; }
-                setAdminMapOpen(true);
-                setAdminMapLoading(true);
-                const pins = await geocodeSubmission(detail.trip_data);
-                setAdminMapPins(pins);
-                setAdminMapLoading(false);
-              }} style={{ padding:"10px 16px", borderRadius:"8px", border:"1px solid rgba(255,255,255,0.2)", background: adminMapOpen ? "rgba(255,255,255,0.15)" : "transparent", color:"rgba(255,255,255,0.8)", fontWeight:600, fontSize:"12px", cursor:"pointer" }}>
-                📍 {adminMapOpen ? "Hide Map" : "Preview Map"}
-              </button>
               <button onClick={() => approve(detail)} style={{ padding:"10px 28px", borderRadius:"8px", border:"none", background:C.green, color:C.white, fontWeight:700, fontSize:"13px", cursor:"pointer" }}>✓ Approve</button>
               <button onClick={() => reject(detail)} style={{ padding:"10px 28px", borderRadius:"8px", border:"none", background:C.red, color:C.white, fontWeight:700, fontSize:"13px", cursor:"pointer" }}>✕ Reject</button>
-              <button onClick={() => { setDetail(null); setAdminMapOpen(false); setAdminMapPins([]); }} style={{ padding:"10px 18px", borderRadius:"8px", border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"rgba(255,255,255,0.7)", fontSize:"12px", cursor:"pointer" }}>Cancel</button>
+              <button onClick={() => setDetail(null)} style={{ padding:"10px 18px", borderRadius:"8px", border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"rgba(255,255,255,0.7)", fontSize:"12px", cursor:"pointer" }}>Cancel</button>
             </div>
           </div>
         );
       })()}
-      {previewTripId && (
-        <div style={{ position:"fixed", inset:0, zIndex:6000, overflowY:"auto" }}>
-          <BlueprintPage tripId={previewTripId} onClose={() => setPreviewTripId(null)} />
-          <div style={{ position:"fixed", top:"16px", right:"16px", zIndex:7000 }}>
-            <button onClick={() => setPreviewTripId(null)} style={{ background:"rgba(28,43,58,0.9)", border:"1px solid rgba(255,255,255,0.2)", color:"#fff", borderRadius:"8px", padding:"8px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>✕ Close Preview</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -2899,7 +2259,7 @@ function AdminQueueModal({ onClose, onApprove }) {
 
 // ── Auth Modal (Login / Register) ─────────────────────────────────────────────
 // ── Hybrid Processor ──────────────────────────────────────────────────────────
-function HybridProcessor({ text, photos, onComplete, onBack, isLocalMode = false }) {
+function HybridProcessor({ text, photos, onComplete, onBack }) {
   const [progress, setProgress] = useState(0);
   const [label, setLabel] = useState("Preparing...");
   const [error, setError] = useState(null);
@@ -2913,7 +2273,12 @@ function HybridProcessor({ text, photos, onComplete, onBack, isLocalMode = false
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
       canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(blob => { URL.revokeObjectURL(url); resolve(blob); }, "image/jpeg", 0.7);
+      canvas.toBlob(blob => {
+        URL.revokeObjectURL(url);
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result.split(",")[1]);
+        reader.readAsDataURL(blob);
+      }, "image/jpeg", 0.65);
     };
     img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
     img.src = url;
@@ -2922,23 +2287,14 @@ function HybridProcessor({ text, photos, onComplete, onBack, isLocalMode = false
   useEffect(() => {
     const run = async () => {
 
-      // Step 1: compress and upload photos to R2
-      const photoUrls = [];
+
+      // Step 1: compress photos
+      const compressed = [];
       if (photos.length > 0) {
-        setLabel(`Uploading ${photos.length} photo${photos.length!==1?"s":""}...`);
+        setLabel(`Compressing ${photos.length} photo${photos.length!==1?"s":""}...`);
         for (let i = 0; i < photos.length; i++) {
-          const blob = await compressOne(photos[i]);
-          if (blob) {
-            try {
-              const ext = (photos[i].name.split(".").pop() || "jpg").toLowerCase();
-              const resp = await fetch(`/api/upload-image?folder=temp&type=image%2Fjpeg&name=photo.${ext}`, {
-                method: "POST",
-                body: blob
-              });
-              const upData = await resp.json();
-              if (upData.url) photoUrls.push(upData.url);
-            } catch {}
-          }
+          const b64 = await compressOne(photos[i]);
+          if (b64) compressed.push(b64);
           setProgress(Math.round((i + 1) / photos.length * 40));
         }
       } else {
@@ -2949,81 +2305,13 @@ function HybridProcessor({ text, photos, onComplete, onBack, isLocalMode = false
       setProgress(50);
 
       const hasText = text.trim().length > 0;
-      const hasPhotos = photoUrls.length > 0;
+      const hasPhotos = compressed.length > 0;
 
-      const prompt = isLocalMode
-        ? `You are helping a local share their city's best spots as a weekend guide on a travel platform called TripCopycat.
+      const prompt = `You are helping a traveller document a trip for a crowd-sourced travel platform called TripCopycat.
 
-The local has organized their picks into these categories:
-
-"${text}"
-
-The input is already sorted by category — trust it:
-- "CITY & WHERE TO STAY" → destination, region, and hotels array
-- "WHERE TO EAT & DRINK" → restaurants array (food venues) and bars array (drinks venues). If ambiguous, food = restaurant, drinks = bar.
-- "WHAT TO DO" → activities array
-- "OTHER NOTES" → informs loves, doNext, tags, and seasonal tips
-
-Use ONLY the venues and places listed. Never invent venues not mentioned.
-
-WEEKEND STRUCTURE — three days, four time slots each. Use slot values: morning / afternoon / evening / late_night only.
-
-DAY 1 — Friday (evening only — no morning or afternoon items)
-  evening:    bar (happy hour) if one was submitted; otherwise first dinner restaurant
-  evening:    dinner restaurant (if happy hour filled the first evening slot)
-  late_night: bar (drinks) if a second bar was submitted; omit if not
-
-DAY 2 — Saturday (full day)
-  morning:    submitted breakfast or coffee venue if mentioned; otherwise label exactly "Breakfast / Coffee (your choice)" — never invent a name
-  morning:    first activity or attraction
-  afternoon:  next available restaurant for lunch
-  afternoon:  next activity
-  evening:    bar (happy hour) if available and not used Friday; plus next dinner restaurant
-  late_night: evening activity if one fits (show, music, rooftop, scenic walk); otherwise a bar; omit if neither
-
-DAY 3 — Sunday (morning only — no afternoon, evening, or late_night items)
-  morning:    next available restaurant for brunch
-  morning:    next activity if available; otherwise label exactly "Explore the neighborhood"
-  morning:    always add one final item: type "transport", label "Head home", slot "morning"
-
-CLASSIFICATION — strictly enforced:
-- Restaurants = food only. Never put a restaurant in a late_night or bar slot.
-- Bars = drinks only. Never put a bar in a meal position.
-- Meal priority order: Fri evening → Sat afternoon (lunch) → Sat evening (dinner) → Sun morning (brunch).
-- Extra restaurants beyond 4 meal slots: add to restaurants array, tip = "Alternate — swap this in for any meal slot."
-- Extra activities beyond 3 activity slots: add to activities array, tip = "Alternate — great swap for a similar time slot."
-- Late night Sat: activity beats bar. If both available, activity wins; bar becomes alternate.
-- GEOGRAPHIC DAY UNITS: Build each day as a neighborhood unit, not just filling slots in list order. Step 1 — group activities that are geographically close or sequentially listed together into the same day. Step 2 — once activities are assigned to a day, assign the nearest restaurant (by proximity or listing proximity) to that day's meal slots, not the next one in list order. Step 3 — assign the nearest bar to that day's evening slot. Result: if an activity and a bar are in the same area, they belong on the same day, and the dinner closest to that area goes on that same evening. If geographic relationships are unclear, preserve the user's listed order.
-
-PRICING: $ / $$ / $$$ / $$$$ only when clearly inferable. Never invent prices.
-
-Return ONLY a valid JSON object, no markdown fences:
-{
-  "title": "Best of [City] — A Local's Weekend",
-  "destination": "City, State — or City, Country for international",
-  "region": "Europe|Asia|North America|Central America|South America|Africa|Oceania",
-  "date": "",
-  "duration": "Weekend",
-  "travelers": "Visitors",
-  "tags": [],
-  "loves": "What makes this city worth the visit — specific to places mentioned",
-  "doNext": "What visitors should prioritize and not miss",
-  "airfare": [],
-  "stay": {"item": "hotel name or neighborhood to base in", "detail": "area · price tier if known", "tip": ""},
-  "hotels": [{"item": "Hotel name if mentioned", "detail": "neighborhood · price tier if known", "tip": ""}],
-  "restaurants": [{"item": "Restaurant name", "detail": "cuisine · price tier if known", "tip": ""}],
-  "bars": [{"item": "Bar name", "detail": "type", "tip": ""}],
-  "activities": [{"item": "Activity or attraction", "detail": "description", "tip": ""}],
-  "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"slot": "morning|afternoon|evening|late_night", "type": "restaurant|bar|activity|transport", "label": "venue or activity name", "note": ""}]}]
-}
-Valid tags: family-friendly, romantic, adventure, food & wine, culture, beach, wildlife, scenic drives`
-        : `You are helping a traveller document a trip for a crowd-sourced travel platform called TripCopycat.
-
-${hasText ? `The traveller wrote this brain dump about their trip:\n\n"${text}"\n\n` : ""}${hasPhotos ? `They have also provided ${photoUrls.length} photos from the trip. Use GPS data, visible signage, and landmarks in the photos to identify specific venues and locations.\n\n` : ""}Your job is to extract and structure everything into a trip itinerary. Be as specific as possible — use real venue names from the text or photos. For anything not mentioned, leave it as an empty string or empty array rather than guessing.
+${hasText ? `The traveller wrote this brain dump about their trip:\n\n"${text}"\n\n` : ""}${hasPhotos ? `They have also provided ${compressed.length} photos from the trip. Use GPS data, visible signage, and landmarks in the photos to identify specific venues and locations.\n\n` : ""}Your job is to extract and structure everything into a trip itinerary. Be as specific as possible — use real venue names from the text or photos. For anything not mentioned, leave it as an empty string or empty array rather than guessing.
 
 IMPORTANT: Never reference photos by number (e.g. "photo 1", "image 3", "in photo 17") anywhere in the output. Never mention photos at all in any field values. All output must read as if written by the traveller from memory, not derived from images.
-
-PRICING: Use $ / $$ / $$$ / $$$$ as a price tier only when clearly inferable from the text. Do NOT invent or estimate specific dollar amounts. If price is unknown, omit the price portion entirely.
 
 Return ONLY a valid JSON object with no other text:
 {
@@ -3036,14 +2324,17 @@ Return ONLY a valid JSON object with no other text:
   "tags": [],
   "loves": "What stood out — be specific with place names if mentioned",
   "doNext": "Honest advice for future travellers",
-  "airfare": [{"item": "Airline and route", "detail": "price if mentioned, otherwise omit", "tip": ""}],
-  "hotels": [{"item": "Hotel name", "detail": "N nights · $$$ (omit price tier if unknown)", "tip": ""}],
-  "restaurants": [{"item": "Restaurant name", "detail": "cuisine type · $$ (omit price tier if unknown)", "tip": ""}],
+  "airfare": [{"item": "Airline and route", "detail": "~$X per person", "tip": ""}],
+  "hotels": [{"item": "Hotel name", "detail": "N nights, ~$X/night", "tip": ""}],
+  "restaurants": [{"item": "Restaurant name", "detail": "cuisine, ~$X per person", "tip": ""}],
   "bars": [{"item": "Bar name", "detail": "type", "tip": ""}],
-  "activities": [{"item": "Activity name", "detail": "description · price tier only if clearly mentioned", "tip": ""}],
+  "activities": [{"item": "Activity name", "detail": "~$X per person", "tip": ""}],
   "days": [{"day": 1, "date": "", "title": "Day title", "items": [{"time": "", "type": "activity|restaurant|bar|hotel|transport", "label": "what happened", "note": ""}]}]
 }
 Valid tags: family-friendly, romantic, adventure, food & wine, culture, beach, wildlife, scenic drives`;
+
+      const parts = [{ text: prompt }];
+      compressed.forEach(b64 => parts.push({ inline_data: { mime_type: "image/jpeg", data: b64 } }));
 
       try {
         const controller = new AbortController();
@@ -3051,7 +2342,7 @@ Valid tags: family-friendly, romantic, adventure, food & wine, culture, beach, w
         const res = await fetch("/api/gemini", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageUrls: photoUrls, prompt }),
+          body: JSON.stringify({ contents: [{ parts }] }),
           signal: controller.signal,
         });
         clearTimeout(timeout);
@@ -3697,35 +2988,27 @@ function AdminEditModal({ trip, onSave, onClose }) {
                 <input style={{...inp, flex:1}} value={form.image||""} onChange={e=>updField("image",e.target.value)} placeholder="/your-photo.jpg or https://..." />
                 <label style={{ padding:"7px 12px", borderRadius:"7px", border:`1px solid ${C.amber}`, background:C.amberBg, color:C.slate, fontSize:"11px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0 }}>
                   📤 Upload Photo
-                  <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" style={{ display:"none" }} onChange={async (e) => {
+                  <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display:"none" }} onChange={async (e) => {
                     const file = e.target.files[0];
                     if (!file) return;
-                    // Compress via canvas — bakes EXIF rotation into pixels
-                    const objUrl = URL.createObjectURL(file);
+                    const scale = Math.min(1, 1200 / 1200);
+                    const canvas = document.createElement("canvas");
                     const img = new Image();
                     img.onload = async () => {
                       const s = Math.min(1, 1200 / img.width);
-                      const canvas = document.createElement("canvas");
                       canvas.width = Math.round(img.width * s);
                       canvas.height = Math.round(img.height * s);
                       canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-                      URL.revokeObjectURL(objUrl);
                       canvas.toBlob(async (blob) => {
-                        // Upload to R2 via server function (consistent with all new uploads)
-                        try {
-                          const resp = await fetch(`/api/upload-image?folder=photos&type=image%2Fjpeg&name=cover.jpg`, {
-                            method: "POST",
-                            body: blob,
-                          });
-                          const upData = await resp.json();
-                          if (upData.url) updField("image", upData.url);
-                        } catch(err) {
-                          console.error("Cover photo upload error:", err);
+                        const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+                        const { error } = await supabase.storage.from("trip-photos").upload(path, blob, { contentType:"image/jpeg", upsert:false });
+                        if (!error) {
+                          const { data } = supabase.storage.from("trip-photos").getPublicUrl(path);
+                          updField("image", data.publicUrl);
                         }
                       }, "image/jpeg", 0.82);
                     };
-                    img.onerror = () => URL.revokeObjectURL(objUrl);
-                    img.src = objUrl;
+                    img.src = URL.createObjectURL(file);
                     e.target.value = "";
                   }} />
                 </label>
@@ -4236,6 +3519,184 @@ function LegalModal({ onClose }) {
 
 
 
+// ── Sample Blueprint Page ─────────────────────────────────────────────────────
+const SAMPLE_CAT_CONFIG = { hotels:"🏨", restaurants:"🍽", bars:"🍸", activities:"🎯" };
+
+const SAMPLE_TRIP = {
+  id:"797fcf29-1f16-410f-bdc8-32446d816209",
+  title:"Amalfi Coast Itinerary: Positano & Beyond",
+  destination:"Positano, Amalfi Coast, Italy",
+  region:"Europe", duration:"6 nights (Oct 15–21)", date:"October 2025", travelers:"Couple", author:"Andrew C.",
+  loves:"Positano lived up to its post-card reputation. The cooking class at Amalfi Heaven Gardens was amazing — even my wife who was initially skeptical called it her highlight. Posides café was a gem where we lingered and connected with the owner and staff over excellent fresh food and housemade pasta. Dinner at Il Tridente delivered incredible atmosphere — a candlelit balcony overlooking the twinkling lights of Positano at night. The Amalfi Coast ferry system made day-tripping to Amalfi and Capri effortless and scenic.",
+  doNext:"We would likely skip Naples next time — it was overcrowded with cruise tourists and the food didn't justify the detour. Use it only as a logistical overnight if your flight requires it.",
+  hotels:[{item:"Hotel Miramare",detail:"Positano",tip:"Book well in advance — fills up fast"},{item:"Hotel Santa Lucia",detail:"Naples",tip:"Good location for early flights"}],
+  restaurants:[{item:"Posides Café",detail:"Positano — fresh food, housemade pasta",tip:"Linger and connect with the owners"},{item:"Il Tridente",detail:"Positano — candlelit balcony",tip:"Reserve the balcony table"},{item:"Saraceno D'Oro",detail:"Positano — streetside pizza patio",tip:"Best pizza of the trip"},{item:"Villa Verde",detail:"Capri",tip:"Great lunch spot"},{item:"Casa Mele",detail:"Capri — modern Italian",tip:"Try the Taurasi wine"},{item:"Al Ruotolo",detail:"Naples",tip:"Very affordable"}],
+  bars:[{item:"Don't Worry Bar",detail:"Positano — speakeasy jazz vibes",tip:"Go after dinner"},{item:"Hotel Palazzo Murat",detail:"Positano patio drinks",tip:"Stunning setting"},{item:"Il Capitano",detail:"Positano — coastal views",tip:"Perfect for sunset"}],
+  activities:[{item:"Amalfi Heaven Gardens Cooking Class",detail:"Made gnocchi with excellent hosts",tip:"Book ahead — trip highlight"},{item:"Cathedral of Sant'Andrea",detail:"Amalfi",tip:"Go early to avoid crowds"},{item:"Ferry to Capri",detail:"Scenic day trip",tip:"Buy tickets the night before"},{item:"Ferry to Amalfi",detail:"Easy day trip from Positano",tip:"Check schedule in advance"}],
+  days:[
+    {day:1,date:"Oct 15",title:"Arrival in Positano",items:[{time:"Afternoon",type:"hotel",label:"Hotel Miramare",note:"Check in and settle"},{time:"Morning",type:"restaurant",label:"Posides Café",note:"Fresh food, friendly staff"},{time:"Evening",type:"bar",label:"Don't Worry Bar",note:"Speakeasy jazz vibes"},{time:"Dinner",type:"restaurant",label:"Saraceno D'Oro",note:"Best pizza of the trip"}]},
+    {day:2,date:"Oct 16",title:"Exploring Positano",items:[{time:"Morning",type:"restaurant",label:"Breakfast at hotel",note:""},{time:"Midday",type:"bar",label:"Hotel Palazzo Murat patio",note:"Stunning setting"},{time:"Lunch",type:"restaurant",label:"Posides Café",note:"Housemade pasta"},{time:"Afternoon",type:"bar",label:"Il Capitano",note:"Coastal views"},{time:"Dinner",type:"restaurant",label:"Il Tridente",note:"Unforgettable balcony"}]},
+    {day:3,date:"Oct 17",title:"Day Trip to Amalfi",items:[{time:"Morning",type:"activity",label:"Ferry to Amalfi",note:"Scenic coastal ride"},{time:"Midday",type:"activity",label:"Cathedral of Sant'Andrea",note:"Go early"},{time:"Evening",type:"activity",label:"Amalfi Gardens Cooking Class",note:"Made gnocchi — trip highlight"}]},
+    {day:4,date:"Oct 18",title:"Day Trip to Capri",items:[{time:"Morning",type:"activity",label:"Ferry to Capri",note:"Buy tickets night before"},{time:"Lunch",type:"restaurant",label:"Villa Verde",note:""},{time:"Dinner",type:"restaurant",label:"Casa Mele",note:"Try the Taurasi"}]},
+    {day:5,date:"Oct 19",title:"Travel to Naples",items:[{time:"Midday",type:"activity",label:"Ferry to Naples",note:""},{time:"Evening",type:"restaurant",label:"Al Ruotolo",note:"Second best pizza"},{time:"Dinner",type:"restaurant",label:"Bechamel di Giorgio Di Fusco",note:"Great value trattoria"}]},
+    {day:6,date:"Oct 20",title:"Departure",items:[{time:"Morning",type:"activity",label:"Departed Naples via Dublin",note:""}]},
+  ],
+};
+
+const SAMPLE_AI_ALTERNATIVES = {
+  hotels:[{name:"Le Sirenuse",reason:"Iconic Positano luxury — views are unmatched if budget allows"},{name:"Casa Mariantonia",reason:"Charming Capri boutique, perfect island base"}],
+  restaurants:[{name:"La Sponda at Le Sirenuse",reason:"Candlelit terrace — most romantic restaurant on the coast"},{name:"Da Adolfo",reason:"Legendary beach restaurant only accessible by boat"}],
+  bars:[{name:"Music on the Rocks",reason:"Built into a cliff cave — legendary Positano nightspot"},{name:"Bar Calypso",reason:"Beachside bar with great aperitivo hour"}],
+  activities:[{name:"Path of the Gods hike",reason:"Stunning clifftop trail with panoramic coast views"},{name:"Private boat tour",reason:"Charter a small boat to reach hidden coves and grottos"}],
+};
+
+function SampleBlueprintPage({ onClose, setShowGear }) {
+  const [kmlLoading, setKmlLoading] = useState(false);
+  const trip = SAMPLE_TRIP;
+
+  const generateKML = async () => {
+    setKmlLoading(true);
+    const cats = [{key:"hotels",color:"ff0000ff",label:"Hotels"},{key:"restaurants",color:"ff00ff00",label:"Restaurants"},{key:"bars",color:"ffff00ff",label:"Bars"},{key:"activities",color:"ffffff00",label:"Activities"}];
+    const geocode = async (name) => {
+      try {
+        const q = encodeURIComponent(name + " " + trip.destination);
+        const res = await fetch("https://photon.komoot.io/api/?q=" + q + "&limit=1");
+        const data = await res.json();
+        const coords = data?.features?.[0]?.geometry?.coordinates;
+        if (coords) return { lon: coords[0], lat: coords[1] };
+      } catch {}
+      return null;
+    };
+    const parts = [];
+    for (const cat of cats) {
+      for (const p of (trip[cat.key]||[]).filter(v=>v.item)) {
+        const coords = await geocode(p.item);
+        const pt = coords ? "<Point><coordinates>" + coords.lon + "," + coords.lat + ",0</coordinates></Point>" : "";
+        parts.push("<Placemark><n>" + p.item + "</n><description>" + cat.label + (p.detail?" — "+p.detail:"") + (p.tip?" | Tip: "+p.tip:"") + "</description><Style><IconStyle><color>" + cat.color + "</color></IconStyle></Style>" + pt + "</Placemark>");
+      }
+    }
+    const kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><n>' + trip.title + '</n>' + parts.join("") + '</Document></kml>';
+    const blob = new Blob([kml], {type:"application/vnd.google-earth.kml+xml"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "amalfi-coast-sample-blueprint.kml";
+    a.click();
+    setKmlLoading(false);
+  };
+
+  const mapsKey = typeof window !== "undefined" && window.__mapsKey ? window.__mapsKey : "";
+
+  return (
+    <div style={{minHeight:"100vh",background:C.seafoam,fontFamily:"'DM Sans',sans-serif"}}>
+      {/* Sample banner */}
+      <div style={{background:"linear-gradient(135deg,#1D6A3A,#2D9A57)",padding:"10px 24px",textAlign:"center",color:"#fff",fontSize:"13px",fontWeight:600}}>
+        ✦ Free sample Blueprint — <span style={{textDecoration:"underline",cursor:"pointer"}} onClick={onClose}>browse all trips on TripCopycat</span> and get your own for $1.99
+      </div>
+      {/* Header */}
+      <div style={{background:C.slate,padding:"32px 40px",position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(rgba(196,168,130,0.08) 1px,transparent 1px)",backgroundSize:"20px 20px"}}/>
+        <div style={{position:"relative",maxWidth:"800px",margin:"0 auto"}}>
+          <button onClick={onClose} style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.7)",borderRadius:"8px",padding:"6px 14px",cursor:"pointer",fontSize:"12px",marginBottom:"20px",fontFamily:"inherit"}}>← Back to TripCopycat</button>
+          <div style={{fontSize:"11px",fontWeight:700,color:C.amber,textTransform:"uppercase",letterSpacing:"0.12em",marginBottom:"10px"}}>{trip.region} · {trip.duration} · {trip.date}</div>
+          <h1 style={{fontFamily:"'Playfair Display',Georgia,serif",fontSize:"34px",fontWeight:900,color:"#fff",margin:"0 0 8px",lineHeight:1.1}}>{trip.title}</h1>
+          <div style={{fontSize:"15px",color:"rgba(255,255,255,0.8)",marginBottom:"6px"}}>{trip.destination}</div>
+          <div style={{fontSize:"13px",color:C.amber,marginBottom:"24px"}}>by {trip.author} · {trip.travelers}</div>
+          <div style={{display:"flex",gap:"10px",flexWrap:"wrap"}}>
+            <button onClick={()=>window.print()} style={{padding:"10px 20px",borderRadius:"8px",border:"none",background:C.amber,color:C.slate,fontSize:"12px",fontWeight:700,cursor:"pointer"}}>⬇ Download PDF</button>
+            <button onClick={generateKML} disabled={kmlLoading} style={{padding:"10px 20px",borderRadius:"8px",border:"1px solid rgba(196,168,130,0.5)",background:"transparent",color:C.amber,fontSize:"12px",fontWeight:700,cursor:"pointer"}}>{kmlLoading?"Geocoding…":"🗺 Open in Google Maps"}</button>
+            <button onClick={()=>{navigator.clipboard.writeText(window.location.href);alert("Link copied!");}} style={{padding:"10px 20px",borderRadius:"8px",border:"1px solid rgba(255,255,255,0.2)",background:"transparent",color:"rgba(255,255,255,0.8)",fontSize:"12px",fontWeight:700,cursor:"pointer"}}>🔗 Share Sample</button>
+          </div>
+        </div>
+      </div>
+      {/* Body */}
+      <div style={{maxWidth:"800px",margin:"0 auto",padding:"32px 24px"}}>
+        <div style={{background:C.white,borderRadius:"16px",padding:"24px 28px",marginBottom:"20px",border:`1px solid ${C.tide}`}}>
+          <div style={{fontSize:"11px",fontWeight:700,color:C.amber,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"10px"}}>❤️ What the traveler loved</div>
+          <p style={{fontSize:"15px",color:C.slate,lineHeight:1.75,margin:0}}>{trip.loves}</p>
+        </div>
+        <div style={{background:C.white,borderRadius:"16px",padding:"24px 28px",marginBottom:"20px",border:`1px solid ${C.tide}`}}>
+          <div style={{fontSize:"11px",fontWeight:700,color:C.amber,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"10px"}}>🔄 What they'd do differently</div>
+          <p style={{fontSize:"15px",color:C.slate,lineHeight:1.75,margin:0}}>{trip.doNext}</p>
+        </div>
+        {/* Day-by-day */}
+        <div style={{background:C.white,borderRadius:"16px",padding:"24px 28px",marginBottom:"20px",border:`1px solid ${C.tide}`}}>
+          <div style={{fontSize:"11px",fontWeight:700,color:C.amber,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"20px"}}>📅 Day-by-Day Itinerary</div>
+          {trip.days.map((day,di)=>(
+            <div key={di} style={{marginBottom:"24px"}}>
+              <div style={{fontSize:"14px",fontWeight:800,color:C.slate,marginBottom:"12px",paddingBottom:"8px",borderBottom:`2px solid ${C.tide}`}}>Day {day.day} — {day.title} · {day.date}</div>
+              <div style={{position:"relative",paddingLeft:"20px"}}>
+                <div style={{position:"absolute",left:"6px",top:0,bottom:0,width:"2px",background:C.tide}}/>
+                {day.items.map((item,ii)=>(
+                  <div key={ii} style={{position:"relative",marginBottom:"12px"}}>
+                    <div style={{position:"absolute",left:"-17px",top:"4px",width:"10px",height:"10px",borderRadius:"50%",background:C.amber,border:`2px solid ${C.white}`}}/>
+                    {item.time&&<div style={{fontSize:"10px",fontWeight:700,color:C.muted,marginBottom:"2px"}}>{item.time}</div>}
+                    <div style={{fontSize:"13px",fontWeight:600,color:C.slate}}>{item.label}</div>
+                    {item.note&&<div style={{fontSize:"12px",color:C.slateLight,marginTop:"2px"}}>{item.note}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Venue details */}
+        {["hotels","restaurants","bars","activities"].map(cat=>(
+          trip[cat]?.length>0&&(
+            <div key={cat} style={{background:C.white,borderRadius:"16px",padding:"24px 28px",marginBottom:"20px",border:`1px solid ${C.tide}`}}>
+              <div style={{fontSize:"11px",fontWeight:700,color:C.amber,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"14px"}}>{SAMPLE_CAT_CONFIG[cat]} {cat.charAt(0).toUpperCase()+cat.slice(1)}</div>
+              {trip[cat].map((item,idx)=>(
+                <div key={idx} style={{padding:"10px 0",borderBottom:`1px solid ${C.seafoam}`}}>
+                  <div style={{fontSize:"13px",fontWeight:700,color:C.slate}}>{item.item}</div>
+                  {item.detail&&<div style={{fontSize:"12px",color:C.slateLight,marginTop:"2px"}}>{item.detail}</div>}
+                  {item.tip&&<div style={{fontSize:"12px",color:C.amber,marginTop:"4px"}}>💡 {item.tip}</div>}
+                </div>
+              ))}
+            </div>
+          )
+        ))}
+        {/* AI Alternatives */}
+        <div style={{background:C.white,borderRadius:"16px",padding:"24px 28px",marginBottom:"20px",border:`1px solid ${C.tide}`}}>
+          <div style={{fontSize:"11px",fontWeight:700,color:C.amber,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"14px"}}>✨ AI-Suggested Alternatives</div>
+          {Object.entries(SAMPLE_AI_ALTERNATIVES).map(([cat,alts])=>(
+            <div key={cat} style={{marginBottom:"14px"}}>
+              <div style={{fontSize:"12px",fontWeight:700,color:C.slate,marginBottom:"6px"}}>{SAMPLE_CAT_CONFIG[cat]} Alternative {cat}</div>
+              {alts.map((a,i)=>(
+                <div key={i} style={{padding:"8px 12px",background:C.seafoam,borderRadius:"8px",marginBottom:"6px"}}>
+                  <div style={{fontSize:"13px",fontWeight:600,color:C.slate}}>{a.name}</div>
+                  <div style={{fontSize:"12px",color:C.slateLight,marginTop:"2px"}}>{a.reason}</div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        {/* Map */}
+        <div style={{background:C.white,borderRadius:"16px",padding:"24px 28px",marginBottom:"20px",border:`1px solid ${C.tide}`}}>
+          <div style={{fontSize:"11px",fontWeight:700,color:C.amber,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"14px"}}>🗺 Map</div>
+          <iframe title="Amalfi Coast Map" width="100%" height="300" style={{border:0,borderRadius:"8px"}} loading="lazy"
+            src={`https://www.google.com/maps/embed/v1/search?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY||""}&q=Positano,Amalfi+Coast,Italy`}/>
+          <div style={{marginTop:"12px"}}>
+            <button onClick={generateKML} disabled={kmlLoading} style={{padding:"8px 16px",borderRadius:"8px",border:`1px solid ${C.tide}`,background:C.seafoam,color:C.slate,fontSize:"12px",fontWeight:600,cursor:"pointer"}}>{kmlLoading?"Geocoding venues…":"⬇ Download KML — Open All Pins in Google Maps"}</button>
+          </div>
+        </div>
+        {/* CTA */}
+        <div style={{background:C.slate,backgroundImage:"radial-gradient(rgba(196,168,130,0.1) 1px,transparent 1px)",backgroundSize:"10px 10px",borderRadius:"16px",padding:"28px",textAlign:"center",marginBottom:"20px"}}>
+          <div style={{fontSize:"20px",fontWeight:900,color:"#fff",fontFamily:"'Playfair Display',Georgia,serif",marginBottom:"8px"}}>Love what you see?</div>
+          <div style={{fontSize:"13px",color:"rgba(196,168,130,0.85)",marginBottom:"20px",lineHeight:1.6}}>Get a full Blueprint like this for any trip on TripCopycat — AI alternatives, PDF export, Google Maps pins, and a shareable link.</div>
+          <button onClick={onClose} style={{background:"#FAF7F2",color:"#1C2B3A",border:"2px solid #C4A882",borderRadius:"8px",padding:"12px 28px",fontSize:"13px",fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:"8px"}}>
+            <span style={{display:"inline-block",transform:"rotate(-45deg)",color:"#C4A882"}}>▲</span>
+            Browse Trips & Get Your Blueprint — $1.99
+          </button>
+        </div>
+        <div style={{textAlign:"center",padding:"20px 0"}}>
+          <div style={{fontSize:"12px",color:C.muted,marginBottom:"4px"}}>Generated by TripCopycat · tripcopycat.com</div>
+          <div style={{fontSize:"11px",color:C.muted}}>Views and recommendations are those of the traveler and not of TripCopycat.</div>
+        </div>
+      </div>
+      <style>{"@media print { button { display: none !important; } body { background: white !important; } }"}</style>
+    </div>
+  );
+}
+
+
 // ── Gear We Love Page ─────────────────────────────────────────────────────────
 const GEAR_ITEMS = [
   { id:1, name:"Wonderfold Wagon", category:"Family Travel", description:"Goes right through airport security and gate checks for free. The only catch — you'll need a minivan or SUV rental on the other end to fit it.", personalNote:"Provided a great spot for naps while on the beach or a patio.", image:"https://m.media-amazon.com/images/I/71K1Ct2KIpL._SL1500_.jpg", affiliateUrl:"https://amzn.to/4smV8W4" },
@@ -4317,66 +3778,12 @@ function BlueprintPage({ tripId, onClose }) {
           tags: data.tags || [], loves: data.loves, doNext: data.do_next,
           airfare: data.airfare || [], hotels: data.hotels || [], restaurants: data.restaurants || [],
           bars: data.bars || [], activities: data.activities || [], days: data.days || [],
-          image: data.image ?? null, focalPoint: data.focal_point || {x:50,y:50}, gallery: data.gallery || [],
-          venueCoords: data.venue_coords || null,
+          image: data.image ?? null, focalPoint: data.focal_point || {x:50,y:50}, gallery: data.gallery || []
         });
       }
       setLoading(false);
     });
   }, [tripId]);
-
-  // Load Google Maps JS API once and render pins when trip is ready
-  useEffect(() => {
-    if (!trip?.venueCoords) return;
-    const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_KEY || "";
-    if (!mapsKey) return;
-
-    const renderMap = () => {
-      const mapEl = document.getElementById("bp-gmap");
-      if (!mapEl || !window.google) return;
-
-      const CAT_COLORS = { hotels:"#C1392B", restaurants:"#2980B9", bars:"#8E44AD", activities:"#27AE60" };
-      const pins = [];
-      for (const [cat, coords] of Object.entries(trip.venueCoords)) {
-        const venues = trip[cat] || [];
-        (coords || []).forEach((c, i) => {
-          if (c && venues[i]?.item) pins.push({ lat: c.lat, lng: c.lng, name: venues[i].item, cat, color: CAT_COLORS[cat] });
-        });
-      }
-      if (pins.length === 0) return;
-
-      const bounds = new window.google.maps.LatLngBounds();
-      const map = new window.google.maps.Map(mapEl, { zoom: 12, center: { lat: pins[0].lat, lng: pins[0].lng }, mapTypeControl: false, streetViewControl: false, fullscreenControl: true });
-      const infoWindow = new window.google.maps.InfoWindow();
-
-      const makeSvgIcon = (color) => {
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36"><path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 22 14 22S28 23.333 28 14C28 6.268 21.732 0 14 0z" fill="${color}"/><circle cx="14" cy="14" r="6" fill="white"/></svg>`;
-        return { url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg), scaledSize: new window.google.maps.Size(28, 36), anchor: new window.google.maps.Point(14, 36) };
-      };
-
-      for (const pin of pins) {
-        const marker = new window.google.maps.Marker({ position: { lat: pin.lat, lng: pin.lng }, map, icon: makeSvgIcon(pin.color), title: pin.name });
-        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pin.name + " " + (trip.destination || ""))}`;
-        marker.addListener("click", () => {
-          infoWindow.setContent(`<div style="font-family:'DM Sans',sans-serif;padding:2px 4px"><div style="font-weight:700;font-size:13px;margin-bottom:3px">${pin.name}</div><div style="font-size:11px;color:#A89080;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">${pin.cat}</div><a href="${mapsUrl}" target="_blank" rel="noopener" style="font-size:12px;color:#4285F4;font-weight:600;text-decoration:none">Open in Google Maps ↗</a></div>`);
-          infoWindow.open(map, marker);
-        });
-        bounds.extend({ lat: pin.lat, lng: pin.lng });
-      }
-      map.fitBounds(bounds);
-      window.google.maps.event.addListenerOnce(map, "idle", () => { if (map.getZoom() > 15) map.setZoom(15); });
-    };
-
-    if (window.google?.maps) {
-      renderMap();
-    } else {
-      window._bpMapCallback = renderMap;
-      const s = document.createElement("script");
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}&callback=_bpMapCallback`;
-      s.async = true; s.defer = true;
-      document.head.appendChild(s);
-    }
-  }, [trip]);
 
   useEffect(() => {
     if (!trip || aiAlternatives) return;
@@ -4395,31 +3802,30 @@ function BlueprintPage({ tripId, onClose }) {
     }).catch(() => setAiAlternatives(null)).finally(() => setAiLoading(false));
   }, [trip]);
 
-  const xmlEsc = (s) => String(s||"")
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-
   const generateKML = () => {
     if (!trip) return;
     const cats = [
-      { key:"hotels",      color:"ff0000ff", label:"Hotel" },
-      { key:"restaurants", color:"ff00ff00", label:"Restaurant" },
-      { key:"bars",        color:"ffff00ff", label:"Bar" },
-      { key:"activities",  color:"ffffff00", label:"Activity" },
+      { key: "hotels", color: "ff0000ff", icon: "lodging" },
+      { key: "restaurants", color: "ff00ff00", icon: "restaurant" },
+      { key: "bars", color: "ffff00ff", icon: "bar" },
+      { key: "activities", color: "ffffff00", icon: "camera" },
     ];
-    const coords = trip.venueCoords || {};
-    const placemarks = cats.flatMap(cat => {
-      const venues = (trip[cat.key] || []).filter(p => p.item);
-      const catCoords = coords[cat.key] || [];
-      return venues.map((p, i) => {
-        const c = catCoords[i];
-        const pt = c?.lat && c?.lng
-          ? `<Point><coordinates>${c.lng},${c.lat},0</coordinates></Point>`
-          : "";
-        return `<Placemark><name>${xmlEsc(p.item)}</name><description>${xmlEsc(cat.label + (p.detail ? " — " + p.detail : "") + (p.tip ? " | Tip: " + p.tip : ""))}</description><Style><IconStyle><color>${cat.color}</color></IconStyle></Style>${pt}</Placemark>`;
-      });
-    });
-    const kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${xmlEsc(trip.title)}</name><description>Trip Blueprint from TripCopycat — tripcopycat.com/trip/${trip.id}</description>${placemarks.join("")}</Document></kml>`;
+    const placemarks = cats.flatMap(cat =>
+      (trip[cat.key] || []).filter(p => p.item).map(p => `
+    <Placemark>
+      <n>${p.item}</n>
+      <description>${p.detail || ""} ${p.tip ? "| Tip: " + p.tip : ""}</description>
+      <StyleMap><Pair><key>normal</key><Style><IconStyle><color>${cat.color}</color></IconStyle></Style></Pair></StyleMap>
+    </Placemark>`).join("")
+    );
+    const kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <n>${trip.title}</n>
+    <description>Trip Blueprint from TripCopycat — tripcopycat.com/trip/${trip.id}</description>
+    ${placemarks}
+  </Document>
+</kml>`;
     const blob = new Blob([kml], { type: "application/vnd.google-earth.kml+xml" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -4465,7 +3871,7 @@ function BlueprintPage({ tripId, onClose }) {
           <div style={{ display:"flex", gap:"10px", marginTop:"24px", flexWrap:"wrap", fontFamily:"'DM Sans',sans-serif" }}>
             <button onClick={() => window.print()} style={{ padding:"10px 20px", borderRadius:"8px", border:"none", background:C.amber, color:C.slate, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>⬇ Download PDF</button>
             <button onClick={generateKML} style={{ padding:"10px 20px", borderRadius:"8px", border:"1px solid rgba(196,168,130,0.5)", background:"transparent", color:C.amber, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>🗺 Open in Google Maps</button>
-            <button onClick={() => { navigator.clipboard.writeText(window.location.href); window.__toast && window.__toast("Link copied!"); }} style={{ padding:"10px 20px", borderRadius:"8px", border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"rgba(255,255,255,0.8)", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>🔗 Share Blueprint</button>
+            <button onClick={() => { navigator.clipboard.writeText(window.location.href); alert("Link copied!"); }} style={{ padding:"10px 20px", borderRadius:"8px", border:"1px solid rgba(255,255,255,0.2)", background:"transparent", color:"rgba(255,255,255,0.8)", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>🔗 Share Blueprint</button>
           </div>
         </div>
       </div>
@@ -4545,27 +3951,16 @@ function BlueprintPage({ tripId, onClose }) {
           ))}
         </div>
 
-        {/* Map with venue pins */}
+        {/* Map embed */}
         <div style={{ background:C.white, borderRadius:"16px", padding:"24px 28px", marginBottom:"20px", border:`1px solid ${C.tide}`, boxShadow:`0 2px 12px rgba(28,43,58,0.06)` }}>
-          <div style={{ fontSize:"11px", fontWeight:700, color:C.amber, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:"14px" }}>🗺 Venue Map</div>
-          {trip.venueCoords ? (
-            <div id="bp-gmap" style={{ width:"100%", height:"360px", borderRadius:"10px", border:`1px solid ${C.tide}` }} />
-          ) : (
-            <iframe
-              title="Trip Map"
-              width="100%" height="300"
-              style={{ border:0, borderRadius:"8px" }}
-              loading="lazy"
-              src={`https://www.google.com/maps/embed/v1/search?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY || ""}&q=${encodeURIComponent(trip.destination)}`}
-            />
-          )}
-          <div style={{ marginTop:"8px", fontSize:"11px", color:C.muted, display:"flex", gap:"12px", flexWrap:"wrap" }}>
-            {trip.venueCoords && (
-              <>
-                <span>🔴 Hotels</span><span>🔵 Restaurants</span><span>🟣 Bars</span><span>🟢 Activities</span>
-              </>
-            )}
-          </div>
+          <div style={{ fontSize:"11px", fontWeight:700, color:C.amber, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:"14px" }}>🗺 Map</div>
+          <iframe
+            title="Trip Map"
+            width="100%" height="300"
+            style={{ border:0, borderRadius:"8px" }}
+            loading="lazy"
+            src={`https://www.google.com/maps/embed/v1/search?key=${import.meta.env.VITE_GOOGLE_MAPS_KEY || ""}&q=${encodeURIComponent(trip.destination)}`}
+          />
           <div style={{ marginTop:"12px" }}>
             <button onClick={generateKML} style={{ padding:"8px 16px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.seafoam, color:C.slate, fontSize:"12px", fontWeight:600, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>⬇ Download KML — Open All Pins in Google Maps</button>
           </div>
@@ -4590,136 +3985,11 @@ function BlueprintPage({ tripId, onClose }) {
 }
 
 
-// ── How It Works Modal ───────────────────────────────────────────────────────
-function HowItWorksModal({ onClose, onSubmit }) {
-  return (
-    <div className="tc-modal-overlay" style={{ position:"fixed", inset:0, background:"rgba(44,62,80,0.75)", zIndex:2000, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"20px 16px", overflowY:"auto", WebkitOverflowScrolling:"touch", backdropFilter:"blur(8px)" }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background:C.white, borderRadius:"20px", width:"100%", maxWidth:"560px", overflow:"hidden", boxShadow:"0 32px 64px rgba(44,62,80,0.22)", border:`1px solid ${C.tide}`, marginTop:"auto", marginBottom:"auto" }}>
-
-        {/* Header */}
-        <div style={{ background:C.slate, padding:"28px 32px 24px", position:"relative", overflow:"hidden" }}>
-          <div style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(rgba(196,168,130,0.08) 1px,transparent 1px)", backgroundSize:"18px 18px" }} />
-          <div style={{ position:"relative" }}>
-            <div style={{ fontSize:"11px", fontWeight:700, color:C.amber, textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:"8px" }}>TripCopycat</div>
-            <h2 style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:"26px", fontWeight:900, color:"#fff", margin:"0 0 8px", lineHeight:1.1 }}>How Does This Work?</h2>
-            <p style={{ fontSize:"13px", color:"rgba(255,255,255,0.72)", margin:0, lineHeight:1.65 }}>TripCopycat is built by travelers, for travelers. Share a trip you've taken — and copy the ones others have shared.</p>
-          </div>
-          <button onClick={onClose} style={{ position:"absolute", top:"16px", right:"16px", background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.2)", color:"rgba(255,255,255,0.8)", borderRadius:"50%", width:"32px", height:"32px", cursor:"pointer", fontSize:"16px", display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
-        </div>
-
-        {/* Steps */}
-        <div style={{ padding:"24px 32px" }}>
-
-          {/* Step 1 */}
-          <div style={{ display:"flex", gap:"16px" }}>
-            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0 }}>
-              <div style={{ width:"38px", height:"38px", borderRadius:"50%", background:C.seafoam, border:`1px solid ${C.tide}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"16px" }}>📝</div>
-              <div style={{ width:"2px", flex:1, background:C.tide, marginTop:"6px", minHeight:"24px" }} />
-            </div>
-            <div style={{ paddingTop:"6px", paddingBottom:"20px" }}>
-              <div style={{ fontSize:"13px", fontWeight:700, color:C.slate, marginBottom:"3px" }}>Step 1 — Share a trip you've taken</div>
-              <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.65 }}>Been somewhere great? Brain dump what you remember — hotels, restaurants, highlights, honest takes — and our AI fills in the structure. Add photos and submit. This is what makes the community work.</div>
-            </div>
-          </div>
-
-          {/* Step 2 */}
-          <div style={{ display:"flex", gap:"16px" }}>
-            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0 }}>
-              <div style={{ width:"38px", height:"38px", borderRadius:"50%", background:C.seafoam, border:`1px solid ${C.tide}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"16px" }}>🗺</div>
-              <div style={{ width:"2px", flex:1, background:C.tide, marginTop:"6px", minHeight:"24px" }} />
-            </div>
-            <div style={{ paddingTop:"6px", paddingBottom:"20px" }}>
-              <div style={{ fontSize:"13px", fontWeight:700, color:C.slate, marginBottom:"3px" }}>Step 2 — Your trip becomes a Blueprint</div>
-              <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.65 }}>Once approved, your trip gets AI-generated venue alternatives and a pinned Google Maps export — becoming a Blueprint that other travelers can leverage to plan their own version of your trip.</div>
-            </div>
-          </div>
-
-          {/* Step 3 */}
-          <div style={{ display:"flex", gap:"16px" }}>
-            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0 }}>
-              <div style={{ width:"38px", height:"38px", borderRadius:"50%", background:C.seafoam, border:`1px solid ${C.tide}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"16px" }}>✈️</div>
-              <div style={{ width:"2px", flex:1, background:C.tide, marginTop:"6px", minHeight:"24px" }} />
-            </div>
-            <div style={{ paddingTop:"6px", paddingBottom:"14px" }}>
-              <div style={{ fontSize:"13px", fontWeight:700, color:C.slate, marginBottom:"3px" }}>Step 3 — Browse what others have shared</div>
-              <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.65 }}>Every trip on TripCopycat was submitted by a real traveler — hotels they actually stayed at, restaurants they genuinely loved, and honest takes on what they'd skip next time.</div>
-            </div>
-          </div>
-
-          {/* Substep — Unlock a Blueprint */}
-          <div style={{ display:"flex", gap:"14px", marginLeft:"18px" }}>
-            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0, width:"20px" }}>
-              <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:C.cta, marginTop:"5px", flexShrink:0 }} />
-            </div>
-            <div style={{ paddingTop:"2px" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px" }}>
-                <div style={{ fontSize:"12px", fontWeight:700, color:C.slate }}>Unlock a Blueprint</div>
-                <div style={{ fontSize:"10px", fontWeight:700, background:C.seafoam, color:C.amber, border:`1px solid ${C.cta}`, padding:"1px 7px", borderRadius:"20px" }}>$1.99</div>
-              </div>
-              <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
-                <div style={{ display:"flex", alignItems:"flex-start", gap:"8px" }}>
-                  <span style={{ fontSize:"13px", flexShrink:0, marginTop:"1px" }}>📍</span>
-                  <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.55 }}><span style={{ fontWeight:700, color:C.slate }}>Custom Google Maps pin map</span> — every hotel, restaurant, bar, and activity dropped as a color-coded pin. Open directly in Google Maps on your phone.</div>
-                </div>
-                <div style={{ display:"flex", alignItems:"flex-start", gap:"8px" }}>
-                  <span style={{ fontSize:"13px", flexShrink:0, marginTop:"1px" }}>📄</span>
-                  <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.55 }}><span style={{ fontWeight:700, color:C.slate }}>Printable PDF</span> — the full itinerary, venue details, and tips in one clean document. Print it, save it, or pull it up offline.</div>
-                </div>
-                <div style={{ display:"flex", alignItems:"flex-start", gap:"8px" }}>
-                  <span style={{ fontSize:"13px", flexShrink:0, marginTop:"1px" }}>🔗</span>
-                  <div style={{ fontSize:"12px", color:C.slateLight, lineHeight:1.55 }}><span style={{ fontWeight:700, color:C.slate }}>Shareable link</span> — send your Blueprint to a travel partner so everyone has everything in one place.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        {/* CTAs */}
-        <div style={{ padding:"16px 32px 28px", display:"flex", gap:"10px", flexWrap:"wrap" }}>
-          <button onClick={() => { onClose(); onSubmit(); }} style={{ flex:1, minWidth:"140px", padding:"12px 20px", borderRadius:"10px", border:"none", background:C.slate, color:"#fff", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-            Share a Trip You've Taken →
-          </button>
-          <button onClick={() => { window.location.href = "/blueprint/sample"; }} style={{ flex:1, minWidth:"140px", padding:"12px 20px", borderRadius:"10px", border:`2px solid ${C.amber}`, background:"transparent", color:C.amber, fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
-            ▲ See a Sample Blueprint
-          </button>
-        </div>
-
-      </div>
-    </div>
-  );
-}
-
 // ── App ───────────────────────────────────────────────────────────────────────
-
-
-// ── Toast Notification ────────────────────────────────────────────────────────
-function Toast() {
-  const [toasts, setToasts] = React.useState([]);
-  React.useEffect(() => {
-    window.__toast = (msg) => {
-      const id = Date.now();
-      setToasts(p => [...p, { id, msg }]);
-      setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 2500);
-    };
-    return () => { window.__toast = null; };
-  }, []);
-  if (!toasts.length) return null;
-  return (
-    <div style={{ position:"fixed", bottom:"80px", left:"50%", transform:"translateX(-50%)", zIndex:9000, display:"flex", flexDirection:"column", gap:"8px", alignItems:"center", pointerEvents:"none" }}>
-      {toasts.map(t => (
-        <div key={t.id} style={{ background:C.slate, color:C.white, padding:"10px 20px", borderRadius:"20px", fontSize:"13px", fontWeight:600, boxShadow:"0 4px 16px rgba(28,43,58,0.25)", whiteSpace:"nowrap", animation:"toast-in .2s ease" }}>
-          {t.msg}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export default function App() {
   const [showGear, setShowGear] = useState(window.location.pathname === "/gear");
-  const [showHowItWorks, setShowHowItWorks] = useState(false);
+  const [showSampleBlueprint, setShowSampleBlueprint] = useState(window.location.pathname === "/blueprint/sample");
   const [trips, setTrips] = useState(SAMPLE_TRIPS);
   const [dbTrips, setDbTrips] = useState(() => {
     try {
@@ -4728,28 +3998,25 @@ export default function App() {
     } catch { return []; }
   });
 
-  const blueprintMatch = window.location.pathname.match(/^\/blueprint\/(?!sample)(.+)/);
+  // Blueprint route detection
+  if (showSampleBlueprint) {
+    return <SampleBlueprintPage onClose={() => { setShowSampleBlueprint(false); window.history.pushState(null, "", "/"); }} />;
+  }
+
+  const blueprintMatch = window.location.pathname.match(/^\/blueprint\/(.+)/);
   const blueprintId = blueprintMatch ? blueprintMatch[1] : null;
   if (blueprintId) {
     return <BlueprintPage tripId={blueprintId} onClose={() => { window.history.pushState(null, "", "/"); window.location.reload(); }} />;
   }
   const [tripsLoading, setTripsLoading] = useState(true);
-  const [foundingCopycats, setFoundingCopycats] = useState(new Set());
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [searchDebounced, setSearchDebounced] = useState("");
-  const sentinelRef = useRef(null);
   const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
-  const [submitLocalMode, setSubmitLocalMode] = useState(false);
   const [photoImportData, setPhotoImportData] = useState(null);
   const [pendingSubmit, setPendingSubmit] = useState(false);
   // Force login before submitting
-  const openSubmit = (localMode = false) => {
-    setSubmitLocalMode(localMode);
+  const openSubmit = () => {
     if (!currentUser) { setPendingSubmit(true); setShowAuth(true); }
     else setShowSubmit(true);
   };
@@ -4758,7 +4025,6 @@ export default function App() {
   const [region, setRegion] = useState("All Regions");
   const [tag, setTag] = useState("All");
   const [sortBy, setSortBy] = useState("default");
-  const [weekenderOnly, setWeekenderOnly] = useState(false);
   const [duration, setDuration] = useState("Any Length");
   const { bookmarks, toggle: toggleBookmark } = useBookmarks();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
@@ -4778,121 +4044,37 @@ export default function App() {
   useEffect(() => { window.__setViewingProfile = setViewingProfile; }, []);
 
 
-  const PAGE_SIZE = 20;
-
-  const mapTrip = t => ({
-    id:t.id, title:t.title, destination:t.destination, region:t.region,
-    author:t.author_name, date:t.date, duration:t.duration, travelers:t.travelers,
-    tags:t.tags||[], loves:t.loves, doNext:t.do_next,
-    airfare:t.airfare||[], hotels:t.hotels||[], restaurants:t.restaurants||[],
-    bars:t.bars||[], activities:t.activities||[], days:t.days||[],
-    image:t.image??null, userId:t.user_id||null, featured:t.featured||false,
-    focalPoint:t.focal_point||{x:50,y:50}, gallery:t.gallery||[],
-    likes_count:t.likes_count||0, stay:t.stay||null
-  });
-
   const fetchTrips = () => {
     setTripsLoading(true);
-    setPage(0);
-    setHasMore(true);
-    supabase.from("trips").select("*").eq("status","published")
-      .order("created_at", { ascending: false })
-      .range(0, PAGE_SIZE - 1)
+    supabase.from("trips").select("*").eq("status","published").order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error) console.error("Supabase fetch error:", error);
-        if (data) {
-          const mapped = data.map(mapTrip);
+        if (data?.length > 0) {
+          const mapped = data.map(t => ({
+            id:t.id, title:t.title, destination:t.destination, region:t.region,
+            author:t.author_name, date:t.date, duration:t.duration, travelers:t.travelers,
+            tags:t.tags||[], loves:t.loves, doNext:t.do_next,
+            airfare:t.airfare||[], hotels:t.hotels||[], restaurants:t.restaurants||[],
+            bars:t.bars||[], activities:t.activities||[], days:t.days||[],
+            image:t.image??null, userId:t.user_id||null, featured:t.featured||false, focalPoint:t.focal_point||{x:50,y:50}, gallery:t.gallery||[]
+          }));
           setDbTrips(mapped);
-          setHasMore(data.length === PAGE_SIZE);
           try { localStorage.setItem("tc_trips_cache", JSON.stringify(mapped)); } catch {}
         }
         setTripsLoading(false);
-        supabase.from("profiles").select("display_name").eq("founding_copycat", true)
-          .then(({ data: founders }) => {
-            if (founders?.length) {
-              setFoundingCopycats(new Set(founders.map(f => (f.display_name || "").toLowerCase())));
-            }
-          });
       });
   };
 
-  const fetchMoreTrips = (currentPage) => {
-    if (loadingMore || !hasMore) return;
-    setLoadingMore(true);
-    const nextPage = currentPage + 1;
-    supabase.from("trips").select("*").eq("status","published")
-      .order("created_at", { ascending: false })
-      .range(nextPage * PAGE_SIZE, nextPage * PAGE_SIZE + PAGE_SIZE - 1)
-      .then(({ data, error }) => {
-        if (error) console.error("Supabase fetch more error:", error);
-        if (data?.length) {
-          setDbTrips(p => {
-            const existingIds = new Set(p.map(t => t.id));
-            const newTrips = data.map(mapTrip).filter(t => !existingIds.has(t.id));
-            return [...p, ...newTrips];
-          });
-          setHasMore(data.length === PAGE_SIZE);
-          setPage(nextPage);
-        } else {
-          setHasMore(false);
-        }
-        setLoadingMore(false);
-      });
-  };
-
-  const searchTrips = (term) => {
-    if (!term.trim()) { fetchTrips(); return; }
-    setTripsLoading(true);
-    supabase.from("trips").select("*").eq("status","published")
-      .or(`title.ilike.%${term}%,destination.ilike.%${term}%,loves.ilike.%${term}%,travelers.ilike.%${term}%`)
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (error) console.error("Supabase search error:", error);
-        setDbTrips(data ? data.map(mapTrip) : []);
-        setHasMore(false);
-        setTripsLoading(false);
-      });
-  };
   useEffect(() => {
     fetchTrips();
     trackEvent("page_view", { path: window.location.pathname });
   }, []);
 
-  // Debounce search — 300ms after user stops typing
-  useEffect(() => {
-    const timer = setTimeout(() => setSearchDebounced(search), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  // When debounced search changes: server-side search or reset to paginated
-  useEffect(() => {
-    if (searchDebounced) {
-      searchTrips(searchDebounced);
-    } else if (searchDebounced === "" && !tripsLoading) {
-      fetchTrips();
-    }
-  }, [searchDebounced]);
-
-  // IntersectionObserver — load more when sentinel div enters viewport
-  useEffect(() => {
-    if (!sentinelRef.current) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && !searchDebounced) {
-          fetchMoreTrips(page);
-        }
-      },
-      { rootMargin: "200px" }
-    );
-    observer.observe(sentinelRef.current);
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, page, searchDebounced]);
-
-  const openTrip = (trip) => { setSelected(trip); window.history.pushState(null, "", `/trip/${trip.id}`); document.title = `${trip.title} | TripCopycat`; trackEvent("trip_view", { trip_id: String(trip.id), title: trip.title, region: trip.region }); };
-  const closeTrip = () => { setSelected(null); window.history.pushState(null, "", "/"); document.title = "TripCopycat | Real Itineraries from Real Travelers"; window.__closeTripModal = null; };
+  const openTrip = (trip) => { setSelected(trip); window.history.pushState(null, "", `/trip/${trip.id}`); trackEvent("trip_view", { trip_id: String(trip.id), title: trip.title, region: trip.region }); };
+  const closeTrip = () => { setSelected(null); window.history.pushState(null, "", "/"); window.__closeTripModal = null; };
   useEffect(() => { window.__closeTripModal = selected ? closeTrip : null; }, [selected]);
 
-  const allTrips = [...dbTrips, ...trips].filter((t, i, arr) => arr.findIndex(x => x.id === t.id) === i);
+  const allTrips = [...dbTrips, ...trips];
 
   // On first load, open trip modal if server injected __INITIAL_TRIP_ID__
   useEffect(() => {
@@ -5040,27 +4222,23 @@ export default function App() {
   };
 
   const filtered = useMemo(() => {
-    let f = allTrips.filter(t =>
-      (!searchDebounced || [t.title,t.destination,t.travelers,t.loves].some(s=>s?.toLowerCase().includes(searchDebounced.toLowerCase()))) &&
+    const f = allTrips.filter(t =>
+      (!search || [t.title,t.destination,t.travelers,t.loves].some(s=>s.toLowerCase().includes(search.toLowerCase()))) &&
       (region==="All Regions"||t.region===region) &&
       (tag==="All"||tag==="__bookmarks__"?true:t.tags.includes(tag)) &&
       (tag!=="__bookmarks__"||bookmarks.includes(t.id)) &&
       matchesDuration(t, duration)
     );
     if (sortBy === "submitter") f.sort((a,b) => a.author.localeCompare(b.author));
-    else if (sortBy === "destination" || sortBy === "city") f.sort((a,b) => a.destination.localeCompare(b.destination));
+    else if (sortBy === "destination") f.sort((a,b) => a.destination.localeCompare(b.destination));
     else if (sortBy === "duration") f.sort((a,b) => parseInt(a.duration)||0 - (parseInt(b.duration)||0));
-    else if (sortBy === "likes") f.sort((a,b) => (b.likes_count||0) - (a.likes_count||0));
-    if (weekenderOnly) f = f.filter(t => t.duration === "Weekend");
     return f;
-  }, [dbTrips, trips, searchDebounced, region, tag, sortBy, duration, bookmarks, weekenderOnly]);
+  }, [dbTrips, trips, search, region, tag, sortBy, duration, bookmarks]);
 
   return (
-    <ErrorBoundary>
     <div style={{ minHeight:"100vh", background:C.seafoam, fontFamily:"'Nunito',system-ui,sans-serif", overflowX:"hidden" }}>
       <GlobalStyles />
       <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,700&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-      <Toast />
 
       {/* Admin banner */}
       {isAdmin && (
@@ -5099,7 +4277,6 @@ export default function App() {
               {isMobile ? "+" : "+ Submit a Trip"}
               {hasDraft && <span style={{ position:"absolute", top:"-4px", right:"-4px", width:"8px", height:"8px", borderRadius:"50%", background:C.amber, border:`1.5px solid ${C.white}` }} />}
             </button>}
-            {!isAdmin && !isMobile && <button onClick={() => openSubmit(true)} style={{ background:C.cta, color:C.ctaText, border:"none", borderRadius:"6px", padding:"6px 14px", fontSize:"11px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>🏙️ My City</button>}
             {isAdmin && <button onClick={() => setShowAnalytics(true)} style={{ background:"rgba(91,143,185,0.12)", color:C.azureDeep, border:`1px solid ${C.azure}44`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>📊 Analytics</button>}
             {isAdmin && <button onClick={() => setShowQueue(true)} style={{ background:C.amberBg, color:C.amber, border:`1px solid ${C.amber}44`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>📋 Queue</button>}
             {isAdmin && <button onClick={() => setShowImport(true)} style={{ background:C.seafoam, color:C.slateMid, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>🤖 Import</button>}
@@ -5117,78 +4294,39 @@ export default function App() {
       {/* Hero — Warm Nomad */}
       <div style={{ background:C.seafoam, padding:"16px 0 14px", margin:"0", textAlign:"center", position:"relative", overflow:"hidden", borderBottom:`1px solid ${C.tide}` }}>
         <div style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(circle at 20% 50%, rgba(196,168,130,0.08) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(193,105,42,0.06) 0%, transparent 50%)", pointerEvents:"none" }} />
-        {!isMobile && (
-          <div style={{ position:"absolute", left:"28px", top:"50%", transform:"translateY(-50%)", zIndex:10 }}>
-            <button onClick={() => setShowHowItWorks(true)} className="tc-btn" style={{ width:"120px", background:C.amber, border:"none", borderRadius:"12px", cursor:"pointer", padding:"16px 12px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"6px", boxShadow:"0 3px 14px rgba(193,105,42,0.3)", fontFamily:"'Nunito',sans-serif" }}>
-              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M16 4C11.582 4 8 7.582 8 12c0 2.8 1.4 5.274 3.556 6.8L12 22h8l.444-3.2C22.6 17.274 24 14.8 24 12c0-4.418-3.582-8-8-8z" fill="white"/>
-                <rect x="12" y="22" width="8" height="2" rx="1" fill="white"/>
-                <rect x="13" y="25" width="6" height="2" rx="1" fill="white"/>
-                <rect x="14" y="28" width="4" height="1.5" rx="0.75" fill="rgba(255,255,255,0.6)"/>
-              </svg>
-              <div style={{ fontSize:"11px", fontWeight:700, color:"#fff", lineHeight:1.3, textAlign:"center" }}>How Does<br/>This Work?</div>
-              <div style={{ fontSize:"9px", fontWeight:600, color:"rgba(255,255,255,0.8)", lineHeight:1.3, textAlign:"center" }}>Browse · Submit<br/>Unlock Blueprint</div>
-            </button>
-          </div>
-        )}
-
         <div style={{ position:"relative", maxWidth:"680px", margin:"0 auto", padding:"0 16px" }}>
           <h1 style={{ fontFamily:"'Playfair Display',Georgia,serif", fontSize:"clamp(22px,4.5vw,46px)", fontWeight:700, color:C.slate, margin:"0 0 10px", lineHeight:1.15, letterSpacing:"-0.01em" }}>
             Planned by others. Perfected by you.
           </h1>
-          <div style={{ display:"flex", gap:"10px", justifyContent:"center", alignItems:"center", flexWrap:"wrap", marginBottom:"12px" }}>
-            <button onClick={() => openSubmit()} style={{ background:C.amber, color:"#fff", border:`2px solid ${C.amber}`, borderRadius:"6px", padding:"9px 20px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif" }}>
+          <div style={{ display:"flex", gap:"8px", justifyContent:"center", alignItems:"center", flexWrap:"wrap", marginBottom:"12px" }}>
+            <button onClick={() => { const el = document.getElementById("trip-grid"); if(el) el.scrollIntoView({ behavior:"smooth" }); }} style={{ background:C.amber, color:C.slate, border:`1.5px solid ${C.amber}`, borderRadius:"6px", padding:"7px 16px", fontSize:"12px", fontWeight:500, cursor:"pointer", fontFamily:"'Nunito',sans-serif", letterSpacing:"0.01em" }}>
+              Leverage a Copycat
+            </button>
+            <button onClick={() => openSubmit()} style={{ background:"transparent", color:C.slate, border:`1.5px solid ${C.slate}`, borderRadius:"6px", padding:"7px 16px", fontSize:"12px", fontWeight:500, cursor:"pointer", fontFamily:"'Nunito',sans-serif", letterSpacing:"0.01em" }}>
               Submit a Trip →
             </button>
-            <button onClick={() => openSubmit(true)} style={{ background:C.slate, color:C.white, border:`2px solid ${C.slate}`, borderRadius:"6px", padding:"9px 18px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", display:"inline-flex", alignItems:"center", gap:"6px" }}>
-              🏙️ Best of My City
-            </button>
-            <button onClick={() => { window.location.href = "/blueprint/sample"; }} style={{ background:"transparent", color:C.amber, border:`2px solid ${C.amber}`, borderRadius:"6px", padding:"9px 18px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", display:"inline-flex", alignItems:"center", gap:"6px" }}>
-              <span style={{ fontSize:"11px" }}>▲</span>
+            <button onClick={() => { setShowSampleBlueprint(true); window.history.pushState(null, "", "/blueprint/sample"); }} style={{ background:"#FAF7F2", color:"#1C2B3A", border:"2px solid #C4A882", borderRadius:"6px", padding:"7px 14px", fontSize:"12px", fontWeight:700, cursor:"pointer", fontFamily:"'Nunito',sans-serif", display:"inline-flex", alignItems:"center", gap:"6px" }}>
+              <span style={{ display:"inline-block", transform:"rotate(-45deg)", fontSize:"12px", lineHeight:1, color:"#C4A882" }}>▲</span>
               Sample Blueprint
-              <span style={{ background:C.amber, color:"#fff", fontSize:"9px", fontWeight:700, padding:"1px 6px", borderRadius:"20px" }}>FREE</span>
+              <span style={{ background:"#C4A882", color:"#1C2B3A", fontSize:"9px", fontWeight:700, padding:"1px 6px", borderRadius:"20px" }}>FREE</span>
             </button>
           </div>
           <div style={{ maxWidth:"500px", margin:"0 auto", position:"relative" }}>
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search destinations, trips, activities…" style={{ width:"100%", padding:"10px 18px 10px 42px", borderRadius:"50px", border:`1.5px solid ${C.tide}`, fontSize:"13px", outline:"none", boxSizing:"border-box", background:C.white, color:C.slate, boxShadow:`0 2px 12px rgba(28,43,58,0.07)`, fontFamily:"'Nunito',sans-serif" }} />
             <span style={{ position:"absolute", left:"14px", top:"50%", transform:"translateY(-50%)", fontSize:"14px" }}>🔍</span>
           </div>
-          {isMobile && (
-            <button onClick={() => setShowHowItWorks(true)} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", width:"100%", maxWidth:"500px", margin:"10px auto 0", padding:"11px 18px", background:C.slate, borderRadius:"10px", border:"none", cursor:"pointer", fontFamily:"'Nunito',sans-serif", textAlign:"left" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-                <div style={{ width:"28px", height:"28px", borderRadius:"50%", background:"rgba(255,255,255,0.12)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                    <svg width="16" height="16" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M16 4C11.582 4 8 7.582 8 12c0 2.8 1.4 5.274 3.556 6.8L12 22h8l.444-3.2C22.6 17.274 24 14.8 24 12c0-4.418-3.582-8-8-8z" fill="white"/>
-                      <rect x="12" y="22" width="8" height="2" rx="1" fill="white"/>
-                      <rect x="13" y="25" width="6" height="2" rx="1" fill="white"/>
-                      <rect x="14" y="28" width="4" height="1.5" rx="0.75" fill="rgba(255,255,255,0.6)"/>
-                    </svg>
-                  </div>
-                <div>
-                  <div style={{ fontSize:"12px", fontWeight:700, color:"#fff", lineHeight:1.2 }}>How Does This Work?</div>
-                  <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.6)", marginTop:"2px" }}>Browse trips · Submit yours · Unlock a Blueprint</div>
-                </div>
-              </div>
-              <span style={{ color:C.cta, fontSize:"16px", fontWeight:700, flexShrink:0 }}>→</span>
-            </button>
-          )}
         </div>
       </div>
 
       {/* Main layout — sidebar + grid */}
       <div style={{ maxWidth:"100%", padding:"20px 16px", display:"flex", gap:"24px", alignItems:"flex-start", boxSizing:"border-box" }}>
 
-        {/* Left Sidebar — desktop: sticky column, mobile: fixed overlay */}
+        {/* Left Sidebar */}
         {sidebarOpen && (
-          <aside style={ isMobile ? {
-            position:"fixed", inset:0, zIndex:300, background:C.seafoam, overflowY:"auto",
-            WebkitOverflowScrolling:"touch", padding:"16px", boxSizing:"border-box"
-          } : {
-            width:"220px", flexShrink:0, position:"sticky", top:"68px"
-          }}>
+          <aside style={{ width:"220px", flexShrink:0, position:"sticky", top:"68px" }}>
             {/* Collapse button */}
-            <button onClick={() => setSidebarOpen(false)} onTouchEnd={e => { e.preventDefault(); setSidebarOpen(false); }} style={{ width:"100%", padding:"10px 14px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.muted, fontSize:"12px", fontWeight:600, cursor:"pointer", marginBottom:"16px", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center", touchAction:"manipulation", WebkitTapHighlightColor:"transparent" }}>
-              <span>Hide filters</span><span style={{ fontSize:"16px", lineHeight:1 }}>×</span>
+            <button onClick={() => setSidebarOpen(false)} style={{ width:"100%", padding:"7px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:C.white, color:C.muted, fontSize:"11px", fontWeight:600, cursor:"pointer", marginBottom:"14px", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span>Hide sidebar</span><span>←</span>
             </button>
 
             {/* Trip type filter */}
@@ -5257,7 +4395,7 @@ export default function App() {
 
         {/* Expand sidebar button when collapsed */}
         {!sidebarOpen && (
-          <button onClick={() => setSidebarOpen(true)} onTouchEnd={e => { e.preventDefault(); setSidebarOpen(true); }} style={{ position:"fixed", left:"16px", top:"50%", transform:"translateY(-50%)", zIndex:150, background:C.white, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"10px 8px", cursor:"pointer", fontSize:"11px", color:C.muted, boxShadow:`0 2px 8px rgba(44,62,80,0.1)`, writingMode:"vertical-rl", WebkitTapHighlightColor:"transparent", touchAction:"manipulation" }}>
+          <button onClick={() => setSidebarOpen(true)} style={{ position:"fixed", left:"16px", top:"50%", transform:"translateY(-50%)", zIndex:50, background:C.white, border:`1px solid ${C.tide}`, borderRadius:"8px", padding:"8px 6px", cursor:"pointer", fontSize:"11px", color:C.muted, boxShadow:`0 2px 8px rgba(44,62,80,0.1)`, writingMode:"vertical-rl" }}>
             Filters →
           </button>
         )}
@@ -5339,17 +4477,12 @@ export default function App() {
               <button onClick={() => { setRegion("All Regions"); setTag("All"); setDuration("Any Length"); }} style={{ fontSize:"11px", color:C.amber, background:"none", border:"none", cursor:"pointer", fontWeight:600 }}>Clear filters ×</button>
             )}
             <div style={{ display:"flex", alignItems:"center", gap:"5px" }}>
-              <button onClick={()=>{ setWeekenderOnly(w=>!w); if(!weekenderOnly) setSortBy("default"); }} style={{ fontSize:"11px", fontWeight:700, padding:"3px 10px", borderRadius:"20px", border:`1px solid ${weekenderOnly?C.amber:C.tide}`, background:weekenderOnly?C.amberBg:C.white, color:weekenderOnly?C.amber:C.slateLight, cursor:"pointer" }}>🏙️ Weekender{weekenderOnly?" ×":""}</button>
-            </div>
-            <div style={{ display:"flex", alignItems:"center", gap:"5px" }}>
               <span style={{ fontSize:"11px", color:C.muted }}>Sort:</span>
               <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{ fontSize:"11px", fontWeight:600, color:C.slate, border:`1px solid ${C.tide}`, borderRadius:"6px", padding:"3px 7px", background:C.white, cursor:"pointer", outline:"none", fontFamily:"inherit" }}>
                 <option value="default">Default</option>
-                <option value="likes">Most Loved</option>
-                {weekenderOnly && <option value="city">By City</option>}
-                {!weekenderOnly && <option value="submitter">By Submitter</option>}
-                {!weekenderOnly && <option value="destination">By Destination</option>}
-                {!weekenderOnly && <option value="duration">By Duration</option>}
+                <option value="submitter">By Submitter</option>
+                <option value="destination">By Destination</option>
+                <option value="duration">By Duration</option>
               </select>
             </div>
           </div>
@@ -5375,16 +4508,12 @@ export default function App() {
                 )}
               </div>
             ))}
-            {tripsLoading && Array.from({length:8}).map((_,i) => (
-              <div key={i} style={{ background:C.white, border:`1px solid ${C.tide}`, borderRadius:"16px", overflow:"hidden" }}>
-                <div style={{ height:"148px", background:`linear-gradient(90deg, ${C.seafoam} 25%, ${C.tide} 50%, ${C.seafoam} 75%)`, backgroundSize:"200% 100%", animation:"skeleton-shimmer 1.4s ease infinite" }} />
-                <div style={{ padding:"16px 18px" }}>
-                  <div style={{ height:"12px", borderRadius:"6px", background:`linear-gradient(90deg, ${C.seafoam} 25%, ${C.tide} 50%, ${C.seafoam} 75%)`, backgroundSize:"200% 100%", animation:"skeleton-shimmer 1.4s ease infinite", marginBottom:"10px", width:"60%" }} />
-                  <div style={{ height:"10px", borderRadius:"6px", background:`linear-gradient(90deg, ${C.seafoam} 25%, ${C.tide} 50%, ${C.seafoam} 75%)`, backgroundSize:"200% 100%", animation:"skeleton-shimmer 1.4s ease infinite", marginBottom:"8px", width:"80%" }} />
-                  <div style={{ height:"10px", borderRadius:"6px", background:`linear-gradient(90deg, ${C.seafoam} 25%, ${C.tide} 50%, ${C.seafoam} 75%)`, backgroundSize:"200% 100%", animation:"skeleton-shimmer 1.4s ease infinite", width:"40%" }} />
-                </div>
+            {tripsLoading && (
+              <div style={{ gridColumn:"1/-1", textAlign:"center", padding:"56px 20px", color:C.muted }}>
+                <div style={{ fontSize:"32px", marginBottom:"12px" }}>🐾</div>
+                <div style={{ fontSize:"14px", fontWeight:600, color:C.slateLight }}>Loading itineraries…</div>
               </div>
-            ))}
+            )}
             {!tripsLoading && filtered.length===0 && (
               <div style={{ gridColumn:"1/-1", textAlign:"center", padding:"56px 20px", color:C.muted }}>
                 <div style={{ fontSize:"38px", marginBottom:"12px" }}>✈️</div>
@@ -5392,14 +4521,6 @@ export default function App() {
               </div>
             )}
           </div>
-
-          {/* Infinite scroll sentinel */}
-          <div ref={sentinelRef} style={{ height:"1px" }} />
-          {loadingMore && (
-            <div style={{ textAlign:"center", padding:"24px", color:C.muted, fontSize:"13px" }}>
-              Loading more itineraries…
-            </div>
-          )}
         </main>
       </div>
 
@@ -5418,12 +4539,11 @@ export default function App() {
         </div>
       )}
 
-      {showHowItWorks && <HowItWorksModal onClose={() => setShowHowItWorks(false)} onSubmit={openSubmit} />}
       {showGear     && <GearPage onClose={() => { setShowGear(false); window.history.pushState(null, "", "/"); }} />}
-      {selected      && <TripModal trip={selected} onClose={closeTrip} allTrips={allTrips} isBookmarked={bookmarks.includes(selected.id)} onBookmark={toggleBookmark} isAdmin={isAdmin} />}
+      {selected      && <TripModal trip={selected} onClose={closeTrip} allTrips={allTrips} isBookmarked={bookmarks.includes(selected.id)} onBookmark={toggleBookmark} isAdmin={isAdmin} currentUser={currentUser} />}
       {showAdd       && <AddTripModal onClose={() => setShowAdd(false)} onAdd={t => setTrips(p=>[t,...p])} />}
       {showImport    && <SmartImportHub onClose={() => setShowImport(false)} onPhotoComplete={(data) => { setPhotoImportData(data); setShowImport(false); openSubmit(); }} />}
-      {showSubmit    && <SubmitTripModal onClose={() => { setShowSubmit(false); setPhotoImportData(null); setSubmitLocalMode(false); }} currentUser={currentUser} displayName={currentDisplayName} onSubmitSuccess={fetchTrips} prefillData={photoImportData} localMode={submitLocalMode} />}
+      {showSubmit    && <SubmitTripModal onClose={() => { setShowSubmit(false); setPhotoImportData(null); }} currentUser={currentUser} displayName={currentDisplayName} onSubmitSuccess={fetchTrips} prefillData={photoImportData} />}
       {showAuth      && <AuthModal onClose={() => setShowAuth(false)} onSuccess={handleAuthSuccess} />}
       {showResetPassword && <ResetPasswordModal onClose={() => setShowResetPassword(false)} />}
       {viewingProfile && <ProfilePage authorName={viewingProfile} allTrips={allTrips} onClose={() => setViewingProfile(null)} onTripClick={openTrip} currentUser={currentUser} onEditTrip={(trip) => setEditingTrip(trip)} onDeleteTrip={(trip) => setConfirmDelete(trip)} />}
@@ -5447,6 +4567,5 @@ export default function App() {
         <button onClick={() => setShowLegal(true)} style={{ fontSize:"11px", color:C.muted, background:"none", border:"none", cursor:"pointer", textDecoration:"underline", fontFamily:"inherit" }}>Terms of Service</button>
       </footer>
     </div>
-    </ErrorBoundary>
   );
 }
