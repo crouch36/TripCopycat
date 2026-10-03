@@ -3781,7 +3781,21 @@ function PlannerPage({ onClose, currentUser, isAdmin }) {
       updated.days.forEach((day, di) => {
         const dayDate = new Date(day.date);
         if (dayDate >= checkIn && dayDate < checkOut) {
-          updated.days[di].items = [...(updated.days[di].items || []), { ...stop, id: Date.now() + di, time: di === updated.days.findIndex(d=>d.date===newStop.checkIn) ? "Check-in" : di === updated.days.findIndex(d=>new Date(d.date) >= checkOut) - 1 ? "Check-out" : "Overnight" }];
+          const isFirst = day.date === newStop.checkIn;
+          const isLast = new Date(day.date) >= new Date(new Date(newStop.checkOut).getTime() - 86400000) && new Date(day.date) < checkOut;
+          updated.days[di].items = [...(updated.days[di].items || []), { ...stop, id: Date.now() + di, time: isFirst ? `Check-in ${newStop.time||""}`.trim() : isLast ? "Check-out" : "Overnight" }];
+        }
+      });
+    } else if (newStop.type === "flight" && newStop.checkIn && newStop.checkOut && newStop.checkIn !== newStop.checkOut) {
+      // Add departure stop on departure day, arrival stop on arrival day
+      updated.days.forEach((day, di) => {
+        if (day.date === newStop.checkIn) {
+          updated.days[di].items = [...(updated.days[di].items || []), { ...stop, id: Date.now() + di, time: newStop.time, note: `Departs ${newStop.time}${newStop.layover ? " · " + newStop.layover : ""}` }];
+        }
+        if (day.date === newStop.checkOut) {
+          // Reverse route for arrival card
+          const arrivalRoute = newStop.flightRoute ? newStop.flightRoute.split("→").reverse().map(s=>s.trim()).join(" → ") : "";
+          updated.days[di].items = [...(updated.days[di].items || []), { ...stop, id: Date.now() + di + 1, flightRoute: arrivalRoute || newStop.flightRoute, time: newStop.arrivalTime, note: `Arrives ${newStop.arrivalTime}` }];
         }
       });
     } else {
@@ -4065,6 +4079,19 @@ Email: ${emailText.slice(0,3000)}`;
                 {[["label","Airline (e.g. Air Canada)"],["flightRoute","Route (e.g. CLE → MAD)"],["flightNumber","Flight number (e.g. AC 785)"],["time","Departure time (e.g. 2:40 PM)"],["arrivalTime","Arrival time (e.g. 11:30 AM next day)"],["layover","Layover (e.g. via YUL — 2.5 hrs)"],["confirmationNo","Confirmation / booking code"],["note","Notes"]].map(([field, placeholder]) => (
                   <input key={field} value={newStop[field]||""} onChange={e=>setNewStop(p=>({...p,[field]:e.target.value}))} placeholder={placeholder} style={{ width:"100%", padding:"9px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"13px", marginBottom:"10px", boxSizing:"border-box", fontFamily:"inherit", outline:"none" }} />
                 ))}
+                <div style={{ background:C.seafoam, borderRadius:"10px", padding:"12px", marginBottom:"10px" }}>
+                  <div style={{ fontSize:"11px", fontWeight:700, color:"#5B8FB9", marginBottom:"8px", textTransform:"uppercase", letterSpacing:"0.08em" }}>✈️ Auto-add to departure & arrival days</div>
+                  <div style={{ display:"flex", gap:"8px" }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:"11px", color:C.muted, marginBottom:"4px" }}>Departure date</div>
+                      <input type="date" value={newStop.checkIn||""} onChange={e=>setNewStop(p=>({...p,checkIn:e.target.value}))} style={{ width:"100%", padding:"8px 10px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"13px", boxSizing:"border-box", fontFamily:"inherit", outline:"none" }} />
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:"11px", color:C.muted, marginBottom:"4px" }}>Arrival date</div>
+                      <input type="date" value={newStop.checkOut||""} onChange={e=>setNewStop(p=>({...p,checkOut:e.target.value}))} style={{ width:"100%", padding:"8px 10px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"13px", boxSizing:"border-box", fontFamily:"inherit", outline:"none" }} />
+                    </div>
+                  </div>
+                </div>
               </>
             ) : (
               [["label","Name *"],["address","Address"],["time","Time (e.g. 5:00 PM check-in)"],["bookingService","Booking service (Airbnb, Direct, etc.)"],["confirmationNo","Confirmation #"],["note","Notes"]].map(([field, placeholder]) => (
@@ -4104,9 +4131,15 @@ Email: ${emailText.slice(0,3000)}`;
                 <button key={key} onClick={() => setEditingStop(p=>({...p, stop:{...p.stop, type:key}}))} style={{ padding:"5px 10px", borderRadius:"20px", border:`1.5px solid ${editingStop.stop.type===key ? cfg.color : C.tide}`, background: editingStop.stop.type===key ? cfg.color+"22" : "transparent", color: editingStop.stop.type===key ? cfg.color : C.muted, fontSize:"11px", fontWeight:600, cursor:"pointer" }}>{cfg.icon} {cfg.label}</button>
               ))}
             </div>
-            {[["label","Name *"],["address","Address"],["time","Time"],["bookingService","Booking service (Airbnb, Direct, etc.)"],["confirmationNo","Confirmation #"],["note","Notes"]].map(([field, placeholder]) => (
-              <input key={field} value={editingStop.stop[field]||""} onChange={e=>setEditingStop(p=>({...p, stop:{...p.stop, [field]:e.target.value}}))} placeholder={placeholder} style={{ width:"100%", padding:"9px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"13px", marginBottom:"10px", boxSizing:"border-box", fontFamily:"inherit", outline:"none" }} />
-            ))}
+            {editingStop.stop.type === "flight" ? (
+              [["label","Airline (e.g. Air Canada)"],["flightRoute","Route (e.g. CLE → MAD)"],["flightNumber","Flight number (e.g. AC 785)"],["time","Departure time (e.g. 2:40 PM)"],["arrivalTime","Arrival time (e.g. 11:30 AM next day)"],["layover","Layover (e.g. via YUL — 2.5 hrs)"],["confirmationNo","Confirmation / booking code"],["note","Notes"]].map(([field, placeholder]) => (
+                <input key={field} value={editingStop.stop[field]||""} onChange={e=>setEditingStop(p=>({...p, stop:{...p.stop, [field]:e.target.value}}))} placeholder={placeholder} style={{ width:"100%", padding:"9px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"13px", marginBottom:"10px", boxSizing:"border-box", fontFamily:"inherit", outline:"none" }} />
+              ))
+            ) : (
+              [["label","Name *"],["address","Address"],["time","Time"],["bookingService","Booking service (Airbnb, Direct, etc.)"],["confirmationNo","Confirmation #"],["note","Notes"]].map(([field, placeholder]) => (
+                <input key={field} value={editingStop.stop[field]||""} onChange={e=>setEditingStop(p=>({...p, stop:{...p.stop, [field]:e.target.value}}))} placeholder={placeholder} style={{ width:"100%", padding:"9px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"13px", marginBottom:"10px", boxSizing:"border-box", fontFamily:"inherit", outline:"none" }} />
+              ))
+            )}
             {editingStop.stop.type === "hotel" && (
               <div style={{ background:C.seafoam, borderRadius:"10px", padding:"12px", marginBottom:"10px" }}>
                 <div style={{ fontSize:"11px", fontWeight:700, color:C.amber, marginBottom:"8px", textTransform:"uppercase", letterSpacing:"0.08em" }}>🏨 Hotel Date Range</div>
