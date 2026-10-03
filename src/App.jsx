@@ -3716,7 +3716,7 @@ function PlannerPage({ onClose, currentUser, isAdmin }) {
   const [aiLoading, setAiLoading]   = useState(false);
   const [emailText, setEmailText]   = useState("");
   const [parsingEmail, setParsingEmail] = useState(false);
-  const [newStop, setNewStop] = useState({ type:"restaurant", time:"", label:"", address:"", note:"", confirmationNo:"", checkIn:"", checkOut:"", bookingService:"" });
+  const [newStop, setNewStop] = useState({ type:"restaurant", time:"", label:"", address:"", note:"", confirmationNo:"", checkIn:"", checkOut:"", bookingService:"", arrivalTime:"", flightRoute:"", flightNumber:"", layover:"" });
   const [editingStop, setEditingStop] = useState(null); // { dayIdx, stopIdx, stop }
 
   // Load saved trips
@@ -3789,7 +3789,7 @@ function PlannerPage({ onClose, currentUser, isAdmin }) {
     }
     setActiveTrip(updated);
     saveTrip(updated);
-    setNewStop({ type:"restaurant", time:"", label:"", address:"", note:"", confirmationNo:"", checkIn:"", checkOut:"", bookingService:"" });
+    setNewStop({ type:"restaurant", time:"", label:"", address:"", note:"", confirmationNo:"", checkIn:"", checkOut:"", bookingService:"", arrivalTime:"", flightRoute:"", flightNumber:"", layover:"" });
     setShowAddStop(false);
   };
 
@@ -3818,13 +3818,17 @@ function PlannerPage({ onClose, currentUser, isAdmin }) {
     const prompt = `Extract reservation details from this confirmation email for a travel itinerary. Return ONLY a valid JSON object with exactly these fields:
 {
   "type": "flight|hotel|restaurant|activity|transport",
-  "label": "property or venue name only (e.g. 'Farm Stay LLanes (Airbnb)') — no guest names, no pax count",
-  "address": "full address if present, otherwise empty string",
-  "checkIn": "YYYY-MM-DD format of check-in or arrival date, or empty string",
-  "checkOut": "YYYY-MM-DD format of check-out or departure date, or empty string",
-  "time": "check-in time if hotel (e.g. '5:00 PM (check-in)'), departure time if flight, reservation time if restaurant",
-  "confirmationNo": "confirmation or reservation number if present, otherwise empty string",
-  "bookingService": "booking platform used — detect from email sender/branding: Airbnb, Booking.com, Hotels.com, VRBO, Expedia, Direct, or Other",
+  "label": "for flights: airline name only (e.g. 'Air Canada'). For hotels: property name only. No guest names, no pax count.",
+  "address": "full address if present (hotels), otherwise empty string",
+  "checkIn": "YYYY-MM-DD of departure date if flight, check-in date if hotel, or empty string",
+  "checkOut": "YYYY-MM-DD of arrival date if flight, check-out date if hotel, or empty string",
+  "time": "for flights: departure time in readable format (e.g. '2:40 PM'). For hotels: check-in time. For restaurants: reservation time.",
+  "arrivalTime": "for flights: arrival time at final destination (e.g. '11:30 AM next day'). Empty string for non-flights.",
+  "flightRoute": "for flights: origin airport code → destination airport code (e.g. 'CLE → MAD'). Empty string for non-flights.",
+  "flightNumber": "for flights: flight number(s) (e.g. 'AC 785'). Empty string for non-flights.",
+  "layover": "for connecting flights: layover airport code and duration (e.g. 'via YUL — 2.5 hrs'). Empty string if direct or non-flight.",
+  "confirmationNo": "confirmation or booking reference number if present, otherwise empty string",
+  "bookingService": "for hotels: booking platform (Airbnb, Booking.com, Hotels.com, VRBO, Expedia, Direct, Other). For flights: airline name or booking site.",
   "note": "one short line of essential logistics only — no guest names, no marketing text"
 }
 Email: ${emailText.slice(0,3000)}`;
@@ -3842,6 +3846,10 @@ Email: ${emailText.slice(0,3000)}`;
         checkIn: parsed.checkIn || "",
         checkOut: parsed.checkOut || "",
         time: parsed.time || "",
+        arrivalTime: parsed.arrivalTime || "",
+        flightRoute: parsed.flightRoute || "",
+        flightNumber: parsed.flightNumber || "",
+        layover: parsed.layover || "",
         confirmationNo: parsed.confirmationNo || "",
         bookingService: parsed.bookingService || "",
         note: parsed.note || "",
@@ -3975,12 +3983,31 @@ Email: ${emailText.slice(0,3000)}`;
                           <div style={{ position:"absolute", left:"-19px", top:"14px", width:"12px", height:"12px", borderRadius:"50%", background:cfg.color, border:`2px solid ${C.white}`, flexShrink:0 }} />
                           <div style={{ fontSize:"18px", lineHeight:1 }}>{cfg.icon}</div>
                           <div style={{ flex:1 }}>
-                            {stop.time && <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, marginBottom:"2px" }}>{stop.time}</div>}
-                            <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>{stop.label}</div>
-                            {stop.address && <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"2px" }}>📍 {stop.address}</div>}
-                            {stop.bookingService && <div style={{ fontSize:"11px", color:C.amber, marginTop:"2px", fontWeight:600 }}>via {stop.bookingService}</div>}
-                            {stop.note && <div style={{ fontSize:"12px", color:C.slateLight, marginTop:"2px" }}>{stop.note}</div>}
-                            {stop.confirmationNo && <div style={{ fontSize:"11px", color:C.muted, marginTop:"4px" }}>Conf: {stop.confirmationNo}</div>}
+                            {stop.type === "flight" ? (
+                              <>
+                                <div style={{ fontSize:"13px", fontWeight:800, color:C.slate }}>
+                                  {stop.flightRoute || stop.label}
+                                  {stop.layover && <span style={{ fontSize:"12px", fontWeight:400, color:C.muted }}> ({stop.layover})</span>}
+                                </div>
+                                <div style={{ fontSize:"12px", color:C.slateLight, marginTop:"3px" }}>
+                                  {stop.label}{stop.flightNumber ? ` · ${stop.flightNumber}` : ""}
+                                </div>
+                                <div style={{ fontSize:"11px", color:C.muted, marginTop:"3px" }}>
+                                  {stop.time && `Departs ${stop.time}`}{stop.arrivalTime && ` · Arrives ${stop.arrivalTime}`}
+                                </div>
+                                {stop.confirmationNo && <div style={{ fontSize:"11px", color:C.amber, marginTop:"3px", fontWeight:600 }}>Conf: {stop.confirmationNo}</div>}
+                                {stop.note && <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"3px" }}>{stop.note}</div>}
+                              </>
+                            ) : (
+                              <>
+                                {stop.time && <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, marginBottom:"2px" }}>{stop.time}</div>}
+                                <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>{stop.label}</div>
+                                {stop.address && <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"2px" }}>📍 {stop.address}</div>}
+                                {stop.bookingService && <div style={{ fontSize:"11px", color:C.amber, marginTop:"2px", fontWeight:600 }}>via {stop.bookingService}</div>}
+                                {stop.note && <div style={{ fontSize:"12px", color:C.slateLight, marginTop:"2px" }}>{stop.note}</div>}
+                                {stop.confirmationNo && <div style={{ fontSize:"11px", color:C.muted, marginTop:"4px" }}>Conf: {stop.confirmationNo}</div>}
+                              </>
+                            )}
                           </div>
                           <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
                             <button onClick={() => setEditingStop({ dayIdx:activeDay, stopIdx:si, stop:{ ...stop } })} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"12px", padding:"2px" }}>✏️</button>
@@ -4033,9 +4060,17 @@ Email: ${emailText.slice(0,3000)}`;
                 <button key={key} onClick={() => setNewStop(p=>({...p, type:key}))} style={{ padding:"5px 10px", borderRadius:"20px", border:`1.5px solid ${newStop.type===key ? cfg.color : C.tide}`, background: newStop.type===key ? cfg.color+"22" : "transparent", color: newStop.type===key ? cfg.color : C.muted, fontSize:"11px", fontWeight:600, cursor:"pointer" }}>{cfg.icon} {cfg.label}</button>
               ))}
             </div>
-            {[["label","Name *"],["address","Address"],["time","Time (e.g. 5:00 PM check-in)"],["bookingService","Booking service (Airbnb, Direct, etc.)"],["confirmationNo","Confirmation #"],["note","Notes"]].map(([field, placeholder]) => (
-              <input key={field} value={newStop[field]||""} onChange={e=>setNewStop(p=>({...p,[field]:e.target.value}))} placeholder={placeholder} style={{ width:"100%", padding:"9px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"13px", marginBottom:"10px", boxSizing:"border-box", fontFamily:"inherit", outline:"none" }} />
-            ))}
+            {newStop.type === "flight" ? (
+              <>
+                {[["label","Airline (e.g. Air Canada)"],["flightRoute","Route (e.g. CLE → MAD)"],["flightNumber","Flight number (e.g. AC 785)"],["time","Departure time (e.g. 2:40 PM)"],["arrivalTime","Arrival time (e.g. 11:30 AM next day)"],["layover","Layover (e.g. via YUL — 2.5 hrs)"],["confirmationNo","Confirmation / booking code"],["note","Notes"]].map(([field, placeholder]) => (
+                  <input key={field} value={newStop[field]||""} onChange={e=>setNewStop(p=>({...p,[field]:e.target.value}))} placeholder={placeholder} style={{ width:"100%", padding:"9px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"13px", marginBottom:"10px", boxSizing:"border-box", fontFamily:"inherit", outline:"none" }} />
+                ))}
+              </>
+            ) : (
+              [["label","Name *"],["address","Address"],["time","Time (e.g. 5:00 PM check-in)"],["bookingService","Booking service (Airbnb, Direct, etc.)"],["confirmationNo","Confirmation #"],["note","Notes"]].map(([field, placeholder]) => (
+                <input key={field} value={newStop[field]||""} onChange={e=>setNewStop(p=>({...p,[field]:e.target.value}))} placeholder={placeholder} style={{ width:"100%", padding:"9px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"13px", marginBottom:"10px", boxSizing:"border-box", fontFamily:"inherit", outline:"none" }} />
+              ))
+            )}
             {newStop.type === "hotel" && (
               <div style={{ background:C.seafoam, borderRadius:"10px", padding:"12px", marginBottom:"10px" }}>
                 <div style={{ fontSize:"11px", fontWeight:700, color:C.amber, marginBottom:"8px", textTransform:"uppercase", letterSpacing:"0.08em" }}>🏨 Hotel Date Range — adds to all nights</div>
@@ -4052,7 +4087,7 @@ Email: ${emailText.slice(0,3000)}`;
               </div>
             )}
             <div style={{ display:"flex", gap:"10px", justifyContent:"flex-end" }}>
-              <button onClick={() => { setShowAddStop(false); setNewStop({ type:"restaurant", time:"", label:"", address:"", note:"", confirmationNo:"", checkIn:"", checkOut:"", bookingService:"" }); }} style={{ padding:"9px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:"transparent", color:C.muted, fontSize:"13px", cursor:"pointer" }}>Cancel</button>
+              <button onClick={() => { setShowAddStop(false); setNewStop({ type:"restaurant", time:"", label:"", address:"", note:"", confirmationNo:"", checkIn:"", checkOut:"", bookingService:"", arrivalTime:"", flightRoute:"", flightNumber:"", layover:"" }); }} style={{ padding:"9px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:"transparent", color:C.muted, fontSize:"13px", cursor:"pointer" }}>Cancel</button>
               <button onClick={addStop} style={{ padding:"9px 18px", borderRadius:"8px", border:"none", background:C.amber, color:"#fff", fontSize:"13px", fontWeight:700, cursor:"pointer" }}>Add Stop</button>
             </div>
           </div>
