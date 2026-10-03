@@ -3716,7 +3716,7 @@ function PlannerPage({ onClose, currentUser, isAdmin }) {
   const [aiLoading, setAiLoading]   = useState(false);
   const [emailText, setEmailText]   = useState("");
   const [parsingEmail, setParsingEmail] = useState(false);
-  const [newStop, setNewStop] = useState({ type:"restaurant", time:"", label:"", note:"", confirmationNo:"", checkIn:"", checkOut:"" });
+  const [newStop, setNewStop] = useState({ type:"restaurant", time:"", label:"", address:"", note:"", confirmationNo:"", checkIn:"", checkOut:"", bookingService:"" });
   const [editingStop, setEditingStop] = useState(null); // { dayIdx, stopIdx, stop }
 
   // Load saved trips
@@ -3789,7 +3789,7 @@ function PlannerPage({ onClose, currentUser, isAdmin }) {
     }
     setActiveTrip(updated);
     saveTrip(updated);
-    setNewStop({ type:"restaurant", time:"", label:"", note:"", confirmationNo:"", checkIn:"", checkOut:"" });
+    setNewStop({ type:"restaurant", time:"", label:"", address:"", note:"", confirmationNo:"", checkIn:"", checkOut:"", bookingService:"" });
     setShowAddStop(false);
   };
 
@@ -3815,7 +3815,19 @@ function PlannerPage({ onClose, currentUser, isAdmin }) {
   const parseEmail = async () => {
     if (!emailText.trim()) return;
     setParsingEmail(true);
-    const prompt = `Extract reservation details from this confirmation email. Return ONLY a JSON object with these fields: { "type": "flight|hotel|restaurant|activity|transport", "label": "venue or flight name", "time": "HH:MM or time description", "date": "YYYY-MM-DD if found", "note": "short summary of key details", "confirmationNo": "confirmation number if present" }. Email: ${emailText.slice(0,2000)}`;
+    const prompt = `Extract reservation details from this confirmation email for a travel itinerary. Return ONLY a valid JSON object with exactly these fields:
+{
+  "type": "flight|hotel|restaurant|activity|transport",
+  "label": "property or venue name only (e.g. 'Farm Stay LLanes (Airbnb)') — no guest names, no pax count",
+  "address": "full address if present, otherwise empty string",
+  "checkIn": "YYYY-MM-DD format of check-in or arrival date, or empty string",
+  "checkOut": "YYYY-MM-DD format of check-out or departure date, or empty string",
+  "time": "check-in time if hotel (e.g. '5:00 PM (check-in)'), departure time if flight, reservation time if restaurant",
+  "confirmationNo": "confirmation or reservation number if present, otherwise empty string",
+  "bookingService": "booking platform used — detect from email sender/branding: Airbnb, Booking.com, Hotels.com, VRBO, Expedia, Direct, or Other",
+  "note": "one short line of essential logistics only — no guest names, no marketing text"
+}
+Email: ${emailText.slice(0,3000)}`;
     try {
       const res = await fetch("/api/gemini", { method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ contents:[{ parts:[{ text: prompt }] }] }) });
@@ -3823,7 +3835,17 @@ function PlannerPage({ onClose, currentUser, isAdmin }) {
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
       const clean = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(clean);
-      setNewStop({ type: parsed.type || "other", time: parsed.time || "", label: parsed.label || "", note: parsed.note || "", confirmationNo: parsed.confirmationNo || "" });
+      setNewStop({
+        type: parsed.type || "hotel",
+        label: parsed.label || "",
+        address: parsed.address || "",
+        checkIn: parsed.checkIn || "",
+        checkOut: parsed.checkOut || "",
+        time: parsed.time || "",
+        confirmationNo: parsed.confirmationNo || "",
+        bookingService: parsed.bookingService || "",
+        note: parsed.note || "",
+      });
       setShowEmailParser(false);
       setShowAddStop(true);
       setEmailText("");
@@ -3955,8 +3977,10 @@ function PlannerPage({ onClose, currentUser, isAdmin }) {
                           <div style={{ flex:1 }}>
                             {stop.time && <div style={{ fontSize:"10px", fontWeight:700, color:C.muted, marginBottom:"2px" }}>{stop.time}</div>}
                             <div style={{ fontSize:"13px", fontWeight:700, color:C.slate }}>{stop.label}</div>
+                            {stop.address && <div style={{ fontSize:"11px", color:C.slateLight, marginTop:"2px" }}>📍 {stop.address}</div>}
+                            {stop.bookingService && <div style={{ fontSize:"11px", color:C.amber, marginTop:"2px", fontWeight:600 }}>via {stop.bookingService}</div>}
                             {stop.note && <div style={{ fontSize:"12px", color:C.slateLight, marginTop:"2px" }}>{stop.note}</div>}
-                            {stop.confirmationNo && <div style={{ fontSize:"11px", color:C.muted, marginTop:"4px" }}>Confirmation: {stop.confirmationNo}</div>}
+                            {stop.confirmationNo && <div style={{ fontSize:"11px", color:C.muted, marginTop:"4px" }}>Conf: {stop.confirmationNo}</div>}
                           </div>
                           <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
                             <button onClick={() => setEditingStop({ dayIdx:activeDay, stopIdx:si, stop:{ ...stop } })} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:"12px", padding:"2px" }}>✏️</button>
@@ -4009,8 +4033,8 @@ function PlannerPage({ onClose, currentUser, isAdmin }) {
                 <button key={key} onClick={() => setNewStop(p=>({...p, type:key}))} style={{ padding:"5px 10px", borderRadius:"20px", border:`1.5px solid ${newStop.type===key ? cfg.color : C.tide}`, background: newStop.type===key ? cfg.color+"22" : "transparent", color: newStop.type===key ? cfg.color : C.muted, fontSize:"11px", fontWeight:600, cursor:"pointer" }}>{cfg.icon} {cfg.label}</button>
               ))}
             </div>
-            {[["time","Time (e.g. 7:30 PM)"],["label","Name / Description *"],["note","Notes or details"],["confirmationNo","Confirmation #"]].map(([field, placeholder]) => (
-              <input key={field} value={newStop[field]} onChange={e=>setNewStop(p=>({...p,[field]:e.target.value}))} placeholder={placeholder} style={{ width:"100%", padding:"9px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"13px", marginBottom:"10px", boxSizing:"border-box", fontFamily:"inherit", outline:"none" }} />
+            {[["label","Name *"],["address","Address"],["time","Time (e.g. 5:00 PM check-in)"],["bookingService","Booking service (Airbnb, Direct, etc.)"],["confirmationNo","Confirmation #"],["note","Notes"]].map(([field, placeholder]) => (
+              <input key={field} value={newStop[field]||""} onChange={e=>setNewStop(p=>({...p,[field]:e.target.value}))} placeholder={placeholder} style={{ width:"100%", padding:"9px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"13px", marginBottom:"10px", boxSizing:"border-box", fontFamily:"inherit", outline:"none" }} />
             ))}
             {newStop.type === "hotel" && (
               <div style={{ background:C.seafoam, borderRadius:"10px", padding:"12px", marginBottom:"10px" }}>
@@ -4028,7 +4052,7 @@ function PlannerPage({ onClose, currentUser, isAdmin }) {
               </div>
             )}
             <div style={{ display:"flex", gap:"10px", justifyContent:"flex-end" }}>
-              <button onClick={() => { setShowAddStop(false); setNewStop({ type:"restaurant", time:"", label:"", note:"", confirmationNo:"", checkIn:"", checkOut:"" }); }} style={{ padding:"9px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:"transparent", color:C.muted, fontSize:"13px", cursor:"pointer" }}>Cancel</button>
+              <button onClick={() => { setShowAddStop(false); setNewStop({ type:"restaurant", time:"", label:"", address:"", note:"", confirmationNo:"", checkIn:"", checkOut:"", bookingService:"" }); }} style={{ padding:"9px 18px", borderRadius:"8px", border:`1px solid ${C.tide}`, background:"transparent", color:C.muted, fontSize:"13px", cursor:"pointer" }}>Cancel</button>
               <button onClick={addStop} style={{ padding:"9px 18px", borderRadius:"8px", border:"none", background:C.amber, color:"#fff", fontSize:"13px", fontWeight:700, cursor:"pointer" }}>Add Stop</button>
             </div>
           </div>
@@ -4045,7 +4069,7 @@ function PlannerPage({ onClose, currentUser, isAdmin }) {
                 <button key={key} onClick={() => setEditingStop(p=>({...p, stop:{...p.stop, type:key}}))} style={{ padding:"5px 10px", borderRadius:"20px", border:`1.5px solid ${editingStop.stop.type===key ? cfg.color : C.tide}`, background: editingStop.stop.type===key ? cfg.color+"22" : "transparent", color: editingStop.stop.type===key ? cfg.color : C.muted, fontSize:"11px", fontWeight:600, cursor:"pointer" }}>{cfg.icon} {cfg.label}</button>
               ))}
             </div>
-            {[["time","Time (e.g. 7:30 PM)"],["label","Name / Description *"],["note","Notes or details"],["confirmationNo","Confirmation #"]].map(([field, placeholder]) => (
+            {[["label","Name *"],["address","Address"],["time","Time"],["bookingService","Booking service (Airbnb, Direct, etc.)"],["confirmationNo","Confirmation #"],["note","Notes"]].map(([field, placeholder]) => (
               <input key={field} value={editingStop.stop[field]||""} onChange={e=>setEditingStop(p=>({...p, stop:{...p.stop, [field]:e.target.value}}))} placeholder={placeholder} style={{ width:"100%", padding:"9px 12px", borderRadius:"8px", border:`1px solid ${C.tide}`, fontSize:"13px", marginBottom:"10px", boxSizing:"border-box", fontFamily:"inherit", outline:"none" }} />
             ))}
             {editingStop.stop.type === "hotel" && (
