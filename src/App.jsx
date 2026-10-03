@@ -3961,11 +3961,20 @@ Email: ${emailText.slice(0,3000)}`;
           <div style={{ width:"180px", flexShrink:0 }}>
             <div style={{ fontSize:"11px", fontWeight:700, color:C.muted, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:"10px" }}>Days</div>
             {(activeTrip.days||[]).map((day, di) => (
-              <button key={di} onClick={() => { setActiveDay(di); getSuggestions(di); }} style={{ width:"100%", textAlign:"left", padding:"10px 12px", marginBottom:"6px", borderRadius:"10px", border:`1px solid ${activeDay===di ? C.amber : C.tide}`, background: activeDay===di ? C.amberBg : C.white, cursor:"pointer", fontSize:"12px", fontFamily:"inherit" }}>
-                <div style={{ fontWeight:700, color:C.slate }}>Day {di+1}</div>
-                <div style={{ color:C.muted, fontSize:"11px" }}>{day.date}</div>
-                <div style={{ color:C.slateLight, fontSize:"10px", marginTop:"2px" }}>{(day.items||[]).length} stops</div>
-              </button>
+              {(() => {
+                const d = new Date(day.date + "T12:00:00");
+                const dow = d.toLocaleDateString("en-US", { weekday:"short" });
+                const dom = d.getDate();
+                return (
+                  <button key={di} onClick={() => { setActiveDay(di); getSuggestions(di); }} style={{ width:"100%", textAlign:"left", padding:"10px 12px", marginBottom:"6px", borderRadius:"10px", border:`1px solid ${activeDay===di ? C.amber : C.tide}`, background: activeDay===di ? C.amberBg : C.white, cursor:"pointer", fontSize:"12px", fontFamily:"inherit" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline" }}>
+                      <span style={{ fontWeight:700, color:C.slate }}>Day {di+1}</span>
+                      <span style={{ fontSize:"11px", fontWeight:600, color:C.amber }}>{dow} {dom}</span>
+                    </div>
+                    <div style={{ color:C.muted, fontSize:"11px", marginTop:"2px" }}>{(day.items||[]).length} stops</div>
+                  </button>
+                );
+              })()}
             ))}
           </div>
 
